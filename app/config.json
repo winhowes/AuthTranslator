@@ -1,0 +1,17 @@
+{
+	"auth_plugins": {
+		"example.com": {
+			"type": "basic",
+			"owner": "admin@example.com"
+		}
+	},
+	"routes": {
+		"example.com": {
+			"target": "http://backend.example.com",
+			"rate_limit": {
+				"per_caller": 100,
+				"per_host": 1000
+			}
+		}
+	}
+}
