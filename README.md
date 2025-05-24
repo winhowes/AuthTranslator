@@ -55,6 +55,14 @@ AuthTransformer is a simple Go-based reverse proxy that injects authentication t
 
    When started, the server listens on port `8080`. Incoming requests are matched against the host header to determine the route and associated authentication plugin.
 
+## Running Tests
+
+Use the Go toolchain to run the unit tests from the repository root:
+
+```bash
+GO111MODULE=off go test ./...
+```
+
 ## License
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
