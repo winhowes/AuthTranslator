@@ -125,10 +125,15 @@ func main() {
 		log.Fatal(err)
 	}
 
+	// Include timestamps in log output
+	log.SetFlags(log.LstdFlags)
+
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		host := r.Host
+		log.Printf("Incoming %s request for %s%s from %s", r.Method, host, r.URL.Path, r.RemoteAddr)
 		route, exists := config.Routes[host]
 		if !exists {
+			log.Printf("No route configured for host %s", host)
 			http.Error(w, "Not Found", http.StatusNotFound)
 			return
 		}
@@ -138,6 +143,7 @@ func main() {
 		if exists {
 			auth := getAuthenticator(authPlugin.Type)
 			if !auth.Authenticate(r) {
+				log.Printf("Authentication failed for host %s from %s", host, r.RemoteAddr)
 				http.Error(w, "Unauthorized", http.StatusUnauthorized)
 				return
 			}
@@ -149,7 +155,13 @@ func main() {
 		rlCaller := NewRateLimiter(route.RateLimit.PerCaller, time.Minute)
 		rlHost := NewRateLimiter(route.RateLimit.PerHost, time.Minute)
 
-		if !rlCaller.Allow(caller) || !rlHost.Allow(host) {
+		if !rlCaller.Allow(caller) {
+			log.Printf("Caller %s exceeded rate limit on host %s", caller, host)
+			http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
+			return
+		}
+		if !rlHost.Allow(host) {
+			log.Printf("Host %s exceeded rate limit", host)
 			http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
 			return
 		}
