@@ -159,6 +159,18 @@ func main() {
 			os.Exit(1)
 		}
 		integ := plugins.Stripe(*name, *token)
+		sendIntegration(integ)
+	case "monday":
+		fs := flag.NewFlagSet("monday", flag.ExitOnError)
+		name := fs.String("name", "monday", "integration name")
+		token := fs.String("token", "", "secret reference for API token")
+		fs.Parse(args)
+		if *token == "" {
+			fmt.Fprintln(os.Stderr, "-token is required")
+			os.Exit(1)
+		}
+		integ := plugins.Monday(*name, *token)
+		sendIntegration(integ)
 	case "okta":
 		fs := flag.NewFlagSet("okta", flag.ExitOnError)
 		name := fs.String("name", "okta", "integration name")

@@ -283,6 +283,10 @@ Add Linear:
 ```bash
 go run ./cmd/integrations linear -token env:LINEAR_TOKEN
 ```
+Add Monday:
+```bash
+go run ./cmd/integrations monday -token env:MONDAY_TOKEN
+```
 Add Asana:
 ```bash
 go run ./cmd/integrations asana -token env:ASANA_TOKEN
