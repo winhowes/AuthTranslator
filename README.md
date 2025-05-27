@@ -67,7 +67,13 @@ AuthTransformer writes log messages to standard output. Each request generates a
 
 ## Deploying with Terraform
 
-Example Terraform files are provided in the `terraform` directory to simplify deploying AuthTransformer to AWS using ECS Fargate. Set the required variables for your environment and run `terraform apply` to create the cluster and service.
+Example Terraform files are provided in the `terraform` directory for AWS, GCP and Azure.
+
+- `terraform` (root) contains the AWS configuration for ECS Fargate.
+- `terraform/gcp` contains a configuration for deploying to Google Cloud Run.
+- `terraform/azure` contains a configuration for deploying to Azure Container Instances.
+
+Set the required variables for your environment and run `terraform apply` inside the desired folder to create the service.
 
 ## License
 

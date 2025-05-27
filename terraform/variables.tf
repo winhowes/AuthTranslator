@@ -23,12 +23,3 @@ variable "security_group_id" {
   type        = string
 }
 
-variable "in_token" {
-  description = "Token value for incoming auth"
-  type        = string
-}
-
-variable "out_token" {
-  description = "Token value for outgoing auth"
-  type        = string
-}
