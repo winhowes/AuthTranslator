@@ -71,13 +71,13 @@ func addEntry(args []string) {
 	// load file
 	data, err := os.ReadFile(*file)
 	if err != nil && !os.IsNotExist(err) {
-		fmt.Println(err)
+		fmt.Fprintln(os.Stderr, err)
 		return
 	}
 	var entries []plugins.AllowlistEntry
 	if len(data) > 0 {
 		if err := json.Unmarshal(data, &entries); err != nil {
-			fmt.Println(err)
+			fmt.Fprintln(os.Stderr, err)
 			return
 		}
 	}
