@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"net/http/httputil"
 	"net/url"
 	"reflect"
 	"regexp"
@@ -131,7 +132,8 @@ type Integration struct {
 	inLimiter  *RateLimiter
 	outLimiter *RateLimiter
 
-	destinationURL *url.URL `json:"-"`
+	destinationURL *url.URL               `json:"-"`
+	proxy          *httputil.ReverseProxy `json:"-"`
 }
 
 var integrations = struct {
@@ -153,6 +155,7 @@ func AddIntegration(i *Integration) error {
 		return fmt.Errorf("invalid destination URL: %w", err)
 	}
 	i.destinationURL = u
+	i.proxy = httputil.NewSingleHostReverseProxy(u)
 
 	// ─── Validate incoming-auth configs ───────────────────────────────────────
 	for idx, a := range i.IncomingAuth {
