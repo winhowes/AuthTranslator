@@ -168,11 +168,25 @@ func matchValue(data, rule interface{}) bool {
 // method if one exists.
 func findConstraint(i *Integration, callerID, pth, method string) (RequestConstraint, bool) {
 	callers := GetAllowlist(i.Name)
-	for _, c := range callers {
+	var wildcard *CallerConfig
+	for idx := range callers {
+		c := &callers[idx]
+		if c.ID == "*" {
+			wildcard = c
+		}
 		if c.ID != callerID {
 			continue
 		}
 		for _, r := range c.Rules {
+			if matchPath(r.Path, pth) {
+				if m, ok := r.Methods[method]; ok {
+					return m, true
+				}
+			}
+		}
+	}
+	if wildcard != nil {
+		for _, r := range wildcard.Rules {
 			if matchPath(r.Path, pth) {
 				if m, ok := r.Methods[method]; ok {
 					return m, true
