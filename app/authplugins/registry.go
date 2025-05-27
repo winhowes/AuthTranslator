@@ -14,6 +14,12 @@ type IncomingAuthPlugin interface {
 	OptionalParams() []string
 }
 
+// Identifier is implemented by incoming auth plugins that can derive a caller
+// identifier from the request. The identifier is used by allowlist checks.
+type Identifier interface {
+	Identify(r *http.Request, params interface{}) (string, bool)
+}
+
 // OutgoingAuthPlugin applies authentication to outbound requests.
 // OutgoingAuthPlugin applies authentication to outbound requests.
 type OutgoingAuthPlugin interface {

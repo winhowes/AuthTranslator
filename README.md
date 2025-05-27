@@ -7,6 +7,7 @@ AuthTransformer is a simple Go-based reverse proxy that injects authentication t
 - **Reverse Proxy**: Forwards incoming HTTP requests to a target backend based on the requested host or `X-AT-Int` header. The header can be disabled or restricted to a specific host using command-line flags.
 - **Pluggable Authentication**: Supports "basic", "token" and Google OIDC authentication types with room for extension.=======
 - **Rate Limiting**: Limits the number of requests per caller and per host within a rolling window.
+- **Allowlist**: Integrations can restrict specific callers to particular paths, methods and required parameters.
 - **Configuration Driven**: Behavior is controlled via a JSON configuration file.
 - **Clean Shutdown**: On SIGINT or SIGTERM the server and rate limiters are gracefully stopped.
 
@@ -45,13 +46,21 @@ AuthTransformer is a simple Go-based reverse proxy that injects authentication t
               "incoming_auth": [
                   {"type": "token", "params": {"secrets": ["env:IN_TOKEN"], "header": "X-Auth"}}
               ],
-              "outgoing_auth": [
-                  {"type": "token", "params": {"secrets": ["env:OUT_TOKEN"], "header": "X-Auth"}}
-              ]
-           }
-       ]
-   }
-   ```
+                "outgoing_auth": [
+                    {"type": "token", "params": {"secrets": ["env:OUT_TOKEN"], "header": "X-Auth"}}
+                ],
+                "allowlist": [
+                    {
+                        "id": "user-token",
+                        "rules": [
+                            {"path": "/allowed", "methods": {"GET": {}}}
+                        ]
+                    }
+                ]
+            }
+        ]
+    }
+    ```
 
 
    - **integrations**: Defines proxy routes, rate limits and authentication methods. Secret references use the `env:` or KMS-prefixed formats described below.
