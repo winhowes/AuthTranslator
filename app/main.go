@@ -24,14 +24,21 @@ type Config struct {
 var debug = flag.Bool("debug", false, "enable debug mode")
 
 func loadConfig(filename string) (*Config, error) {
-	data, err := os.ReadFile(filename)
+	f, err := os.Open(filename)
 	if err != nil {
 		return nil, err
 	}
+	defer f.Close()
+
+	dec := json.NewDecoder(f)
+	dec.DisallowUnknownFields()
 
 	var config Config
-	err = json.Unmarshal(data, &config)
-	return &config, err
+	if err := dec.Decode(&config); err != nil {
+		return nil, err
+	}
+
+	return &config, nil
 }
 
 type RateLimiter struct {
