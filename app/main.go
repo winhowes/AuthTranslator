@@ -110,7 +110,10 @@ func integrationsHandler(w http.ResponseWriter, r *http.Request) {
 
 // proxyHandler handles incoming requests and proxies them according to the integration.
 func proxyHandler(w http.ResponseWriter, r *http.Request) {
-	host := r.Host
+	host := r.Header.Get("X-AT-Int")
+	if host == "" {
+		host = r.Host
+	}
 	log.Printf("Incoming %s request for %s%s from %s", r.Method, host, r.URL.Path, r.RemoteAddr)
 	integ, ok := GetIntegration(host)
 	if !ok {
