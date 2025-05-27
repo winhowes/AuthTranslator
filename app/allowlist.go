@@ -181,7 +181,6 @@ func findConstraint(i *Integration, callerID, pth, method string) (RequestConstr
 	callers := allowlists.m[i.Name]
 	wildcard, hasWildcard := callers["*"]
 	c, ok := callers[callerID]
-	wildcard, wOK := callers["*"]
 	allowlists.RUnlock()
 
 	if ok {
