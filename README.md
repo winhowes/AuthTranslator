@@ -1,3 +1,5 @@
+[![Go Report Card](https://goreportcard.com/badge/github.com/winhowes/AuthTranslator)](https://goreportcard.com/report/github.com/winhowes/AuthTranslator)
+
 # AuthTranslator
 
 AuthTranslator is a simple Go-based reverse proxy that injects authentication tokens and enforces per-host and per-caller rate limits. It is configured through a JSON file and demonstrates a plug-in style architecture for authentication methods.
