@@ -1,12 +1,10 @@
 package incoming
 
 import (
-	"bytes"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"io"
 	"net/http"
 
 	"github.com/winhowes/AuthTranslator/app/authplugins"
@@ -50,11 +48,10 @@ func (g *GitHubSignatureAuth) Authenticate(r *http.Request, p interface{}) bool 
 	if !ok {
 		return false
 	}
-	body, err := io.ReadAll(r.Body)
+	body, err := authplugins.GetBody(r)
 	if err != nil {
 		return false
 	}
-	r.Body = io.NopCloser(bytes.NewReader(body))
 	sig := r.Header.Get(cfg.Header)
 	if sig == "" {
 		return false

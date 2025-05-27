@@ -1,37 +1,44 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
-	"io"
 	"net/http"
 	"net/url"
 	"path"
 	"strings"
 	"sync"
 
+	"github.com/winhowes/AuthTranslator/app/authplugins"
 	integrationplugins "github.com/winhowes/AuthTranslator/app/integrationplugins"
 )
 
 var allowlists = struct {
 	sync.RWMutex
-	m map[string][]CallerConfig
-}{m: make(map[string][]CallerConfig)}
+	m map[string]map[string]CallerConfig
+}{m: make(map[string]map[string]CallerConfig)}
 
 // SetAllowlist registers the caller allowlist for an integration.
 func SetAllowlist(name string, callers []CallerConfig) {
 	callers = integrationplugins.ExpandCapabilities(name, callers)
+	m := make(map[string]CallerConfig, len(callers))
+	for _, c := range callers {
+		m[c.ID] = c
+	}
 	allowlists.Lock()
-	allowlists.m[name] = callers
+	allowlists.m[name] = m
 	allowlists.Unlock()
 }
 
 // GetAllowlist retrieves the allowlist for an integration.
 func GetAllowlist(name string) []CallerConfig {
 	allowlists.RLock()
-	callers := allowlists.m[name]
+	m := allowlists.m[name]
 	allowlists.RUnlock()
-	return callers
+	res := make([]CallerConfig, 0, len(m))
+	for _, c := range m {
+		res = append(res, c)
+	}
+	return res
 }
 
 // matchPath checks whether the request path matches the pattern. '*' matches a
@@ -68,11 +75,10 @@ func validateRequest(r *http.Request, c RequestConstraint) bool {
 	if len(c.Body) == 0 {
 		return true
 	}
-	bodyBytes, err := io.ReadAll(r.Body)
+	bodyBytes, err := authplugins.GetBody(r)
 	if err != nil {
 		return false
 	}
-	r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
 	ct := r.Header.Get("Content-Type")
 	if strings.Contains(ct, "application/json") {
 		var data map[string]interface{}
@@ -167,16 +173,17 @@ func matchValue(data, rule interface{}) bool {
 // findConstraint returns the RequestConstraint for the given caller, path and
 // method if one exists.
 func findConstraint(i *Integration, callerID, pth, method string) (RequestConstraint, bool) {
-	callers := GetAllowlist(i.Name)
-	for _, c := range callers {
-		if c.ID != callerID {
-			continue
-		}
-		for _, r := range c.Rules {
-			if matchPath(r.Path, pth) {
-				if m, ok := r.Methods[method]; ok {
-					return m, true
-				}
+	allowlists.RLock()
+	callers := allowlists.m[i.Name]
+	c, ok := callers[callerID]
+	allowlists.RUnlock()
+	if !ok {
+		return RequestConstraint{}, false
+	}
+	for _, r := range c.Rules {
+		if matchPath(r.Path, pth) {
+			if m, ok := r.Methods[method]; ok {
+				return m, true
 			}
 		}
 	}

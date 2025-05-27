@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
+	"sync"
 )
 
 // Plugin fetches a secret value for a given identifier.
@@ -14,6 +15,10 @@ type Plugin interface {
 }
 
 var registry = make(map[string]Plugin)
+var secretCache = struct {
+	sync.RWMutex
+	m map[string]string
+}{m: make(map[string]string)}
 
 // Register adds a secret plugin for a prefix.
 func Register(p Plugin) { registry[p.Prefix()] = p }
@@ -33,6 +38,13 @@ func ValidateSecret(ref string) error {
 
 // LoadSecret resolves a secret reference using the registered plugins.
 func LoadSecret(ref string) (string, error) {
+	secretCache.RLock()
+	if val, ok := secretCache.m[ref]; ok {
+		secretCache.RUnlock()
+		return val, nil
+	}
+	secretCache.RUnlock()
+
 	parts := strings.SplitN(ref, ":", 2)
 	if len(parts) != 2 {
 		return "", fmt.Errorf("invalid secret reference: %s", ref)
@@ -42,7 +54,14 @@ func LoadSecret(ref string) (string, error) {
 	if !ok {
 		return "", fmt.Errorf("unknown secret source: %s", prefix)
 	}
-	return p.Load(id)
+	val, err := p.Load(id)
+	if err != nil {
+		return "", err
+	}
+	secretCache.Lock()
+	secretCache.m[ref] = val
+	secretCache.Unlock()
+	return val, nil
 }
 
 // LoadRandomSecret selects one of the provided secret references at random and
