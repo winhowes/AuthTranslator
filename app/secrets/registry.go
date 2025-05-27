@@ -2,7 +2,6 @@ package secrets
 
 import (
 	"fmt"
-	"os"
 	"strings"
 )
 
@@ -42,21 +41,4 @@ func LoadSecret(ref string) (string, error) {
 		return "", fmt.Errorf("unknown secret source: %s", prefix)
 	}
 	return p.Load(id)
-}
-
-type envPlugin struct{}
-
-func (envPlugin) Prefix() string                 { return "env" }
-func (envPlugin) Load(id string) (string, error) { return os.Getenv(id), nil }
-
-type kmsPlugin struct{ prefix string }
-
-func (k kmsPlugin) Prefix() string                 { return k.prefix }
-func (k kmsPlugin) Load(id string) (string, error) { return "kms-" + id, nil }
-
-func init() {
-	Register(envPlugin{})
-	for _, p := range []string{"gcp", "aws", "oracle", "azure"} {
-		Register(kmsPlugin{prefix: p})
-	}
 }
