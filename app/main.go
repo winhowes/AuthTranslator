@@ -7,7 +7,6 @@ import (
 	"log"
 	"net/http"
 	"net/http/httputil"
-	"net/url"
 	"os"
 	"os/signal"
 	"strings"
@@ -186,13 +185,12 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	target, err := url.Parse(integ.Destination)
-	if err != nil {
+	if integ.destinationURL == nil {
 		http.Error(w, "Bad Gateway", http.StatusBadGateway)
 		return
 	}
 
-	proxy := httputil.NewSingleHostReverseProxy(target)
+	proxy := httputil.NewSingleHostReverseProxy(integ.destinationURL)
 	proxy.ServeHTTP(w, r)
 }
 

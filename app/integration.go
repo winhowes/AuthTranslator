@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"reflect"
 	"regexp"
 	"strings"
@@ -142,6 +143,8 @@ type Integration struct {
 
 	inLimiter  *RateLimiter
 	outLimiter *RateLimiter
+
+	destinationURL *url.URL `json:"-"`
 }
 
 var integrations = struct {
@@ -156,6 +159,13 @@ func AddIntegration(i *Integration) error {
 	if !nameRegexp.MatchString(i.Name) {
 		return errors.New("invalid integration name")
 	}
+
+	// Parse the destination URL once upfront.
+	u, err := url.Parse(i.Destination)
+	if err != nil {
+		return fmt.Errorf("invalid destination URL: %w", err)
+	}
+	i.destinationURL = u
 
 	// ─── Validate incoming-auth configs ───────────────────────────────────────
 	for idx, a := range i.IncomingAuth {
