@@ -35,6 +35,10 @@ func TestBasicIncomingAuth(t *testing.T) {
 	if !p.Authenticate(r, cfg) {
 		t.Fatal("expected authentication to succeed")
 	}
+
+	if id, ok := p.Identify(r, cfg); !ok || id != "user" {
+		t.Fatalf("unexpected identifier %s", id)
+	}
 }
 
 func TestBasicIncomingAuthFail(t *testing.T) {

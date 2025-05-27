@@ -171,7 +171,7 @@ array.
    - **jwt**: Validates generic JWTs using provided keys and can attach tokens on outgoing requests.
    - **mtls**: Requires a verified client certificate and optional subject match, and accepts outbound certificate configuration.
    - **token**: Header token comparison for simple shared secrets.
-   - **basic**: Performs HTTP Basic authentication using credentials loaded from configured secrets. The username portion is used as the caller ID.
+  - **basic**: Performs HTTP Basic authentication using credentials loaded from configured secrets. The username becomes the caller ID for allowlist checks.
    - **hmac_signature**: Computes or verifies request HMAC digests with a configurable algorithm.
    - **github_signature**: Validates GitHub webhook signatures against shared secrets.
    - **slack_signature**: Validates Slack request signatures with timestamp tolerance.

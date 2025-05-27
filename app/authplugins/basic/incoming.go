@@ -68,6 +68,7 @@ func (b *BasicAuth) Authenticate(r *http.Request, p interface{}) bool {
 	return false
 }
 
+// Identify returns the username from the Basic auth header when present.
 func (b *BasicAuth) Identify(r *http.Request, p interface{}) (string, bool) {
 	cfg, ok := p.(*inParams)
 	if !ok {
