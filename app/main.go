@@ -6,7 +6,6 @@ import (
 	"flag"
 	"log"
 	"net/http"
-	"net/http/httputil"
 	"os"
 	"os/signal"
 	"strings"
@@ -219,13 +218,12 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if integ.destinationURL == nil {
+	if integ.proxy == nil {
 		http.Error(w, "Bad Gateway", http.StatusBadGateway)
 		return
 	}
 
-	proxy := httputil.NewSingleHostReverseProxy(integ.destinationURL)
-	proxy.ServeHTTP(w, r)
+	integ.proxy.ServeHTTP(w, r)
 }
 
 func main() {
