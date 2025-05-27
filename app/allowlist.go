@@ -176,6 +176,9 @@ func findConstraint(i *Integration, callerID, pth, method string) (RequestConstr
 	allowlists.RLock()
 	callers := allowlists.m[i.Name]
 	c, ok := callers[callerID]
+	if !ok {
+		c, ok = callers["*"]
+	}
 	allowlists.RUnlock()
 	if !ok {
 		return RequestConstraint{}, false
@@ -184,15 +187,6 @@ func findConstraint(i *Integration, callerID, pth, method string) (RequestConstr
 		if matchPath(r.Path, pth) {
 			if m, ok := r.Methods[method]; ok {
 				return m, true
-			}
-		}
-	}
-	if wildcard != nil {
-		for _, r := range wildcard.Rules {
-			if matchPath(r.Path, pth) {
-				if m, ok := r.Methods[method]; ok {
-					return m, true
-				}
 			}
 		}
 	}
