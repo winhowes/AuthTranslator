@@ -22,3 +22,21 @@ func TestAddrFlagSet(t *testing.T) {
 		t.Fatalf("expected addr 127.0.0.1:9000, got %s", *addr)
 	}
 }
+
+func TestConfigFlagDefault(t *testing.T) {
+	if *configFile != "config.json" {
+		t.Fatalf("expected default config.json, got %s", *configFile)
+	}
+}
+
+func TestConfigFlagSet(t *testing.T) {
+	old := *configFile
+	t.Cleanup(func() { flag.Set("config", old) })
+
+	if err := flag.Set("config", "custom.json"); err != nil {
+		t.Fatal(err)
+	}
+	if *configFile != "custom.json" {
+		t.Fatalf("expected config custom.json, got %s", *configFile)
+	}
+}

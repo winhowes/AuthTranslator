@@ -55,6 +55,7 @@ var disableXATInt = flag.Bool("disable_x_at_int", false, "ignore X-AT-Int header
 var xAtIntHost = flag.String("x_at_int_host", "", "only respect X-AT-Int header when request Host matches this value")
 var addr = flag.String("addr", ":8080", "listen address")
 var allowlistFile = flag.String("allowlist", "allowlist.json", "path to allowlist configuration")
+var configFile = flag.String("config", "config.json", "path to configuration file")
 
 func loadConfig(filename string) (*Config, error) {
 	f, err := os.Open(filename)
@@ -225,7 +226,7 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 func main() {
 	flag.Parse()
 
-	config, err := loadConfig("config.json")
+	config, err := loadConfig(*configFile)
 	if err != nil {
 		log.Fatal(err)
 	}
