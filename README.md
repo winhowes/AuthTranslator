@@ -4,7 +4,7 @@ AuthTransformer is a simple Go-based reverse proxy that injects authentication t
 
 ## Features
 
-- **Reverse Proxy**: Forwards incoming HTTP requests to a target backend based on the requested host or `X-AT-Int` header.
+- **Reverse Proxy**: Forwards incoming HTTP requests to a target backend based on the requested host or `X-AT-Int` header. The header can be disabled or restricted to a specific host using command-line flags.
 - **Pluggable Authentication**: Supports "basic", "token" and Google OIDC authentication types with room for extension.=======
 - **Rate Limiting**: Limits the number of requests per caller and per host within a rolling window.
 - **Configuration Driven**: Behavior is controlled via a JSON configuration file.
@@ -52,7 +52,7 @@ AuthTransformer is a simple Go-based reverse proxy that injects authentication t
 
 3. **Running**
 
-   When started, the server listens on port `8080`. Incoming requests are matched against the `X-AT-Int` header, if present, or otherwise the host header to determine the route and associated authentication plugin.
+   When started, the server listens on port `8080`. Incoming requests are matched against the `X-AT-Int` header, if present, or otherwise the host header to determine the route and associated authentication plugin. Use `-disable_x_at_int` to ignore the header entirely or `-x_at_int_host` to only respect the header when a specific host is requested.
 
 4. **Run Locally**
 
