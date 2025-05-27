@@ -85,8 +85,9 @@ The project exists to make it trivial to translate one type of authentication in
   Caller IDs are derived by the incoming auth plugins. Plugins that
   implement the `Identifier` interface return a string used to match the
   `id` field in the allowlist. `jwt` and `google_oidc` return the token's
-  `sub` claim while `mtls` uses the client certificate's common name. The
-  `token` plugin, for example, does not supply an ID. Allowlist entries are grouped first
+  `sub` claim while `mtls` uses the client certificate's common name and
+  `basic` returns the username portion of the credentials. Plugins like the
+  `token` plugin do not supply an ID. Allowlist entries are grouped first
   by integration name and then by caller ID. When no ID is available the
   wildcard `"*"` entry is used so all callers share those rules.
 
@@ -170,7 +171,7 @@ array.
    - **jwt**: Validates generic JWTs using provided keys and can attach tokens on outgoing requests.
    - **mtls**: Requires a verified client certificate and optional subject match, and accepts outbound certificate configuration.
    - **token**: Header token comparison for simple shared secrets.
-   - **basic**: Performs HTTP Basic authentication using credentials loaded from configured secrets.
+   - **basic**: Performs HTTP Basic authentication using credentials loaded from configured secrets. The username portion is used as the caller ID.
    - **hmac_signature**: Computes or verifies request HMAC digests with a configurable algorithm.
    - **github_signature**: Validates GitHub webhook signatures against shared secrets.
    - **slack_signature**: Validates Slack request signatures with timestamp tolerance.

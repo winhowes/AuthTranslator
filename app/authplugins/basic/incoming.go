@@ -68,4 +68,25 @@ func (b *BasicAuth) Authenticate(r *http.Request, p interface{}) bool {
 	return false
 }
 
+func (b *BasicAuth) Identify(r *http.Request, p interface{}) (string, bool) {
+	cfg, ok := p.(*inParams)
+	if !ok {
+		return "", false
+	}
+	header := r.Header.Get(cfg.Header)
+	if !strings.HasPrefix(header, cfg.Prefix) {
+		return "", false
+	}
+	enc := strings.TrimPrefix(header, cfg.Prefix)
+	dec, err := base64.StdEncoding.DecodeString(enc)
+	if err != nil {
+		return "", false
+	}
+	parts := strings.SplitN(string(dec), ":", 2)
+	if len(parts) != 2 || parts[0] == "" {
+		return "", false
+	}
+	return parts[0], true
+}
+
 func init() { authplugins.RegisterIncoming(&BasicAuth{}) }
