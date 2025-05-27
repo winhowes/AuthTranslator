@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"time"
 )
 
 // azureKMSPlugin retrieves secrets from Azure Key Vault. It uses the
@@ -18,6 +19,8 @@ import (
 // identifier should be the full URL of the secret without any
 // query parameters (e.g. "https://myvault.vault.azure.net/secrets/foo").
 type azureKMSPlugin struct{}
+
+var HTTPClient = &http.Client{Timeout: 5 * time.Second}
 
 // Prefix returns the identifier prefix used in configuration strings.
 func (azureKMSPlugin) Prefix() string { return "azure" }
@@ -43,7 +46,7 @@ func (azureKMSPlugin) Load(id string) (string, error) {
 		return "", err
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := HTTPClient.Do(req)
 	if err != nil {
 		return "", err
 	}
@@ -75,7 +78,7 @@ func getAzureToken(tenant, client, secret string) (string, error) {
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := HTTPClient.Do(req)
 	if err != nil {
 		return "", err
 	}

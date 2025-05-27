@@ -1,7 +1,6 @@
 package hmacsig
 
 import (
-	"bytes"
 	"crypto/hmac"
 	"crypto/sha1"
 	"crypto/sha256"
@@ -9,7 +8,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"hash"
-	"io"
 	"net/http"
 
 	"github.com/winhowes/AuthTranslator/app/authplugins"
@@ -73,11 +71,10 @@ func (h *HMACSignature) AddAuth(r *http.Request, params interface{}) {
 	if err != nil {
 		return
 	}
-	body, err := io.ReadAll(r.Body)
+	body, err := authplugins.GetBody(r)
 	if err != nil {
 		return
 	}
-	r.Body = io.NopCloser(bytes.NewReader(body))
 	secret, err := secrets.LoadRandomSecret(cfg.Secrets)
 	if err != nil {
 		return

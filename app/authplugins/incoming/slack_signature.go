@@ -1,12 +1,10 @@
 package incoming
 
 import (
-	"bytes"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"io"
 	"net/http"
 	"strconv"
 	"time"
@@ -70,11 +68,10 @@ func (s *SlackSignatureAuth) Authenticate(r *http.Request, p interface{}) bool {
 	if abs(time.Now().Unix()-ts) > cfg.Tolerance {
 		return false
 	}
-	body, err := io.ReadAll(r.Body)
+	body, err := authplugins.GetBody(r)
 	if err != nil {
 		return false
 	}
-	r.Body = io.NopCloser(bytes.NewReader(body))
 	base := fmt.Sprintf("%s:%s:%s", cfg.Version, tsStr, string(body))
 	sig := r.Header.Get(cfg.SigHeader)
 	if sig == "" {

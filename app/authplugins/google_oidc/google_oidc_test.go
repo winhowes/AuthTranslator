@@ -1,7 +1,12 @@
 package googleoidc
 
 import (
+	"crypto"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -68,15 +73,46 @@ func TestGoogleOIDCDefaults(t *testing.T) {
 	}
 }
 
-func makeToken(aud, sub string, exp int64) string {
-	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"none"}`))
-	payload := fmt.Sprintf(`{"aud":"%s","sub":"%s","exp":%d}`, aud, sub, exp)
-	body := base64.RawURLEncoding.EncodeToString([]byte(payload))
-	return header + "." + body + "."
+func makeToken(aud, sub string, exp int64, key *rsa.PrivateKey, kid string) string {
+	headerBytes, _ := json.Marshal(map[string]string{"alg": "RS256", "kid": kid})
+	header := base64.RawURLEncoding.EncodeToString(headerBytes)
+	payloadBytes, _ := json.Marshal(map[string]interface{}{"aud": aud, "sub": sub, "exp": exp})
+	payload := base64.RawURLEncoding.EncodeToString(payloadBytes)
+	signingInput := header + "." + payload
+	h := sha256.Sum256([]byte(signingInput))
+	sig, _ := rsa.SignPKCS1v15(rand.Reader, key, crypto.SHA256, h[:])
+	return signingInput + "." + base64.RawURLEncoding.EncodeToString(sig)
+}
+
+func jwksForKey(pub *rsa.PublicKey, kid string) string {
+	n := base64.RawURLEncoding.EncodeToString(pub.N.Bytes())
+	eBytes := make([]byte, 0)
+	e := pub.E
+	for e > 0 {
+		eBytes = append([]byte{byte(e % 256)}, eBytes...)
+		e /= 256
+	}
+	eStr := base64.RawURLEncoding.EncodeToString(eBytes)
+	return fmt.Sprintf(`{"keys":[{"kty":"RSA","kid":"%s","alg":"RS256","n":"%s","e":"%s"}]}`, kid, n, eStr)
 }
 
 func TestGoogleOIDCIncomingAuth(t *testing.T) {
-	tok := makeToken("aud1", "user1", time.Now().Add(time.Hour).Unix())
+	key, _ := rsa.GenerateKey(rand.Reader, 1024)
+	kid := "k1"
+	jwks := jwksForKey(&key.PublicKey, kid)
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, jwks)
+	}))
+	defer ts.Close()
+
+	oldURL := CertsURL
+	CertsURL = ts.URL
+	defer func() { CertsURL = oldURL }()
+	oldClient := HTTPClient
+	HTTPClient = ts.Client()
+	defer func() { HTTPClient = oldClient }()
+
+	tok := makeToken("aud1", "user1", time.Now().Add(time.Hour).Unix(), key, kid)
 	r := &http.Request{Header: http.Header{"Authorization": []string{"Bearer " + tok}}}
 	p := GoogleOIDCAuth{}
 	cfg, err := p.ParseParams(map[string]interface{}{"audience": "aud1"})
@@ -92,7 +128,22 @@ func TestGoogleOIDCIncomingAuth(t *testing.T) {
 }
 
 func TestGoogleOIDCIncomingAuthFail(t *testing.T) {
-	tok := makeToken("aud2", "u", time.Now().Add(-time.Hour).Unix())
+	key, _ := rsa.GenerateKey(rand.Reader, 1024)
+	kid := "k2"
+	jwks := jwksForKey(&key.PublicKey, kid)
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, jwks)
+	}))
+	defer ts.Close()
+
+	oldURL := CertsURL
+	CertsURL = ts.URL
+	defer func() { CertsURL = oldURL }()
+	oldClient := HTTPClient
+	HTTPClient = ts.Client()
+	defer func() { HTTPClient = oldClient }()
+
+	tok := makeToken("aud2", "u", time.Now().Add(-time.Hour).Unix(), key, kid)
 	r := &http.Request{Header: http.Header{"Authorization": []string{"Bearer " + tok}}}
 	p := GoogleOIDCAuth{}
 	cfg, err := p.ParseParams(map[string]interface{}{"audience": "aud1"})

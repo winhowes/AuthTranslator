@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/winhowes/AuthTranslator/app/secrets"
 )
@@ -19,6 +20,8 @@ import (
 // which means it only works when running on GCP with a service account
 // attached.
 type gcpKMSPlugin struct{}
+
+var HTTPClient = &http.Client{Timeout: 5 * time.Second}
 
 func (gcpKMSPlugin) Prefix() string { return "gcp" }
 
@@ -35,7 +38,7 @@ func (gcpKMSPlugin) Load(id string) (string, error) {
 		return "", err
 	}
 	req.Header.Set("Metadata-Flavor", "Google")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := HTTPClient.Do(req)
 	if err != nil {
 		return "", err
 	}
@@ -65,7 +68,7 @@ func (gcpKMSPlugin) Load(id string) (string, error) {
 	postReq.Header.Set("Authorization", "Bearer "+tr.AccessToken)
 	postReq.Header.Set("Content-Type", "application/json")
 
-	resp2, err := http.DefaultClient.Do(postReq)
+	resp2, err := HTTPClient.Do(postReq)
 	if err != nil {
 		return "", err
 	}
