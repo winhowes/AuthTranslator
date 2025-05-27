@@ -11,8 +11,12 @@ import (
 func TestTokenOutgoingPrefix(t *testing.T) {
 	r := &http.Request{Header: http.Header{}}
 	p := outgoing.TokenAuthOut{}
-	params := map[string]string{"token": "secret", "header": "Authorization", "prefix": "Bearer "}
-	p.AddAuth(r, params)
+	t.Setenv("TOK", "secret")
+	cfg, err := p.ParseParams(map[string]interface{}{"secrets": []string{"env:TOK"}, "header": "Authorization", "prefix": "Bearer "})
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.AddAuth(r, cfg)
 	if got := r.Header.Get("Authorization"); got != "Bearer secret" {
 		t.Fatalf("expected 'Bearer secret', got %s", got)
 	}
@@ -21,8 +25,12 @@ func TestTokenOutgoingPrefix(t *testing.T) {
 func TestTokenIncomingPrefix(t *testing.T) {
 	r := &http.Request{Header: http.Header{"Authorization": []string{"Bearer secret"}}}
 	p := incoming.TokenAuth{}
-	params := map[string]string{"token": "secret", "header": "Authorization", "prefix": "Bearer "}
-	if !p.Authenticate(r, params) {
+	t.Setenv("TOK", "secret")
+	cfg, err := p.ParseParams(map[string]interface{}{"secrets": []string{"env:TOK"}, "header": "Authorization", "prefix": "Bearer "})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !p.Authenticate(r, cfg) {
 		t.Fatal("expected authentication to succeed with prefix")
 	}
 }
@@ -30,8 +38,12 @@ func TestTokenIncomingPrefix(t *testing.T) {
 func TestTokenIncomingPrefixMismatch(t *testing.T) {
 	r := &http.Request{Header: http.Header{"Authorization": []string{"Bearer secret"}}}
 	p := incoming.TokenAuth{}
-	params := map[string]string{"token": "secret", "header": "Authorization"}
-	if p.Authenticate(r, params) {
+	t.Setenv("TOK", "secret")
+	cfg, err := p.ParseParams(map[string]interface{}{"secrets": []string{"env:TOK"}, "header": "Authorization"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Authenticate(r, cfg) {
 		t.Fatal("expected authentication to fail when prefix not configured")
 	}
 }
