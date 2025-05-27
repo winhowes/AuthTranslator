@@ -19,8 +19,10 @@ type params struct {
 
 type TokenAuth struct{}
 
-func (t *TokenAuth) Name() string             { return "token" }
-func (t *TokenAuth) RequiredParams() []string { return []string{"secrets", "header"} }
+func (t *TokenAuth) Name() string { return "token" }
+func (t *TokenAuth) RequiredParams() []string {
+	return []string{"secrets", "header"}
+}
 func (t *TokenAuth) OptionalParams() []string { return []string{"prefix"} }
 
 func (t *TokenAuth) ParseParams(m map[string]interface{}) (interface{}, error) {
@@ -43,8 +45,7 @@ func (t *TokenAuth) Authenticate(r *http.Request, p interface{}) bool {
 	if !ok {
 		return false
 	}
-	tokenValue := r.Header.Get(cfg.Header)
-	tokenValue = strings.TrimPrefix(tokenValue, cfg.Prefix)
+	tokenValue := strings.TrimPrefix(r.Header.Get(cfg.Header), cfg.Prefix)
 	for _, ref := range cfg.Secrets {
 		token, err := secrets.LoadSecret(ref)
 		if err == nil && tokenValue == token {
