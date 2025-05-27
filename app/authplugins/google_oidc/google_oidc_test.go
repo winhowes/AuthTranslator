@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	_ "github.com/winhowes/AuthTransformer/app/secrets/plugins"
+	_ "github.com/winhowes/AuthTranslator/app/secrets/plugins"
 )
 
 func TestGoogleOIDCAddAuth(t *testing.T) {

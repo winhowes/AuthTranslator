@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/winhowes/AuthTransformer/app/authplugins"
+	"github.com/winhowes/AuthTranslator/app/authplugins"
 )
 
 // inParams configures validation of incoming Google OIDC tokens.

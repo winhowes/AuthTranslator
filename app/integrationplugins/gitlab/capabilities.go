@@ -2,7 +2,7 @@ package gitlab
 
 import (
 	"fmt"
-	integrationplugins "github.com/winhowes/AuthTransformer/app/integrationplugins"
+	integrationplugins "github.com/winhowes/AuthTranslator/app/integrationplugins"
 )
 
 func init() {

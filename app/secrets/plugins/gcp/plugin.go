@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/winhowes/AuthTransformer/app/secrets"
+	"github.com/winhowes/AuthTranslator/app/secrets"
 )
 
 // gcpKMSPlugin loads secrets from Google Cloud KMS. The identifier should be in

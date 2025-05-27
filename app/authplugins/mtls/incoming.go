@@ -3,7 +3,7 @@ package mtls
 import (
 	"net/http"
 
-	"github.com/winhowes/AuthTransformer/app/authplugins"
+	"github.com/winhowes/AuthTranslator/app/authplugins"
 )
 
 // mtlsParams defines allowed subject names for client certificates.

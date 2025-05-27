@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/winhowes/AuthTransformer/cmd/integrations/plugins"
+	"github.com/winhowes/AuthTranslator/cmd/integrations/plugins"
 )
 
 var server = flag.String("server", "http://localhost:8080/integrations", "integration endpoint")

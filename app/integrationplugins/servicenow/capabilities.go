@@ -1,6 +1,6 @@
 package servicenow
 
-import integrationplugins "github.com/winhowes/AuthTransformer/app/integrationplugins"
+import integrationplugins "github.com/winhowes/AuthTranslator/app/integrationplugins"
 
 func init() {
 	integrationplugins.RegisterCapability("servicenow", "open_ticket", integrationplugins.CapabilitySpec{

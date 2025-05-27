@@ -2,7 +2,7 @@ package slack
 
 import "fmt"
 
-import integrationplugins "github.com/winhowes/AuthTransformer/app/integrationplugins"
+import integrationplugins "github.com/winhowes/AuthTranslator/app/integrationplugins"
 
 func init() {
 	integrationplugins.RegisterCapability("slack", "post_public_as", integrationplugins.CapabilitySpec{

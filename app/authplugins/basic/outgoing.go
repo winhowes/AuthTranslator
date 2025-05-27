@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/winhowes/AuthTransformer/app/authplugins"
-	"github.com/winhowes/AuthTransformer/app/secrets"
+	"github.com/winhowes/AuthTranslator/app/authplugins"
+	"github.com/winhowes/AuthTranslator/app/secrets"
 )
 
 // BasicAuthOut sets HTTP Basic credentials on outbound requests.

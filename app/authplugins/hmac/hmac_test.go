@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	_ "github.com/winhowes/AuthTransformer/app/secrets/plugins"
+	_ "github.com/winhowes/AuthTranslator/app/secrets/plugins"
 )
 
 func TestHMACOutgoingAddAuth(t *testing.T) {

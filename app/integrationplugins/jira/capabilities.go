@@ -1,6 +1,6 @@
 package jira
 
-import integrationplugins "github.com/winhowes/AuthTransformer/app/integrationplugins"
+import integrationplugins "github.com/winhowes/AuthTranslator/app/integrationplugins"
 
 func init() {
 	integrationplugins.RegisterCapability("jira", "create_task", integrationplugins.CapabilitySpec{

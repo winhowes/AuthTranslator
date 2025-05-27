@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	_ "github.com/winhowes/AuthTransformer/app/secrets/plugins"
+	_ "github.com/winhowes/AuthTranslator/app/secrets/plugins"
 )
 
 func makeHS256Token(aud, sub, key string, exp int64) string {

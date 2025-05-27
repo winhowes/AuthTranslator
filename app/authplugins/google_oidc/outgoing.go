@@ -7,7 +7,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/winhowes/AuthTransformer/app/authplugins"
+	"github.com/winhowes/AuthTranslator/app/authplugins"
 )
 
 // googleOIDCParams holds configuration for the Google OIDC plugin.

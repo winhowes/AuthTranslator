@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/winhowes/AuthTransformer/cmd/allowlist/plugins"
+	"github.com/winhowes/AuthTranslator/cmd/allowlist/plugins"
 )
 
 var file = flag.String("file", "allowlist.json", "allowlist file")

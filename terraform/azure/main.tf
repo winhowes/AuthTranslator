@@ -19,13 +19,13 @@ resource "azurerm_resource_group" "this" {
 }
 
 resource "azurerm_container_group" "this" {
-  name                = "auth-transformer"
+  name                = "auth-translator"
   location            = azurerm_resource_group.this.location
   resource_group_name = azurerm_resource_group.this.name
   os_type             = "Linux"
 
   container {
-    name   = "auth-transformer"
+    name   = "auth-translator"
     image  = var.container_image
     cpu    = "0.5"
     memory = "1.0"

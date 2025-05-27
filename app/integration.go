@@ -11,9 +11,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/winhowes/AuthTransformer/app/authplugins"
-	integrationplugins "github.com/winhowes/AuthTransformer/app/integrationplugins"
-	"github.com/winhowes/AuthTransformer/app/secrets"
+	"github.com/winhowes/AuthTranslator/app/authplugins"
+	integrationplugins "github.com/winhowes/AuthTranslator/app/integrationplugins"
+	"github.com/winhowes/AuthTranslator/app/secrets"
 )
 
 // paramRules is the interface every auth-plugin already satisfies.

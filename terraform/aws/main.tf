@@ -15,11 +15,11 @@ provider "aws" {
 }
 
 resource "aws_ecs_cluster" "this" {
-  name = "auth-transformer"
+  name = "auth-translator"
 }
 
 resource "aws_ecs_task_definition" "this" {
-  family                   = "auth-transformer"
+  family                   = "auth-translator"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
   cpu                      = 256
@@ -28,7 +28,7 @@ resource "aws_ecs_task_definition" "this" {
 
   container_definitions = jsonencode([
     {
-      name  = "auth-transformer"
+      name  = "auth-translator"
       image = var.container_image
       portMappings = [{
         containerPort = 8080
@@ -40,7 +40,7 @@ resource "aws_ecs_task_definition" "this" {
 }
 
 resource "aws_ecs_service" "this" {
-  name            = "auth-transformer"
+  name            = "auth-translator"
   cluster         = aws_ecs_cluster.this.id
   task_definition = aws_ecs_task_definition.this.arn
   desired_count   = 1
