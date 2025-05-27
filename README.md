@@ -114,6 +114,26 @@ fields and may list required values:
   }
   ```
 
+#### Body Matching
+
+Body rules are checked against only the fields listed in the rule. Additional
+fields in the request are ignored. Values are compared using these rules:
+
+* **Primitive values** must match exactly.
+* **Objects** are matched recursively. Every key present in the rule must also
+  exist in the request with a value that satisfies the sub‑rule.
+* **Arrays** require that every element in the rule appear somewhere in the
+  request array. Order does not matter and extra elements are allowed.
+
+These rules apply to nested structures as well. For example, the rule
+
+```json
+{"items": [{"id": 1}]}
+```
+
+matches a body where `items` contains an object with `{"id":1}` anywhere in the
+array.
+
 
 
    - **integrations**: Defines proxy routes, rate limits and authentication methods. Secret references use the `env:` or KMS-prefixed formats described below.
