@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -183,7 +184,11 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rateKey := r.RemoteAddr
+	clientIP, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		clientIP = r.RemoteAddr
+	}
+	rateKey := clientIP
 	callerID := "*"
 	for _, cfg := range integ.IncomingAuth {
 		p := authplugins.GetIncoming(cfg.Type)
