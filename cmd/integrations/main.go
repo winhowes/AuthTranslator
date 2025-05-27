@@ -14,10 +14,18 @@ import (
 
 var server = flag.String("server", "http://localhost:8080/integrations", "integration endpoint")
 
+func usage() {
+	fmt.Fprintf(flag.CommandLine.Output(), `Usage: integrations [options] <list|plugin> [plugin options]\n\n`)
+	fmt.Fprintf(flag.CommandLine.Output(), "Options:\n")
+	flag.PrintDefaults()
+	fmt.Fprintln(flag.CommandLine.Output(), "\nRun \"integrations <plugin> -help\" to see plugin flags.")
+}
+
 func main() {
+	flag.Usage = usage
 	flag.Parse()
 	if flag.NArg() < 1 {
-		fmt.Fprintln(os.Stderr, "usage: integrations <list|plugin> [options]")
+		usage()
 		os.Exit(1)
 	}
 	plugin := flag.Arg(0)

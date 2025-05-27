@@ -31,6 +31,8 @@ The project exists to make it trivial to translate one type of authentication in
    ```bash
    go run ./app -config app/config.json
    ```
+
+   Run `go run ./app --help` to see all available flags.
    
    Or build an executable:
    
@@ -248,6 +250,8 @@ associates the plugin name with a function that parses CLI flags and returns an
 
 ## Integration CLI
 
+Run `go run ./cmd/integrations --help` for a full list of commands and options.
+
 Start the server with `-debug` so the `/integrations` endpoint is available:
 
 ```bash
@@ -323,6 +327,8 @@ go run ./cmd/integrations stripe -token env:STRIPE_TOKEN
 ```
 
 ## Allowlist CLI
+
+Run `go run ./cmd/allowlist --help` to view commands and flags.
 
 The `allowlist` command helps maintain the `allowlist.json` file. Run `allowlist list` to view every capability defined by the integration plugins:
 

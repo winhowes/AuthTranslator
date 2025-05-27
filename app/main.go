@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -66,6 +67,12 @@ var xAtIntHost = flag.String("x_at_int_host", "", "only respect X-AT-Int header 
 var addr = flag.String("addr", ":8080", "listen address")
 var allowlistFile = flag.String("allowlist", "allowlist.json", "path to allowlist configuration")
 var configFile = flag.String("config", "config.json", "path to configuration file")
+
+func usage() {
+	fmt.Fprintf(flag.CommandLine.Output(), "Usage: authtranslator [options]\n\n")
+	fmt.Fprintf(flag.CommandLine.Output(), "Options:\n")
+	flag.PrintDefaults()
+}
 
 func loadConfig(filename string) (*Config, error) {
 	f, err := os.Open(filename)
@@ -238,6 +245,7 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	flag.Usage = usage
 	flag.Parse()
 
 	config, err := loadConfig(*configFile)
