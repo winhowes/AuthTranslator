@@ -22,10 +22,11 @@ func main() {
 	}
 	plugin := flag.Arg(0)
 	args := flag.Args()[1:]
-  
-  if plugin == "list" {
+
+	if plugin == "list" {
 		listIntegrations()
-  }
+		return
+	}
 
 	builder := plugins.Get(plugin)
 	if builder == nil {
