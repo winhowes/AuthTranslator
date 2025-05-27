@@ -1,4 +1,4 @@
-package secrets
+package plugins
 
 import (
 	"bytes"
@@ -8,6 +8,8 @@ import (
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/winhowes/AuthTransformer/app/secrets"
 )
 
 // gcpKMSPlugin loads secrets from Google Cloud KMS. The identifier should be in
@@ -85,4 +87,4 @@ func (gcpKMSPlugin) Load(id string) (string, error) {
 	return string(plaintext), nil
 }
 
-func init() { Register(gcpKMSPlugin{}) }
+func init() { secrets.Register(gcpKMSPlugin{}) }

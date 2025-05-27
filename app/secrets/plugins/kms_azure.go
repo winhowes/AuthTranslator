@@ -1,4 +1,6 @@
-package secrets
+package plugins
+
+import "github.com/winhowes/AuthTransformer/app/secrets"
 
 // azureKMSPlugin is a stub for loading secrets from Azure Key Vault.
 type azureKMSPlugin struct{}
@@ -10,4 +12,4 @@ func (azureKMSPlugin) Load(id string) (string, error) {
 	return "azure-kms-" + id, nil
 }
 
-func init() { Register(azureKMSPlugin{}) }
+func init() { secrets.Register(azureKMSPlugin{}) }

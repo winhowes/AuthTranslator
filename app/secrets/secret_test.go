@@ -1,15 +1,18 @@
-package secrets
+package secrets_test
 
 import (
 	"crypto/aes"
 	"crypto/cipher"
 	"encoding/base64"
 	"testing"
+
+	"github.com/winhowes/AuthTransformer/app/secrets"
+	_ "github.com/winhowes/AuthTransformer/app/secrets/plugins"
 )
 
 func TestLoadSecretEnv(t *testing.T) {
 	t.Setenv("MY_SECRET", "val")
-	s, err := LoadSecret("env:MY_SECRET")
+	s, err := secrets.LoadSecret("env:MY_SECRET")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -19,7 +22,7 @@ func TestLoadSecretEnv(t *testing.T) {
 }
 
 func TestLoadSecretUnknown(t *testing.T) {
-	if _, err := LoadSecret("unknown:id"); err == nil {
+	if _, err := secrets.LoadSecret("unknown:id"); err == nil {
 		t.Fatal("expected error for unknown secret source")
 	}
 }
@@ -29,7 +32,7 @@ func TestLoadRandomSecret(t *testing.T) {
 	t.Setenv("B", "second")
 
 	// Single reference
-	val, err := LoadRandomSecret([]string{"env:A"})
+	val, err := secrets.LoadRandomSecret([]string{"env:A"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -38,7 +41,7 @@ func TestLoadRandomSecret(t *testing.T) {
 	}
 
 	// Multiple references - result should be one of the provided values
-	val, err = LoadRandomSecret([]string{"env:A", "env:B"})
+	val, err = secrets.LoadRandomSecret([]string{"env:A", "env:B"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -72,7 +75,7 @@ func TestLoadSecretAWSKMS(t *testing.T) {
 	ct = append(nonce, ct...)
 	ref := "aws:" + base64.StdEncoding.EncodeToString(ct)
 
-	val, err := LoadSecret(ref)
+	val, err := secrets.LoadSecret(ref)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
