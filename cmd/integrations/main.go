@@ -70,6 +70,39 @@ func main() {
 		}
 		integ := plugins.Linear(*name, *token)
 		sendIntegration(integ)
+	case "asana":
+		fs := flag.NewFlagSet("asana", flag.ExitOnError)
+		name := fs.String("name", "asana", "integration name")
+		token := fs.String("token", "", "secret reference for API token")
+		fs.Parse(args)
+		if *token == "" {
+			fmt.Fprintln(os.Stderr, "-token is required")
+			os.Exit(1)
+		}
+		integ := plugins.Asana(*name, *token)
+		sendIntegration(integ)
+	case "zendesk":
+		fs := flag.NewFlagSet("zendesk", flag.ExitOnError)
+		name := fs.String("name", "zendesk", "integration name")
+		token := fs.String("token", "", "secret reference for API token")
+		fs.Parse(args)
+		if *token == "" {
+			fmt.Fprintln(os.Stderr, "-token is required")
+			os.Exit(1)
+		}
+		integ := plugins.Zendesk(*name, *token)
+		sendIntegration(integ)
+	case "servicenow":
+		fs := flag.NewFlagSet("servicenow", flag.ExitOnError)
+		name := fs.String("name", "servicenow", "integration name")
+		token := fs.String("token", "", "secret reference for API token")
+		fs.Parse(args)
+		if *token == "" {
+			fmt.Fprintln(os.Stderr, "-token is required")
+			os.Exit(1)
+		}
+		integ := plugins.ServiceNow(*name, *token)
+		sendIntegration(integ)
 	default:
 		fmt.Fprintf(os.Stderr, "unknown plugin %s\n", plugin)
 		os.Exit(1)

@@ -18,8 +18,13 @@ import (
 	_ "github.com/winhowes/AuthTransformer/app/authplugins/basic"
 	_ "github.com/winhowes/AuthTransformer/app/authplugins/google_oidc"
 	_ "github.com/winhowes/AuthTransformer/app/authplugins/token"
+	_ "github.com/winhowes/AuthTransformer/app/integrationplugins/asana"
 	_ "github.com/winhowes/AuthTransformer/app/integrationplugins/github"
+	_ "github.com/winhowes/AuthTransformer/app/integrationplugins/jira"
+	_ "github.com/winhowes/AuthTransformer/app/integrationplugins/linear"
+	_ "github.com/winhowes/AuthTransformer/app/integrationplugins/servicenow"
 	_ "github.com/winhowes/AuthTransformer/app/integrationplugins/slack"
+	_ "github.com/winhowes/AuthTransformer/app/integrationplugins/zendesk"
 	_ "github.com/winhowes/AuthTransformer/app/secrets/plugins"
 )
 
