@@ -11,9 +11,14 @@ import (
 )
 
 // AuthPluginConfig ties an auth plugin type to its parameters.
+// AuthPluginConfig ties an auth plugin type to its parameters. The Params field
+// holds the raw configuration from the JSON config while parsed is used at
+// runtime after being validated by the plugin's ParseParams function.
 type AuthPluginConfig struct {
-	Type   string            `json:"type"`
-	Params map[string]string `json:"params"`
+	Type   string                 `json:"type"`
+	Params map[string]interface{} `json:"params"`
+
+	parsed interface{}
 }
 
 // Integration represents a configured proxy integration.
@@ -42,28 +47,28 @@ func AddIntegration(i *Integration) error {
 		return errors.New("invalid integration name")
 	}
 
-	for _, a := range i.IncomingAuth {
+	for idx, a := range i.IncomingAuth {
 		p := authplugins.GetIncoming(a.Type)
 		if p == nil {
 			return fmt.Errorf("unknown incoming auth type %s", a.Type)
 		}
-		for _, req := range p.RequiredParams() {
-			if _, ok := a.Params[req]; !ok {
-				return fmt.Errorf("missing param %s for auth %s", req, a.Type)
-			}
+		cfg, err := p.ParseParams(a.Params)
+		if err != nil {
+			return fmt.Errorf("invalid params for auth %s: %v", a.Type, err)
 		}
+		i.IncomingAuth[idx].parsed = cfg
 	}
 
-	for _, a := range i.OutgoingAuth {
+	for idx, a := range i.OutgoingAuth {
 		p := authplugins.GetOutgoing(a.Type)
 		if p == nil {
 			return fmt.Errorf("unknown outgoing auth type %s", a.Type)
 		}
-		for _, req := range p.RequiredParams() {
-			if _, ok := a.Params[req]; !ok {
-				return fmt.Errorf("missing param %s for auth %s", req, a.Type)
-			}
+		cfg, err := p.ParseParams(a.Params)
+		if err != nil {
+			return fmt.Errorf("invalid params for auth %s: %v", a.Type, err)
 		}
+		i.OutgoingAuth[idx].parsed = cfg
 	}
 
 	i.inLimiter = NewRateLimiter(i.InRateLimit, time.Minute)

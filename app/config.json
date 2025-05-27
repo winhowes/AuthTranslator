@@ -6,10 +6,10 @@
             "in_rate_limit": 100,
             "out_rate_limit": 1000,
             "incoming_auth": [
-                {"type": "token", "params": {"token": "secret", "header": "X-Auth"}}
+                {"type": "token", "params": {"secrets": ["env:IN_TOKEN"], "header": "X-Auth"}}
             ],
             "outgoing_auth": [
-                {"type": "token", "params": {"token": "secret", "header": "X-Auth"}}
+                {"type": "token", "params": {"secrets": ["env:OUT_TOKEN"], "header": "X-Auth"}}
             ]
         }
     ]
