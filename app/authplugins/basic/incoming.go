@@ -1,4 +1,4 @@
-package incoming
+package basic
 
 import (
 	"encoding/base64"
@@ -11,7 +11,7 @@ import (
 )
 
 // BasicAuth validates HTTP Basic credentials from the request header.
-type basicParams struct {
+type inParams struct {
 	Secrets []string `json:"secrets"`
 	Header  string   `json:"header"`
 	Prefix  string   `json:"prefix"`
@@ -24,7 +24,7 @@ func (b *BasicAuth) RequiredParams() []string { return []string{"secrets"} }
 func (b *BasicAuth) OptionalParams() []string { return []string{"header", "prefix"} }
 
 func (b *BasicAuth) ParseParams(m map[string]interface{}) (interface{}, error) {
-	p, err := authplugins.ParseParams[basicParams](m)
+	p, err := authplugins.ParseParams[inParams](m)
 	if err != nil {
 		return nil, err
 	}
@@ -41,7 +41,7 @@ func (b *BasicAuth) ParseParams(m map[string]interface{}) (interface{}, error) {
 }
 
 func (b *BasicAuth) Authenticate(r *http.Request, p interface{}) bool {
-	cfg, ok := p.(*basicParams)
+	cfg, ok := p.(*inParams)
 	if !ok {
 		return false
 	}

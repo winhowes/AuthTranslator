@@ -1,4 +1,4 @@
-package outgoing
+package basic
 
 import (
 	"encoding/base64"
@@ -10,7 +10,7 @@ import (
 )
 
 // BasicAuthOut sets HTTP Basic credentials on outbound requests.
-type basicParams struct {
+type outParams struct {
 	Secrets []string `json:"secrets"`
 	Header  string   `json:"header"`
 	Prefix  string   `json:"prefix"`
@@ -23,7 +23,7 @@ func (b *BasicAuthOut) RequiredParams() []string { return []string{"secrets"} }
 func (b *BasicAuthOut) OptionalParams() []string { return []string{"header", "prefix"} }
 
 func (b *BasicAuthOut) ParseParams(m map[string]interface{}) (interface{}, error) {
-	p, err := authplugins.ParseParams[basicParams](m)
+	p, err := authplugins.ParseParams[outParams](m)
 	if err != nil {
 		return nil, err
 	}
@@ -40,7 +40,7 @@ func (b *BasicAuthOut) ParseParams(m map[string]interface{}) (interface{}, error
 }
 
 func (b *BasicAuthOut) AddAuth(r *http.Request, p interface{}) {
-	cfg, ok := p.(*basicParams)
+	cfg, ok := p.(*outParams)
 	if !ok || len(cfg.Secrets) == 0 {
 		return
 	}

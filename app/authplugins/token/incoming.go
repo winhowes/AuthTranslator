@@ -1,4 +1,4 @@
-package incoming
+package token
 
 import (
 	"fmt"
@@ -10,7 +10,7 @@ import (
 )
 
 // TokenAuth checks that the caller supplied one of the configured tokens.
-type params struct {
+type inParams struct {
 	Secrets []string `json:"secrets"`
 	Header  string   `json:"header"`
 	Prefix  string   `json:"prefix"`
@@ -25,7 +25,7 @@ func (t *TokenAuth) RequiredParams() []string {
 func (t *TokenAuth) OptionalParams() []string { return []string{"prefix"} }
 
 func (t *TokenAuth) ParseParams(m map[string]interface{}) (interface{}, error) {
-	p, err := authplugins.ParseParams[params](m)
+	p, err := authplugins.ParseParams[inParams](m)
 	if err != nil {
 		return nil, err
 	}
@@ -36,7 +36,7 @@ func (t *TokenAuth) ParseParams(m map[string]interface{}) (interface{}, error) {
 }
 
 func (t *TokenAuth) Authenticate(r *http.Request, p interface{}) bool {
-	cfg, ok := p.(*params)
+	cfg, ok := p.(*inParams)
 	if !ok {
 		return false
 	}
@@ -53,7 +53,7 @@ func (t *TokenAuth) Authenticate(r *http.Request, p interface{}) bool {
 // Identify returns the raw token value provided by the caller. It is used as a
 // caller ID for allowlist checks.
 func (t *TokenAuth) Identify(r *http.Request, p interface{}) (string, bool) {
-	cfg, ok := p.(*params)
+	cfg, ok := p.(*inParams)
 	if !ok {
 		return "", false
 	}

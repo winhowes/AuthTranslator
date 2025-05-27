@@ -1,17 +1,15 @@
-package main
+package token
 
 import (
 	"net/http"
 	"testing"
 
-	"github.com/winhowes/AuthTransformer/app/authplugins/incoming"
-	"github.com/winhowes/AuthTransformer/app/authplugins/outgoing"
 	_ "github.com/winhowes/AuthTransformer/app/secrets/plugins"
 )
 
 func TestTokenOutgoingPrefix(t *testing.T) {
 	r := &http.Request{Header: http.Header{}}
-	p := outgoing.TokenAuthOut{}
+	p := TokenAuthOut{}
 	t.Setenv("TOK", "secret")
 	cfg, err := p.ParseParams(map[string]interface{}{"secrets": []string{"env:TOK"}, "header": "Authorization", "prefix": "Bearer "})
 	if err != nil {
@@ -25,7 +23,7 @@ func TestTokenOutgoingPrefix(t *testing.T) {
 
 func TestTokenIncomingPrefix(t *testing.T) {
 	r := &http.Request{Header: http.Header{"Authorization": []string{"Bearer secret"}}}
-	p := incoming.TokenAuth{}
+	p := TokenAuth{}
 	t.Setenv("TOK", "secret")
 	cfg, err := p.ParseParams(map[string]interface{}{"secrets": []string{"env:TOK"}, "header": "Authorization", "prefix": "Bearer "})
 	if err != nil {
@@ -38,7 +36,7 @@ func TestTokenIncomingPrefix(t *testing.T) {
 
 func TestTokenIncomingPrefixMismatch(t *testing.T) {
 	r := &http.Request{Header: http.Header{"Authorization": []string{"Bearer secret"}}}
-	p := incoming.TokenAuth{}
+	p := TokenAuth{}
 	t.Setenv("TOK", "secret")
 	cfg, err := p.ParseParams(map[string]interface{}{"secrets": []string{"env:TOK"}, "header": "Authorization"})
 	if err != nil {
@@ -50,8 +48,8 @@ func TestTokenIncomingPrefixMismatch(t *testing.T) {
 }
 
 func TestTokenPluginOptionalParams(t *testing.T) {
-	in := incoming.TokenAuth{}
-	out := outgoing.TokenAuthOut{}
+	in := TokenAuth{}
+	out := TokenAuthOut{}
 	if got := in.OptionalParams(); len(got) != 1 || got[0] != "prefix" {
 		t.Fatalf("unexpected optional params: %v", got)
 	}

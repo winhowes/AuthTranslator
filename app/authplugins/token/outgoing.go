@@ -1,4 +1,4 @@
-package outgoing
+package token
 
 import (
 	"fmt"
@@ -9,7 +9,7 @@ import (
 )
 
 // TokenAuthOut adds a token header to outbound requests.
-type params struct {
+type outParams struct {
 	Secrets []string `json:"secrets"`
 	Header  string   `json:"header"`
 	Prefix  string   `json:"prefix"`
@@ -24,7 +24,7 @@ func (t *TokenAuthOut) RequiredParams() []string {
 func (t *TokenAuthOut) OptionalParams() []string { return []string{"prefix"} }
 
 func (t *TokenAuthOut) ParseParams(m map[string]interface{}) (interface{}, error) {
-	p, err := authplugins.ParseParams[params](m)
+	p, err := authplugins.ParseParams[outParams](m)
 	if err != nil {
 		return nil, err
 	}
@@ -35,7 +35,7 @@ func (t *TokenAuthOut) ParseParams(m map[string]interface{}) (interface{}, error
 }
 
 func (t *TokenAuthOut) AddAuth(r *http.Request, p interface{}) {
-	cfg, ok := p.(*params)
+	cfg, ok := p.(*outParams)
 	if !ok || len(cfg.Secrets) == 0 {
 		return
 	}

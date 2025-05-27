@@ -1,4 +1,4 @@
-package outgoing
+package googleoidc
 
 import (
 	"fmt"
