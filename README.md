@@ -205,7 +205,6 @@ Integration plugins can bundle common allowlist rules into **capabilities**. Ass
 - `sendgrid.send_email`, `sendgrid.manage_contacts`, `sendgrid.update_template` – basic SendGrid operations.
 - `twilio.send_sms`, `twilio.make_call`, `twilio.query_message` – Twilio messaging and voice APIs.
 - `okta.create_user`, `okta.update_user`, `okta.deactivate_user` – manage Okta user accounts.
-- `workday.query_worker` – read worker information from Workday.
 - `stripe.create_charge`, `stripe.refund_charge`, `stripe.create_customer` – Stripe payment flows.
 
 ### Secret Plugin Environment Variables
