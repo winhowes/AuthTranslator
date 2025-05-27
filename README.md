@@ -109,7 +109,7 @@ fields and may list required values:
 
 
    - **integrations**: Defines proxy routes, rate limits and authentication methods. Secret references use the `env:` or KMS-prefixed formats described below.
-   - **google_oidc**: Outgoing auth plugin that retrieves an ID token from the GCP metadata server and sets it in the `Authorization` header for backend requests.
+   - **google_oidc**: Outgoing auth plugin that retrieves an ID token from the GCP metadata server and sets it in the `Authorization` header for backend requests. The incoming variant validates Google ID tokens against a configured audience.
    - **basic**: Performs HTTP Basic authentication using credentials loaded from configured secrets.
 
 ### Secret Plugin Environment Variables
