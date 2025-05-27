@@ -121,7 +121,7 @@ fields in the request are ignored. Values are compared using these rules:
 
 * **Primitive values** must match exactly.
 * **Objects** are matched recursively. Every key present in the rule must also
-  exist in the request with a value that satisfies the sub‑rule.
+  exist in the request with a value that satisfies the sub‑rule. Extra keys in the request are allowed.
 * **Arrays** require that every element in the rule appear somewhere in the
   request array. Order does not matter and extra elements are allowed.
 
