@@ -19,8 +19,10 @@ type params struct {
 
 type TokenAuthOut struct{}
 
-func (t *TokenAuthOut) Name() string             { return "token" }
-func (t *TokenAuthOut) RequiredParams() []string { return []string{"secrets", "header"} }
+func (t *TokenAuthOut) Name() string { return "token" }
+func (t *TokenAuthOut) RequiredParams() []string {
+	return []string{"secrets", "header"}
+}
 func (t *TokenAuthOut) OptionalParams() []string { return []string{"prefix"} }
 
 func (t *TokenAuthOut) ParseParams(m map[string]interface{}) (interface{}, error) {
@@ -47,8 +49,7 @@ func (t *TokenAuthOut) AddAuth(r *http.Request, p interface{}) {
 	if err != nil {
 		return
 	}
-	token = cfg.Prefix + token
-	r.Header.Set(cfg.Header, token)
+	r.Header.Set(cfg.Header, cfg.Prefix+token)
 }
 
 func init() { authplugins.RegisterOutgoing(&TokenAuthOut{}) }
