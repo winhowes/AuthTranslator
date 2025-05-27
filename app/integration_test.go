@@ -31,6 +31,10 @@ func TestAddIntegrationValid(t *testing.T) {
 	if err := AddIntegration(i); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	t.Cleanup(func() {
+		i.inLimiter.Stop()
+		i.outLimiter.Stop()
+	})
 }
 
 func TestAddIntegrationOptionalParam(t *testing.T) {
@@ -44,6 +48,10 @@ func TestAddIntegrationOptionalParam(t *testing.T) {
 	if err := AddIntegration(i); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	t.Cleanup(func() {
+		i.inLimiter.Stop()
+		i.outLimiter.Stop()
+	})
 }
 
 func TestAddIntegrationUnknownParam(t *testing.T) {
