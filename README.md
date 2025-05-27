@@ -2,6 +2,13 @@
 
 AuthTransformer is a simple Go-based reverse proxy that injects authentication tokens and enforces per-host and per-caller rate limits. It is configured through a JSON file and demonstrates a plug-in style architecture for authentication methods.
 
+The project exists to make it trivial to translate one type of authentication into another. By running AuthTransformer as a centralized proxy, a small group of administrators can manage the secrets for each integration while developers simply reference those integrations. Ideally, this project allows short‑lived credentials provided by your organization to be exchanged for the long‑lived tokens required by third‑party services, and inbound requests bearing long‑lived credentials transformed back into short‑lived secrets. This keeps sensitive keys out of day‑to‑day workflows while still allowing seamless access.
+
+### Goals
+
+- **Centralized secrets management** – only a few trusted maintainers need to add or rotate secrets for each integration. Developers reference the integrations without ever seeing the underlying values.
+- **Short‑lived credentials** – internal callers should use ephemeral tokens. The proxy swaps them for the long‑lived keys external services require and can also downgrade inbound requests to short‑lived tokens so long‑lived secrets never circulate internally.
+
 ## Features
 
 - **Reverse Proxy**: Forwards incoming HTTP requests to a target backend based on the requested host or `X-AT-Int` header. The header can be disabled or restricted to a specific host using command-line flags.
@@ -112,6 +119,14 @@ fields and may list required values:
    - **google_oidc**: Outgoing auth plugin that retrieves an ID token from the GCP metadata server and sets it in the `Authorization` header for backend requests. The incoming variant validates Google ID tokens against a configured audience.
    - **basic**: Performs HTTP Basic authentication using credentials loaded from configured secrets.
 
+### Capabilities
+
+Integration plugins can bundle common allowlist rules into **capabilities**. Assigning a capability to a caller expands to one or more rules automatically. A few examples:
+
+- `slack.post_public_as` – permit posting a message as a specific username.
+- `slack.post_channels_as` – restrict posting to a defined set of channels.
+- `github.comment` – allow creating issue comments in a given repository (requires the `repo` parameter).
+
 ### Secret Plugin Environment Variables
 
 | Prefix | Environment Variables | Description |
@@ -218,6 +233,24 @@ Add Linear:
 ```bash
 go run ./cmd/integrations linear -token env:LINEAR_TOKEN
 ```
+
+## Allowlist CLI
+
+The `allowlist` command helps maintain the `allowlist.json` file. Run `allowlist list` to view every capability defined by the integration plugins:
+
+```bash
+go run ./cmd/allowlist list
+```
+
+To grant a caller a capability use `allowlist add`:
+
+```bash
+go run ./cmd/allowlist add -integration slack \
+    -caller user-token -capability post_public_as \
+    -params username=ci-bot
+```
+
+The CLI updates the file in place (default `allowlist.json`, overridable with `-file`).
 
 ## Running Tests
 
