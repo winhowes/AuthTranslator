@@ -91,6 +91,10 @@ The project exists to make it trivial to translate one type of authentication in
   by integration name and then by caller ID. When no ID is available the
   wildcard `"*"` entry is used so all callers share those rules.
 
+  On startup the server converts this list into a nested map keyed first
+  by integration and then by caller ID so lookups are fast during request
+  processing.
+
    Capabilities can be listed instead of explicit rules. Each capability expands
    to one or more rules when loaded, making it easy to audit access by name:
 
