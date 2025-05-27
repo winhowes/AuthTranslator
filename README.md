@@ -2,7 +2,7 @@
 
 AuthTransformer is a simple Go-based reverse proxy that injects authentication tokens and enforces per-host and per-caller rate limits. It is configured through a JSON file and demonstrates a plug-in style architecture for authentication methods.
 
-The project exists to make it trivial to translate one type of authentication into another. By running AuthTransformer as a centralized proxy, a small group of administrators can manage the secrets for each integration while developers simply reference those integrations. Short‑lived credentials provided by your organization are exchanged for the long‑lived tokens required by third‑party services, and inbound requests bearing long‑lived credentials can be transformed back into short‑lived secrets. This keeps sensitive keys out of day‑to‑day workflows while still allowing seamless access.
+The project exists to make it trivial to translate one type of authentication into another. By running AuthTransformer as a centralized proxy, a small group of administrators can manage the secrets for each integration while developers simply reference those integrations. Ideally, this project allows short‑lived credentials provided by your organization to be exchanged for the long‑lived tokens required by third‑party services, and inbound requests bearing long‑lived credentials transformed back into short‑lived secrets. This keeps sensitive keys out of day‑to‑day workflows while still allowing seamless access.
 
 ### Goals
 
