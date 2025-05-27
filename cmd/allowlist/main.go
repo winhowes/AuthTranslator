@@ -102,5 +102,8 @@ func addEntry(args []string) {
 	callerCfg.Capabilities = append(callerCfg.Capabilities, plugins.CapabilityConfig{Name: *capName, Params: params})
 
 	out, _ := json.MarshalIndent(entries, "", "    ")
-	os.WriteFile(*file, out, 0644)
+	if err := os.WriteFile(*file, out, 0644); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
 }
