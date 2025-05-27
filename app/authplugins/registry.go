@@ -3,19 +3,25 @@ package authplugins
 import "net/http"
 
 // IncomingAuthPlugin processes authentication from incoming callers.
+// IncomingAuthPlugin processes authentication from incoming callers.
+// ParseParams should validate and convert the raw parameter map into a
+// plugin-specific configuration struct.
 type IncomingAuthPlugin interface {
 	Name() string
+	ParseParams(map[string]interface{}) (interface{}, error)
+	Authenticate(r *http.Request, params interface{}) bool
 	RequiredParams() []string
 	OptionalParams() []string
-	Authenticate(r *http.Request, params map[string]string) bool
 }
 
 // OutgoingAuthPlugin applies authentication to outbound requests.
+// OutgoingAuthPlugin applies authentication to outbound requests.
 type OutgoingAuthPlugin interface {
 	Name() string
+	ParseParams(map[string]interface{}) (interface{}, error)
+	AddAuth(r *http.Request, params interface{})
 	RequiredParams() []string
 	OptionalParams() []string
-	AddAuth(r *http.Request, params map[string]string)
 }
 
 var incomingRegistry = map[string]IncomingAuthPlugin{}

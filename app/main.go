@@ -2,6 +2,7 @@ package main
 
 import (
         "encoding/json"
+        "flag"
         "log"
         "net/http"
         "net/http/httputil"
@@ -18,6 +19,8 @@ import (
 type Config struct {
 	Integrations []Integration `json:"integrations"`
 }
+
+var debug = flag.Bool("debug", false, "enable debug mode")
 
 func loadConfig(filename string) (*Config, error) {
 	data, err := os.ReadFile(filename)
@@ -104,7 +107,7 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 
 	for _, cfg := range integ.IncomingAuth {
 		p := authplugins.GetIncoming(cfg.Type)
-		if p != nil && !p.Authenticate(r, cfg.Params) {
+		if p != nil && !p.Authenticate(r, cfg.parsed) {
 			log.Printf("Authentication failed for host %s from %s", host, r.RemoteAddr)
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
@@ -126,7 +129,7 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 	for _, cfg := range integ.OutgoingAuth {
 		p := authplugins.GetOutgoing(cfg.Type)
 		if p != nil {
-			p.AddAuth(r, cfg.Params)
+			p.AddAuth(r, cfg.parsed)
 		}
 	}
 
@@ -141,6 +144,8 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	flag.Parse()
+
 	config, err := loadConfig("config.json")
 	if err != nil {
 		log.Fatal(err)
@@ -155,7 +160,9 @@ func main() {
 	// Include timestamps in log output
 	log.SetFlags(log.LstdFlags)
 
-	http.HandleFunc("/integrations", integrationsHandler)
+	if *debug {
+		http.HandleFunc("/integrations", integrationsHandler)
+	}
 
 	http.HandleFunc("/", proxyHandler)
 

@@ -30,26 +30,24 @@ AuthTransformer is a simple Go-based reverse proxy that injects authentication t
    
    ```json
    {
-       "auth_plugins": {
-           "example.com": {
-               "type": "basic",
-               "owner": "admin@example.com"
+       "integrations": [
+           {
+               "name": "example",
+               "destination": "http://backend.example.com",
+               "in_rate_limit": 100,
+               "out_rate_limit": 1000,
+              "incoming_auth": [
+                  {"type": "token", "params": {"secrets": ["env:IN_TOKEN"], "header": "X-Auth"}}
+              ],
+              "outgoing_auth": [
+                  {"type": "token", "params": {"secrets": ["env:OUT_TOKEN"], "header": "X-Auth"}}
+              ]
            }
-       },
-       "routes": {
-           "example.com": {
-               "target": "http://backend.example.com",
-               "rate_limit": {
-                   "per_caller": 100,
-                   "per_host": 1000
-               }
-           }
-       }
+       ]
    }
    ```
-   
-   - **auth_plugins**: Maps a hostname to an authentication plugin. The example uses `basic` auth.
-   - **routes**: Defines where requests should be proxied and how they should be rate limited.
+
+   - **integrations**: Defines proxy routes, rate limits and authentication methods. Secret references use the `env:` or KMS-prefixed formats described below.
 
 3. **Running**
 

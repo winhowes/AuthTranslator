@@ -13,7 +13,7 @@ func TestAddIntegrationMissingParam(t *testing.T) {
 		Destination:  "http://example.com",
 		InRateLimit:  1,
 		OutRateLimit: 1,
-		IncomingAuth: []AuthPluginConfig{{Type: "token", Params: map[string]string{}}},
+		IncomingAuth: []AuthPluginConfig{{Type: "token", Params: map[string]interface{}{}}},
 	}
 	if err := AddIntegration(i); err == nil {
 		t.Fatal("expected error for missing params")
@@ -26,7 +26,7 @@ func TestAddIntegrationValid(t *testing.T) {
 		Destination:  "http://example.com",
 		InRateLimit:  1,
 		OutRateLimit: 1,
-		IncomingAuth: []AuthPluginConfig{{Type: "token", Params: map[string]string{"token": "x", "header": "X-Auth"}}},
+		IncomingAuth: []AuthPluginConfig{{Type: "token", Params: map[string]interface{}{"secrets": []string{"env:TOK"}, "header": "X-Auth"}}},
 	}
 	if err := AddIntegration(i); err != nil {
 		t.Fatalf("unexpected error: %v", err)

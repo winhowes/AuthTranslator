@@ -3,17 +3,81 @@ package main
 import (
 	"errors"
 	"fmt"
+	"reflect"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/winhowes/AuthTransformer/app/authplugins"
 )
 
-// AuthPluginConfig ties an auth plugin type to its parameters.
+
+// paramRules is the interface every auth-plugin already satisfies.
+type paramRules interface {
+	RequiredParams() []string
+	OptionalParams() []string
+}
+
+// validateRequired checks that all fields named in rules.RequiredParams()
+// are non-zero in v.  It assumes v has already been produced by the plugin’s
+// ParseParams, which should take care of “unknown field” errors by calling
+// json.Decoder.DisallowUnknownFields internally.
+func validateRequired(v interface{}, rules paramRules) error {
+	rv := reflect.ValueOf(v)
+	if rv.Kind() == reflect.Pointer {
+		rv = rv.Elem()
+	}
+	if rv.Kind() != reflect.Struct {
+		return fmt.Errorf("validateRequired: expected struct, got %T", v)
+	}
+
+	// Build map jsonTag → fieldValue for zero-check lookup.
+	fields := make(map[string]reflect.Value)
+	rt := rv.Type()
+	for i := 0; i < rt.NumField(); i++ {
+		sf := rt.Field(i)
+
+		// Determine the JSON key name for the field.
+		jsonTag := sf.Tag.Get("json")
+		name := sf.Name
+		if jsonTag != "" {
+			if comma := strings.Index(jsonTag, ","); comma >= 0 {
+				if comma == 0 {
+					// Tag like ",omitempty" – field is skipped unless renamed; ignore.
+					continue
+				}
+				name = jsonTag[:comma]
+			} else {
+				name = jsonTag
+			}
+		}
+
+		fields[name] = rv.Field(i)
+	}
+
+	// All required params must be present and non-zero.
+	for _, req := range rules.RequiredParams() {
+		fv, ok := fields[req]
+		if !ok {
+			return fmt.Errorf("required param %q not found in struct", req)
+		}
+		if fv.IsZero() {
+			return fmt.Errorf("missing param %q", req)
+		}
+	}
+
+	return nil
+}
+
+// AuthPluginConfig ties an auth plugin type to its parameters. The Params field
+// holds the raw configuration from the JSON config while parsed is used at
+// runtime after being validated by the plugin's ParseParams function.
 type AuthPluginConfig struct {
-	Type   string            `json:"type"`
-	Params map[string]string `json:"params"`
+	Type   string                 `json:"type"`
+	Params map[string]interface{} `json:"params"`
+
+	parsed interface{}
 }
 
 // Integration represents a configured proxy integration.
@@ -42,56 +106,48 @@ func AddIntegration(i *Integration) error {
 		return errors.New("invalid integration name")
 	}
 
-	for _, a := range i.IncomingAuth {
+	// ─── Validate incoming-auth configs ───────────────────────────────────────
+	for idx, a := range i.IncomingAuth {
 		p := authplugins.GetIncoming(a.Type)
 		if p == nil {
 			return fmt.Errorf("unknown incoming auth type %s", a.Type)
 		}
-		known := map[string]struct{}{}
-		for _, req := range p.RequiredParams() {
-			if _, ok := a.Params[req]; !ok {
-				return fmt.Errorf("missing param %s for auth %s", req, a.Type)
-			}
-			known[req] = struct{}{}
+
+		cfg, err := p.ParseParams(a.Params) // plugin handles json + unknown fields
+		if err != nil {
+			return fmt.Errorf("invalid params for auth %s: %v", a.Type, err)
 		}
-		for _, opt := range p.OptionalParams() {
-			known[opt] = struct{}{}
+		if err := validateRequired(cfg, p); err != nil {
+			return fmt.Errorf("invalid params for auth %s: %w", a.Type, err)
 		}
-		for k := range a.Params {
-			if _, ok := known[k]; !ok {
-				return fmt.Errorf("unknown param %s for auth %s", k, a.Type)
-			}
-		}
+		i.IncomingAuth[idx].parsed = cfg
 	}
 
-	for _, a := range i.OutgoingAuth {
+	// ─── Validate outgoing-auth configs ───────────────────────────────────────
+	for idx, a := range i.OutgoingAuth {
 		p := authplugins.GetOutgoing(a.Type)
 		if p == nil {
 			return fmt.Errorf("unknown outgoing auth type %s", a.Type)
 		}
-		known := map[string]struct{}{}
-		for _, req := range p.RequiredParams() {
-			if _, ok := a.Params[req]; !ok {
-				return fmt.Errorf("missing param %s for auth %s", req, a.Type)
-			}
-			known[req] = struct{}{}
+
+		cfg, err := p.ParseParams(a.Params)
+		if err != nil {
+			return fmt.Errorf("invalid params for auth %s: %v", a.Type, err)
 		}
-		for _, opt := range p.OptionalParams() {
-			known[opt] = struct{}{}
+		if err := validateRequired(cfg, p); err != nil {
+			return fmt.Errorf("invalid params for auth %s: %w", a.Type, err)
 		}
-		for k := range a.Params {
-			if _, ok := known[k]; !ok {
-				return fmt.Errorf("unknown param %s for auth %s", k, a.Type)
-			}
-		}
+		i.OutgoingAuth[idx].parsed = cfg
 	}
 
+	// ─── Rate limiters & storage ──────────────────────────────────────────────
 	i.inLimiter = NewRateLimiter(i.InRateLimit, time.Minute)
 	i.outLimiter = NewRateLimiter(i.OutRateLimit, time.Minute)
 
 	integrations.Lock()
 	integrations.m[i.Name] = i
 	integrations.Unlock()
+
 	return nil
 }
 
