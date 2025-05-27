@@ -12,7 +12,7 @@ The project exists to make it trivial to translate one type of authentication in
 ## Features
 
 - **Reverse Proxy**: Forwards incoming HTTP requests to a target backend based on the requested host or `X-AT-Int` header. The header can be disabled or restricted to a specific host using command-line flags.
-- **Pluggable Authentication**: Supports "basic", "token", `hmac_signature`, `jwt`, `mtls` and `url_path` authentication types for both incoming and outgoing requests including Google OIDC with room for extension.
+- **Pluggable Authentication**: Supports "basic", "token", `hmac_signature`, `jwt`, `mtls`, `url_path`, `github_signature` and `slack_signature` authentication types for both incoming and outgoing requests including Google OIDC with room for extension.
 - **Extensible Plugins**: Add new auth, secret and integration plugins to cover different systems.
 - **Rate Limiting**: Limits the number of requests per caller and per host within a rolling window.
 - **Allowlist**: Integrations can restrict specific callers to particular paths, methods and required parameters.
@@ -172,6 +172,8 @@ array.
    - **token**: Header token comparison for simple shared secrets.
    - **basic**: Performs HTTP Basic authentication using credentials loaded from configured secrets.
    - **hmac_signature**: Computes or verifies request HMAC digests with a configurable algorithm.
+   - **github_signature**: Validates GitHub webhook signatures against shared secrets.
+   - **slack_signature**: Validates Slack request signatures with timestamp tolerance.
    - **url_path**: Appends a secret to the request path for outgoing calls and verifies it on incoming requests.
 
 ### Capabilities
@@ -349,6 +351,14 @@ go run ./cmd/integrations sendgrid -token env:SENDGRID_TOKEN
 Add Twilio:
 ```bash
 go run ./cmd/integrations twilio -token env:TWILIO_TOKEN
+```
+Add Okta:
+```bash
+go run ./cmd/integrations okta -domain okta.example.com -token env:OKTA_TOKEN
+```
+Add Workday:
+```bash
+go run ./cmd/integrations workday -domain workday.example.com -token env:WORKDAY_TOKEN
 ```
 Add Stripe:
 ```bash
