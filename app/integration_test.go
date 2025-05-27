@@ -39,7 +39,7 @@ func TestAddIntegrationOptionalParam(t *testing.T) {
 		Destination:  "http://example.com",
 		InRateLimit:  1,
 		OutRateLimit: 1,
-		IncomingAuth: []AuthPluginConfig{{Type: "token", Params: map[string]string{"token": "x", "header": "X-Auth", "prefix": "Bearer "}}},
+		IncomingAuth: []AuthPluginConfig{{Type: "token", Params: map[string]interface{}{"secrets": []string{"env:TOK"}, "header": "X-Auth", "prefix": "Bearer "}}},
 	}
 	if err := AddIntegration(i); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -52,7 +52,7 @@ func TestAddIntegrationUnknownParam(t *testing.T) {
 		Destination:  "http://example.com",
 		InRateLimit:  1,
 		OutRateLimit: 1,
-		IncomingAuth: []AuthPluginConfig{{Type: "token", Params: map[string]string{"token": "x", "header": "X-Auth", "bogus": "y"}}},
+		IncomingAuth: []AuthPluginConfig{{Type: "token", Params: map[string]interface{}{"secrets": []string{"x"}, "header": "X-Auth", "bogus": "y"}}},
 	}
 	if err := AddIntegration(i); err == nil {
 		t.Fatal("expected error for unknown param")

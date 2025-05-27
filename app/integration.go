@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/winhowes/AuthTransformer/app/authplugins"
+	"github.com/winhowes/AuthTransformer/app/secrets"
 )
-
 
 // paramRules is the interface every auth-plugin already satisfies.
 type paramRules interface {
@@ -70,6 +70,37 @@ func validateRequired(v interface{}, rules paramRules) error {
 	return nil
 }
 
+// collectSecretRefs returns any fields named "secrets" (case-insensitive) that
+// are slices of strings. It assumes cfg is a struct or pointer to struct.
+func collectSecretRefs(cfg interface{}) []string {
+	rv := reflect.ValueOf(cfg)
+	if rv.Kind() == reflect.Pointer {
+		rv = rv.Elem()
+	}
+	if rv.Kind() != reflect.Struct {
+		return nil
+	}
+	rt := rv.Type()
+	var refs []string
+	for i := 0; i < rt.NumField(); i++ {
+		sf := rt.Field(i)
+		name := sf.Tag.Get("json")
+		if comma := strings.Index(name, ","); comma >= 0 {
+			name = name[:comma]
+		}
+		if name == "" {
+			name = sf.Name
+		}
+		if strings.EqualFold(name, "secrets") && sf.Type.Kind() == reflect.Slice && sf.Type.Elem().Kind() == reflect.String {
+			slice := rv.Field(i)
+			for j := 0; j < slice.Len(); j++ {
+				refs = append(refs, slice.Index(j).String())
+			}
+		}
+	}
+	return refs
+}
+
 // AuthPluginConfig ties an auth plugin type to its parameters. The Params field
 // holds the raw configuration from the JSON config while parsed is used at
 // runtime after being validated by the plugin's ParseParams function.
@@ -120,6 +151,11 @@ func AddIntegration(i *Integration) error {
 		if err := validateRequired(cfg, p); err != nil {
 			return fmt.Errorf("invalid params for auth %s: %w", a.Type, err)
 		}
+		for _, ref := range collectSecretRefs(cfg) {
+			if err := secrets.ValidateSecret(ref); err != nil {
+				return fmt.Errorf("invalid params for auth %s: %w", a.Type, err)
+			}
+		}
 		i.IncomingAuth[idx].parsed = cfg
 	}
 
@@ -136,6 +172,11 @@ func AddIntegration(i *Integration) error {
 		}
 		if err := validateRequired(cfg, p); err != nil {
 			return fmt.Errorf("invalid params for auth %s: %w", a.Type, err)
+		}
+		for _, ref := range collectSecretRefs(cfg) {
+			if err := secrets.ValidateSecret(ref); err != nil {
+				return fmt.Errorf("invalid params for auth %s: %w", a.Type, err)
+			}
 		}
 		i.OutgoingAuth[idx].parsed = cfg
 	}

@@ -7,20 +7,20 @@ import (
 	"strings"
 
 	"github.com/winhowes/AuthTransformer/app/authplugins"
-  "github.com/winhowes/AuthTransformer/app/secrets"
+	"github.com/winhowes/AuthTransformer/app/secrets"
 )
 
 // TokenAuth checks that the caller supplied one of the configured tokens.
-type tokenParams struct {
+type params struct {
 	Secrets []string `json:"secrets"`
 	Header  string   `json:"header"`
-  Prefix  string   `json:"prefix"`
+	Prefix  string   `json:"prefix"`
 }
 
 type TokenAuth struct{}
 
-func (t *TokenAuth) Name() string { return "token" }
-func (t *TokenAuth) RequiredParams() []string { return []string{"token", "header"} }
+func (t *TokenAuth) Name() string             { return "token" }
+func (t *TokenAuth) RequiredParams() []string { return []string{"secrets", "header"} }
 func (t *TokenAuth) OptionalParams() []string { return []string{"prefix"} }
 
 func (t *TokenAuth) ParseParams(m map[string]interface{}) (interface{}, error) {
@@ -28,7 +28,7 @@ func (t *TokenAuth) ParseParams(m map[string]interface{}) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	var p tokenParams
+	var p params
 	if err := json.Unmarshal(data, &p); err != nil {
 		return nil, err
 	}
@@ -38,13 +38,13 @@ func (t *TokenAuth) ParseParams(m map[string]interface{}) (interface{}, error) {
 	return &p, nil
 }
 
-func (t *TokenAuth) Authenticate(r *http.Request, params interface{}) bool {
-	cfg, ok := params.(*tokenParams)
+func (t *TokenAuth) Authenticate(r *http.Request, p interface{}) bool {
+	cfg, ok := p.(*params)
 	if !ok {
 		return false
 	}
 	tokenValue := r.Header.Get(cfg.Header)
-	tokenValue = strings.TrimPrefix(tokenValue, prefix)
+	tokenValue = strings.TrimPrefix(tokenValue, cfg.Prefix)
 	for _, ref := range cfg.Secrets {
 		token, err := secrets.LoadSecret(ref)
 		if err == nil && tokenValue == token {
