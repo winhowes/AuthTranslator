@@ -1,4 +1,4 @@
-package main
+package googleoidc
 
 import (
 	"fmt"
@@ -6,7 +6,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/winhowes/AuthTransformer/app/authplugins/outgoing"
 	_ "github.com/winhowes/AuthTransformer/app/secrets/plugins"
 )
 
@@ -22,11 +21,11 @@ func TestGoogleOIDCAddAuth(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	oldHost := outgoing.MetadataHost
-	outgoing.MetadataHost = ts.URL
-	defer func() { outgoing.MetadataHost = oldHost }()
+	oldHost := MetadataHost
+	MetadataHost = ts.URL
+	defer func() { MetadataHost = oldHost }()
 
-	p := outgoing.GoogleOIDC{}
+	p := GoogleOIDC{}
 	cfg, err := p.ParseParams(map[string]interface{}{"audience": "testaud"})
 	if err != nil {
 		t.Fatal(err)
@@ -45,11 +44,11 @@ func TestGoogleOIDCDefaults(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	oldHost := outgoing.MetadataHost
-	outgoing.MetadataHost = ts.URL
-	defer func() { outgoing.MetadataHost = oldHost }()
+	oldHost := MetadataHost
+	MetadataHost = ts.URL
+	defer func() { MetadataHost = oldHost }()
 
-	p := outgoing.GoogleOIDC{}
+	p := GoogleOIDC{}
 	cfg, err := p.ParseParams(map[string]interface{}{"audience": "aud"})
 	if err != nil {
 		t.Fatal(err)

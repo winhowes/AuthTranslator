@@ -1,18 +1,16 @@
-package main
+package basic
 
 import (
 	"encoding/base64"
 	"net/http"
 	"testing"
 
-	"github.com/winhowes/AuthTransformer/app/authplugins/incoming"
-	"github.com/winhowes/AuthTransformer/app/authplugins/outgoing"
 	_ "github.com/winhowes/AuthTransformer/app/secrets/plugins"
 )
 
 func TestBasicOutgoingAddAuth(t *testing.T) {
 	r := &http.Request{Header: http.Header{}}
-	p := outgoing.BasicAuthOut{}
+	p := BasicAuthOut{}
 	t.Setenv("CREDS", "user:pass")
 	cfg, err := p.ParseParams(map[string]interface{}{"secrets": []string{"env:CREDS"}})
 	if err != nil {
@@ -28,7 +26,7 @@ func TestBasicOutgoingAddAuth(t *testing.T) {
 func TestBasicIncomingAuth(t *testing.T) {
 	cred := base64.StdEncoding.EncodeToString([]byte("user:pass"))
 	r := &http.Request{Header: http.Header{"Authorization": []string{"Basic " + cred}}}
-	p := incoming.BasicAuth{}
+	p := BasicAuth{}
 	t.Setenv("CREDS", "user:pass")
 	cfg, err := p.ParseParams(map[string]interface{}{"secrets": []string{"env:CREDS"}})
 	if err != nil {
@@ -42,7 +40,7 @@ func TestBasicIncomingAuth(t *testing.T) {
 func TestBasicIncomingAuthFail(t *testing.T) {
 	cred := base64.StdEncoding.EncodeToString([]byte("user:wrong"))
 	r := &http.Request{Header: http.Header{"Authorization": []string{"Basic " + cred}}}
-	p := incoming.BasicAuth{}
+	p := BasicAuth{}
 	t.Setenv("CREDS", "user:pass")
 	cfg, err := p.ParseParams(map[string]interface{}{"secrets": []string{"env:CREDS"}})
 	if err != nil {
@@ -54,8 +52,8 @@ func TestBasicIncomingAuthFail(t *testing.T) {
 }
 
 func TestBasicPluginOptionalParams(t *testing.T) {
-	in := incoming.BasicAuth{}
-	out := outgoing.BasicAuthOut{}
+	in := BasicAuth{}
+	out := BasicAuthOut{}
 	if got := in.OptionalParams(); len(got) != 2 || got[0] != "header" || got[1] != "prefix" {
 		t.Fatalf("unexpected optional params: %v", got)
 	}
