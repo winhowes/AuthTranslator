@@ -37,30 +37,40 @@ AuthTransformer is a simple Go-based reverse proxy that injects authentication t
    
    ```json
    {
-       "integrations": [
-           {
-               "name": "example",
-               "destination": "http://backend.example.com",
-               "in_rate_limit": 100,
-               "out_rate_limit": 1000,
-              "incoming_auth": [
-                  {"type": "token", "params": {"secrets": ["env:IN_TOKEN"], "header": "X-Auth"}}
-              ],
+        "integrations": [
+            {
+                "name": "example",
+                "destination": "http://backend.example.com",
+                "in_rate_limit": 100,
+                "out_rate_limit": 1000,
+               "incoming_auth": [
+                   {"type": "token", "params": {"secrets": ["env:IN_TOKEN"], "header": "X-Auth"}}
+               ],
                 "outgoing_auth": [
                     {"type": "token", "params": {"secrets": ["env:OUT_TOKEN"], "header": "X-Auth"}}
-                ],
-                "allowlist": [
-                    {
-                        "id": "user-token",
-                        "rules": [
-                            {"path": "/allowed", "methods": {"GET": {}}}
-                        ]
-                    }
                 ]
             }
         ]
     }
     ```
+
+   The allowlist configuration lives in a separate `allowlist.json` file:
+
+   ```json
+   [
+       {
+           "integration": "example",
+           "callers": [
+               {
+                   "id": "user-token",
+                   "rules": [
+                       {"path": "/allowed", "methods": {"GET": {}}}
+                   ]
+               }
+           ]
+       }
+   ]
+   ```
 
 
    - **integrations**: Defines proxy routes, rate limits and authentication methods. Secret references use the `env:` or KMS-prefixed formats described below.
@@ -78,7 +88,7 @@ AuthTransformer is a simple Go-based reverse proxy that injects authentication t
 
 3. **Running**
 
-   The listen address can be configured with the `-addr` flag. By default the server listens on `:8080`. Incoming requests are matched against the `X-AT-Int` header, if present, or otherwise the host header to determine the route and associated authentication plugin. Use `-disable_x_at_int` to ignore the header entirely or `-x_at_int_host` to only respect the header when a specific host is requested.
+   The listen address can be configured with the `-addr` flag. By default the server listens on `:8080`. Incoming requests are matched against the `X-AT-Int` header, if present, or otherwise the host header to determine the route and associated authentication plugin. Use `-disable_x_at_int` to ignore the header entirely or `-x_at_int_host` to only respect the header when a specific host is requested. The allowlist file can be specified with `-allowlist`; it defaults to `allowlist.json`.
 
 4. **Run Locally**
 
@@ -115,7 +125,7 @@ AuthTransformer is a simple Go-based reverse proxy that injects authentication t
    ```bash
    export IN_TOKEN=secret-in
    export OUT_TOKEN=secret-out
-   go run ./app
+   go run ./app -allowlist allowlist.json
    ```
 
    In another terminal, call the proxy using the integration name as the Host header:

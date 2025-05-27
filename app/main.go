@@ -21,14 +21,38 @@ import (
 	_ "github.com/winhowes/AuthTransformer/app/secrets/plugins"
 )
 
+type AllowlistEntry struct {
+	Integration string         `json:"integration"`
+	Callers     []CallerConfig `json:"callers"`
+}
+
 type Config struct {
 	Integrations []Integration `json:"integrations"`
+}
+
+func loadAllowlists(filename string) ([]AllowlistEntry, error) {
+	f, err := os.Open(filename)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	dec := json.NewDecoder(f)
+	dec.DisallowUnknownFields()
+
+	var entries []AllowlistEntry
+	if err := dec.Decode(&entries); err != nil {
+		return nil, err
+	}
+
+	return entries, nil
 }
 
 var debug = flag.Bool("debug", false, "enable debug mode")
 var disableXATInt = flag.Bool("disable_x_at_int", false, "ignore X-AT-Int header for routing")
 var xAtIntHost = flag.String("x_at_int_host", "", "only respect X-AT-Int header when request Host matches this value")
 var addr = flag.String("addr", ":8080", "listen address")
+var allowlistFile = flag.String("allowlist", "allowlist.json", "path to allowlist configuration")
 
 func loadConfig(filename string) (*Config, error) {
 	f, err := os.Open(filename)
@@ -167,7 +191,8 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if len(integ.AllowedCallers) > 0 {
+	callers := GetAllowlist(integ.Name)
+	if len(callers) > 0 {
 		cons, ok := findConstraint(integ, callerID, r.URL.Path, r.Method)
 		if !ok {
 			http.Error(w, "Forbidden", http.StatusForbidden)
@@ -207,6 +232,14 @@ func main() {
 		if err := AddIntegration(&config.Integrations[i]); err != nil {
 			log.Fatalf("failed to load integration %s: %v", config.Integrations[i].Name, err)
 		}
+	}
+
+	entries, err := loadAllowlists(*allowlistFile)
+	if err != nil && !os.IsNotExist(err) {
+		log.Fatalf("failed to load allowlist: %v", err)
+	}
+	for _, al := range entries {
+		SetAllowlist(al.Integration, al.Callers)
 	}
 
 	// Include timestamps in log output
