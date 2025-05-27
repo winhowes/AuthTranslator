@@ -1,0 +1,75 @@
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"flag"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+
+	"github.com/winhowes/AuthTransformer/cmd/integrations/plugins"
+)
+
+var server = flag.String("server", "http://localhost:8080/integrations", "integration endpoint")
+
+func main() {
+	flag.Parse()
+	if flag.NArg() < 1 {
+		fmt.Fprintln(os.Stderr, "usage: integrations <plugin> [options]")
+		os.Exit(1)
+	}
+	plugin := flag.Arg(0)
+	args := flag.Args()[1:]
+
+	switch plugin {
+	case "slack":
+		fs := flag.NewFlagSet("slack", flag.ExitOnError)
+		name := fs.String("name", "slack", "integration name")
+		token := fs.String("token", "", "secret reference for API token")
+		sign := fs.String("signing-secret", "", "secret reference for signing secret")
+		fs.Parse(args)
+		if *token == "" || *sign == "" {
+			fmt.Fprintln(os.Stderr, "-token and -signing-secret are required")
+			os.Exit(1)
+		}
+		integ := plugins.Slack(*name, *token, *sign)
+		sendIntegration(integ)
+	case "github":
+		fs := flag.NewFlagSet("github", flag.ExitOnError)
+		name := fs.String("name", "github", "integration name")
+		token := fs.String("token", "", "secret reference for API token")
+		secret := fs.String("webhook-secret", "", "secret reference for webhook secret")
+		fs.Parse(args)
+		if *token == "" || *secret == "" {
+			fmt.Fprintln(os.Stderr, "-token and -webhook-secret are required")
+			os.Exit(1)
+		}
+		integ := plugins.GitHub(*name, *token, *secret)
+		sendIntegration(integ)
+	default:
+		fmt.Fprintf(os.Stderr, "unknown plugin %s\n", plugin)
+		os.Exit(1)
+	}
+}
+
+func sendIntegration(i plugins.Integration) {
+	data, err := json.Marshal(i)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	resp, err := http.Post(*server, "application/json", bytes.NewBuffer(data))
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusCreated {
+		body, _ := io.ReadAll(resp.Body)
+		fmt.Fprintf(os.Stderr, "server error: %s\n%s\n", resp.Status, string(body))
+		os.Exit(1)
+	}
+	fmt.Println("integration added")
+}

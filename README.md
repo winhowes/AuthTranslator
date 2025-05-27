@@ -124,6 +124,19 @@ AuthTransformer is a simple Go-based reverse proxy that injects authentication t
    curl -H "Host: example" -H "X-Auth: $IN_TOKEN" http://localhost:8080/
    ```
 
+## Integration CLI
+
+When run with the `-debug` flag the server exposes a `/integrations` endpoint for adding integrations. A helper CLI is available under `cmd/integrations` to create Slack or GitHub integrations with minimal flags.
+
+Add Slack:
+```bash
+go run ./cmd/integrations slack -token env:SLACK_TOKEN -signing-secret env:SLACK_SIGNING
+```
+Add GitHub:
+```bash
+go run ./cmd/integrations github -token env:GITHUB_TOKEN -webhook-secret env:GITHUB_SECRET
+```
+
 ## Running Tests
 
 Use the Go toolchain to vet and test the code:
