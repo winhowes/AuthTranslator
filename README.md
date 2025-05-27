@@ -107,6 +107,20 @@ Use the Go toolchain to run the unit tests from the repository root:
 GO111MODULE=off go test ./...
 ```
 
+## Docker
+
+Build the container image:
+
+```bash
+docker build -t authtransformer .
+```
+
+Run the image exposing port 8080:
+
+```bash
+docker run -p 8080:8080 authtransformer
+```
+
 ## Logging
 
 AuthTransformer writes log messages to standard output. Each request generates an entry showing the HTTP method, host, path and remote address. Authentication failures and rate limiting events are also logged. The logger is configured with Go's standard time-prefixed format.
