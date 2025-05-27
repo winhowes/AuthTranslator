@@ -24,6 +24,9 @@ func TestGoogleOIDCAddAuth(t *testing.T) {
 	oldHost := MetadataHost
 	MetadataHost = ts.URL
 	defer func() { MetadataHost = oldHost }()
+	oldClient := HTTPClient
+	HTTPClient = ts.Client()
+	defer func() { HTTPClient = oldClient }()
 
 	p := GoogleOIDC{}
 	cfg, err := p.ParseParams(map[string]interface{}{"audience": "testaud"})
@@ -47,6 +50,9 @@ func TestGoogleOIDCDefaults(t *testing.T) {
 	oldHost := MetadataHost
 	MetadataHost = ts.URL
 	defer func() { MetadataHost = oldHost }()
+	oldClient := HTTPClient
+	HTTPClient = ts.Client()
+	defer func() { HTTPClient = oldClient }()
 
 	p := GoogleOIDC{}
 	cfg, err := p.ParseParams(map[string]interface{}{"audience": "aud"})
