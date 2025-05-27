@@ -13,6 +13,7 @@ The project exists to make it trivial to translate one type of authentication in
 
 - **Reverse Proxy**: Forwards incoming HTTP requests to a target backend based on the requested host or `X-AT-Int` header. The header can be disabled or restricted to a specific host using command-line flags.
 - **Pluggable Authentication**: Supports "basic", "token" and Google OIDC authentication types with room for extension.
+- **Extensible Plugins**: Add new auth, secret and integration plugins to cover different systems.
 - **Rate Limiting**: Limits the number of requests per caller and per host within a rolling window.
 - **Allowlist**: Integrations can restrict specific callers to particular paths, methods and required parameters.
 - **Configuration Driven**: Behavior is controlled via a JSON configuration file.
@@ -138,7 +139,11 @@ Integration plugins can bundle common allowlist rules into **capabilities**. Ass
 
 ### Writing Plugins
 
-New functionality can be added without modifying the core server.
+New functionality can be added without modifying the core server. There are three plugin categories:
+
+- **Auth plugins** handle incoming and outgoing authentication.
+- **Secret plugins** resolve secret references from external providers.
+- **Integration plugins** generate predefined integration definitions and capability helpers for the CLI.
 
 **Auth plugins** live under `app/authplugins`. Implement the
 `IncomingAuthPlugin` or `OutgoingAuthPlugin` interface and call the appropriate
@@ -149,9 +154,7 @@ New functionality can be added without modifying the core server.
 subdirectories of `app/secrets/plugins` and register themselves with
 `secrets.Register`.
 
-The CLI in `cmd/integrations` can be extended by creating a new helper in
-`cmd/integrations/plugins` that returns an `Integration` struct. Add a case to
-`cmd/integrations/main.go` so the CLI recognizes the new plugin name.
+Integration plugins live under `cmd/integrations/plugins`. Each function returns an `Integration` struct and may define capabilities. Add a case to `cmd/integrations/main.go` so the CLI recognizes the new plugin.
 
 3. **Running**
 
