@@ -1,10 +1,12 @@
 package googleoidc
 
 import (
+	"encoding/base64"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	_ "github.com/winhowes/AuthTransformer/app/secrets/plugins"
 )
@@ -57,5 +59,41 @@ func TestGoogleOIDCDefaults(t *testing.T) {
 	p.AddAuth(r, cfg)
 	if got := r.Header.Get("Authorization"); got != "Bearer tok" {
 		t.Fatalf("unexpected header %s", got)
+	}
+}
+
+func makeToken(aud, sub string, exp int64) string {
+	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"none"}`))
+	payload := fmt.Sprintf(`{"aud":"%s","sub":"%s","exp":%d}`, aud, sub, exp)
+	body := base64.RawURLEncoding.EncodeToString([]byte(payload))
+	return header + "." + body + "."
+}
+
+func TestGoogleOIDCIncomingAuth(t *testing.T) {
+	tok := makeToken("aud1", "user1", time.Now().Add(time.Hour).Unix())
+	r := &http.Request{Header: http.Header{"Authorization": []string{"Bearer " + tok}}}
+	p := GoogleOIDCAuth{}
+	cfg, err := p.ParseParams(map[string]interface{}{"audience": "aud1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !p.Authenticate(r, cfg) {
+		t.Fatal("expected authentication to succeed")
+	}
+	if id, ok := p.Identify(r, cfg); !ok || id != "user1" {
+		t.Fatalf("unexpected identifier %s", id)
+	}
+}
+
+func TestGoogleOIDCIncomingAuthFail(t *testing.T) {
+	tok := makeToken("aud2", "u", time.Now().Add(-time.Hour).Unix())
+	r := &http.Request{Header: http.Header{"Authorization": []string{"Bearer " + tok}}}
+	p := GoogleOIDCAuth{}
+	cfg, err := p.ParseParams(map[string]interface{}{"audience": "aud1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Authenticate(r, cfg) {
+		t.Fatal("expected authentication to fail")
 	}
 }
