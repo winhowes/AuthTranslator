@@ -45,40 +45,40 @@ The project exists to make it trivial to translate one type of authentication in
    
    ```json
    {
-        "integrations": [
-            {
-                "name": "example",
-                "destination": "http://backend.example.com",
-                "in_rate_limit": 100,
-                "out_rate_limit": 1000,
-               "incoming_auth": [
-                   {"type": "token", "params": {"secrets": ["env:IN_TOKEN"], "header": "X-Auth"}}
-               ],
-                "outgoing_auth": [
-                    {"type": "token", "params": {"secrets": ["env:OUT_TOKEN"], "header": "X-Auth"}}
-                ]
-            }
-        ]
-    }
-    ```
+     "integrations": [
+       {
+         "name": "example",
+         "destination": "http://backend.example.com",
+         "in_rate_limit": 100,
+         "out_rate_limit": 1000,
+         "incoming_auth": [
+           {"type": "token", "params": {"secrets": ["env:IN_TOKEN"], "header": "X-Auth"}}
+         ],
+         "outgoing_auth": [
+           {"type": "token", "params": {"secrets": ["env:OUT_TOKEN"], "header": "X-Auth"}}
+         ]
+       }
+     ]
+   }
+   ```
 
    The allowlist configuration lives in a separate `allowlist.json` file:
 
    ```json
    [
-       {
-           "integration": "example",
-           "callers": [
-               {
-                   "id": "user-token",
-                   "rules": [
-                       {"path": "/allowed", "methods": {"GET": {}}}
-                   ]
-               }
+     {
+       "integration": "example",
+       "callers": [
+         {
+           "id": "user-token",
+           "rules": [
+             {"path": "/allowed", "methods": {"GET": {}}}
            ]
-       }
-  ]
-  ```
+         }
+       ]
+     }
+   ]
+   ```
 
 ### Allowlist Rules
 
@@ -108,11 +108,11 @@ fields and may list required values:
   "path": "/submit",
   "methods": {
     "POST": {
-  "body": {"tag": ["a", "b"]}
+      "body": {"tag": ["a", "b"]}
+    }
   }
-  }
-  }
-  ```
+}
+```
 
 #### Body Matching
 
