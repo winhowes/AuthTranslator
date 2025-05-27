@@ -69,8 +69,43 @@ AuthTransformer is a simple Go-based reverse proxy that injects authentication t
                }
            ]
        }
-   ]
-   ```
+  ]
+  ```
+
+### Allowlist Rules
+
+Each caller entry lists path patterns and method constraints. `*` matches a
+single path segment while `**` matches any remaining segments. Header names are
+listed under `headers` and required body fields under `body`.
+
+Example rule requiring an `X-Token` header and a JSON field:
+
+```json
+{
+  "path": "/api/**",
+  "methods": {
+    "POST": {
+      "headers": ["X-Token"],
+      "body": {"action": "create"}
+    }
+  }
+}
+```
+
+For `application/x-www-form-urlencoded` requests the `body` keys refer to form
+fields and may list required values:
+
+```json
+{
+  "path": "/submit",
+  "methods": {
+    "POST": {
+  "body": {"tag": ["a", "b"]}
+  }
+  }
+  }
+  ```
+
 
 
    - **integrations**: Defines proxy routes, rate limits and authentication methods. Secret references use the `env:` or KMS-prefixed formats described below.
@@ -85,6 +120,22 @@ AuthTransformer is a simple Go-based reverse proxy that injects authentication t
 | `aws`  | `AWS_KMS_KEY` | Base64 encoded 32 byte key used for decrypting `aws:` secrets. |
 | `azure`| `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET` | Credentials for fetching `azure:` secrets from Key Vault. |
 | `gcp`  | _none_ | Uses the GCP metadata service for authentication when resolving `gcp:` secrets. |
+
+### Writing Plugins
+
+New functionality can be added without modifying the core server.
+
+**Auth plugins** live under `app/authplugins`. Implement the
+`IncomingAuthPlugin` or `OutgoingAuthPlugin` interface and call the appropriate
+`authplugins.RegisterIncoming` or `authplugins.RegisterOutgoing` function in an
+`init()` block.
+
+**Secret plugins** implement the `secrets.Plugin` interface in
+`app/secrets/plugins` and register themselves with `secrets.Register`.
+
+The CLI in `cmd/integrations` can be extended by creating a new helper in
+`cmd/integrations/plugins` that returns an `Integration` struct. Add a case to
+`cmd/integrations/main.go` so the CLI recognizes the new plugin name.
 
 3. **Running**
 
@@ -136,15 +187,27 @@ AuthTransformer is a simple Go-based reverse proxy that injects authentication t
 
 ## Integration CLI
 
-When run with the `-debug` flag the server exposes a `/integrations` endpoint for adding integrations. A helper CLI is available under `cmd/integrations` to create Slack, GitHub, Jira or Linear integrations with minimal flags.
+Start the server with `-debug` so the `/integrations` endpoint is available:
+
+```bash
+go run ./app -debug
+```
+
+Then run the CLI to POST a new integration configuration. The `-server` flag
+controls where the CLI sends the request (default `http://localhost:8080/integrations`).
+
+A helper CLI is available under `cmd/integrations` to create Slack, GitHub, Jira or Linear integrations with minimal flags.
 
 Add Slack:
 ```bash
-go run ./cmd/integrations slack -token env:SLACK_TOKEN -signing-secret env:SLACK_SIGNING
+go run ./cmd/integrations -server http://localhost:8080/integrations \
+  slack -token env:SLACK_TOKEN -signing-secret env:SLACK_SIGNING
 ```
+
 Add GitHub:
 ```bash
-go run ./cmd/integrations github -token env:GITHUB_TOKEN -webhook-secret env:GITHUB_SECRET
+go run ./cmd/integrations -server http://localhost:8080/integrations \
+  github -token env:GITHUB_TOKEN -webhook-secret env:GITHUB_SECRET
 ```
 Add Jira:
 ```bash
