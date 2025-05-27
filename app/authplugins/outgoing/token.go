@@ -3,9 +3,7 @@ package outgoing
 import (
 	"encoding/json"
 	"fmt"
-	"math/rand"
 	"net/http"
-	"time"
 
 	"github.com/winhowes/AuthTransformer/app/authplugins"
 	"github.com/winhowes/AuthTransformer/app/secrets"
@@ -44,11 +42,7 @@ func (t *TokenAuthOut) AddAuth(r *http.Request, p interface{}) {
 	if !ok || len(cfg.Secrets) == 0 {
 		return
 	}
-	if len(cfg.Secrets) > 1 {
-		rand.Seed(time.Now().UnixNano())
-	}
-	ref := cfg.Secrets[rand.Intn(len(cfg.Secrets))]
-	token, err := secrets.LoadSecret(ref)
+	token, err := secrets.LoadRandomSecret(cfg.Secrets)
 	if err != nil {
 		return
 	}
