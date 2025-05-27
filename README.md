@@ -10,6 +10,11 @@ AuthTransformer is a simple Go-based reverse proxy that injects authentication t
 - **Configuration Driven**: Behavior is controlled via a JSON configuration file.
 - **Clean Shutdown**: On SIGINT or SIGTERM the server and rate limiters are gracefully stopped.
 
+## Development Requirements
+
+- [Go](https://golang.org/doc/install) 1.24 or newer.
+- [`golangci-lint`](https://github.com/golangci/golangci-lint) (optional) for running lint checks.
+
 ## Getting Started
 
 1. **Build or Run**
@@ -101,10 +106,17 @@ AuthTransformer is a simple Go-based reverse proxy that injects authentication t
 
 ## Running Tests
 
-Use the Go toolchain to run the unit tests from the repository root:
+Use the Go toolchain to vet and test the code:
 
 ```bash
-GO111MODULE=off go test ./...
+go vet ./...
+go test ./...
+```
+
+If you have [`golangci-lint`](https://github.com/golangci/golangci-lint) installed you can also run:
+
+```bash
+golangci-lint run
 ```
 
 ## Docker
