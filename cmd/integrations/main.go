@@ -103,6 +103,30 @@ func main() {
 		}
 		integ := plugins.ServiceNow(*name, *token)
 		sendIntegration(integ)
+	case "okta":
+		fs := flag.NewFlagSet("okta", flag.ExitOnError)
+		name := fs.String("name", "okta", "integration name")
+		domain := fs.String("domain", "", "okta domain, e.g. myorg.okta.com")
+		token := fs.String("token", "", "secret reference for API token")
+		fs.Parse(args)
+		if *token == "" || *domain == "" {
+			fmt.Fprintln(os.Stderr, "-token and -domain are required")
+			os.Exit(1)
+		}
+		integ := plugins.Okta(*name, *domain, *token)
+		sendIntegration(integ)
+	case "workday":
+		fs := flag.NewFlagSet("workday", flag.ExitOnError)
+		name := fs.String("name", "workday", "integration name")
+		domain := fs.String("domain", "", "workday domain, e.g. myorg.workday.com")
+		token := fs.String("token", "", "secret reference for API token")
+		fs.Parse(args)
+		if *token == "" || *domain == "" {
+			fmt.Fprintln(os.Stderr, "-token and -domain are required")
+			os.Exit(1)
+		}
+		integ := plugins.Workday(*name, *domain, *token)
+		sendIntegration(integ)
 	default:
 		fmt.Fprintf(os.Stderr, "unknown plugin %s\n", plugin)
 		os.Exit(1)
