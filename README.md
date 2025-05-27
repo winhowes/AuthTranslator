@@ -136,7 +136,7 @@ AuthTransformer is a simple Go-based reverse proxy that injects authentication t
 
 ## Integration CLI
 
-When run with the `-debug` flag the server exposes a `/integrations` endpoint for adding integrations. A helper CLI is available under `cmd/integrations` to create Slack or GitHub integrations with minimal flags.
+When run with the `-debug` flag the server exposes a `/integrations` endpoint for adding integrations. A helper CLI is available under `cmd/integrations` to create Slack, GitHub, Jira or Linear integrations with minimal flags.
 
 Add Slack:
 ```bash
@@ -145,6 +145,14 @@ go run ./cmd/integrations slack -token env:SLACK_TOKEN -signing-secret env:SLACK
 Add GitHub:
 ```bash
 go run ./cmd/integrations github -token env:GITHUB_TOKEN -webhook-secret env:GITHUB_SECRET
+```
+Add Jira:
+```bash
+go run ./cmd/integrations jira -token env:JIRA_TOKEN
+```
+Add Linear:
+```bash
+go run ./cmd/integrations linear -token env:LINEAR_TOKEN
 ```
 
 ## Running Tests
