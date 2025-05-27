@@ -24,10 +24,16 @@ func (t *gcpRewriteTransport) RoundTrip(req *http.Request) (*http.Response, erro
 }
 
 func setGCPTestClient(ts *httptest.Server) func() {
-	old := http.DefaultClient
+	oldDef := http.DefaultClient
+	old := HTTPClient
 	u, _ := url.Parse(ts.URL)
-	http.DefaultClient = &http.Client{Transport: &gcpRewriteTransport{rt: ts.Client().Transport, scheme: u.Scheme, host: u.Host}}
-	return func() { http.DefaultClient = old }
+	c := &http.Client{Transport: &gcpRewriteTransport{rt: ts.Client().Transport, scheme: u.Scheme, host: u.Host}}
+	http.DefaultClient = c
+	HTTPClient = c
+	return func() {
+		http.DefaultClient = oldDef
+		HTTPClient = old
+	}
 }
 
 func TestGCPKMSLoad(t *testing.T) {

@@ -21,10 +21,16 @@ func (t *azureRewriteTransport) RoundTrip(req *http.Request) (*http.Response, er
 }
 
 func setAzureTestClient(ts *httptest.Server) func() {
-	old := http.DefaultClient
+	oldDef := http.DefaultClient
+	old := HTTPClient
 	u, _ := url.Parse(ts.URL)
-	http.DefaultClient = &http.Client{Transport: &azureRewriteTransport{rt: ts.Client().Transport, scheme: u.Scheme, host: u.Host}}
-	return func() { http.DefaultClient = old }
+	c := &http.Client{Transport: &azureRewriteTransport{rt: ts.Client().Transport, scheme: u.Scheme, host: u.Host}}
+	http.DefaultClient = c
+	HTTPClient = c
+	return func() {
+		http.DefaultClient = oldDef
+		HTTPClient = old
+	}
 }
 
 func TestAzureKMSLoad(t *testing.T) {
