@@ -155,7 +155,7 @@ These rules apply to nested structures as well. For example, the rule
 matches a body where `items` contains an object with `{"id":1}` anywhere in the
 array.
 
-
+### Built-in Authentication Plugins
 
    - **integrations**: Defines proxy routes, rate limits and authentication methods. Secret references use the `env:`, `file:` or KMS-prefixed formats described below.
    - **google_oidc**: Outgoing auth plugin that retrieves an ID token from the GCP metadata server and sets it in the `Authorization` header for backend requests. The incoming variant validates Google ID tokens against a configured audience.
@@ -185,6 +185,8 @@ Integration plugins can bundle common allowlist rules into **capabilities**. Ass
 - `zendesk.query_status`, `servicenow.query_status` – allow reading ticket status.
 - `sendgrid.send_email`, `sendgrid.manage_contacts`, `sendgrid.update_template` – basic SendGrid operations.
 - `twilio.send_sms`, `twilio.make_call`, `twilio.query_message` – Twilio messaging and voice APIs.
+- `okta.create_user`, `okta.update_user`, `okta.deactivate_user` – manage Okta user accounts.
+- `workday.query_worker` – read worker information from Workday.
 - `stripe.create_charge`, `stripe.refund_charge`, `stripe.create_customer` – Stripe payment flows.
 
 ### Secret Plugin Environment Variables
