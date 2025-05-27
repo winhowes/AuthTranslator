@@ -12,7 +12,7 @@ The project exists to make it trivial to translate one type of authentication in
 ## Features
 
 - **Reverse Proxy**: Forwards incoming HTTP requests to a target backend based on the requested host or `X-AT-Int` header. The header can be disabled or restricted to a specific host using command-line flags.
-- **Pluggable Authentication**: Supports "basic", "token", `hmac_signature`, "jwt" and "mtls" authentication types including Google OIDC with room for extension.
+- **Pluggable Authentication**: Supports "basic", "token", `hmac_signature`, "jwt" and "mtls" authentication types for both incoming and outgoing requests including Google OIDC with room for extension.
 - **Extensible Plugins**: Add new auth, secret and integration plugins to cover different systems.
 - **Rate Limiting**: Limits the number of requests per caller and per host within a rolling window.
 - **Allowlist**: Integrations can restrict specific callers to particular paths, methods and required parameters.
@@ -45,40 +45,40 @@ The project exists to make it trivial to translate one type of authentication in
    
    ```json
    {
-        "integrations": [
-            {
-                "name": "example",
-                "destination": "http://backend.example.com",
-                "in_rate_limit": 100,
-                "out_rate_limit": 1000,
-               "incoming_auth": [
-                   {"type": "token", "params": {"secrets": ["env:IN_TOKEN"], "header": "X-Auth"}}
-               ],
-                "outgoing_auth": [
-                    {"type": "token", "params": {"secrets": ["env:OUT_TOKEN"], "header": "X-Auth"}}
-                ]
-            }
-        ]
-    }
-    ```
+     "integrations": [
+       {
+         "name": "example",
+         "destination": "http://backend.example.com",
+         "in_rate_limit": 100,
+         "out_rate_limit": 1000,
+         "incoming_auth": [
+           {"type": "token", "params": {"secrets": ["env:IN_TOKEN"], "header": "X-Auth"}}
+         ],
+         "outgoing_auth": [
+           {"type": "token", "params": {"secrets": ["env:OUT_TOKEN"], "header": "X-Auth"}}
+         ]
+       }
+     ]
+   }
+   ```
 
    The allowlist configuration lives in a separate `allowlist.json` file:
 
    ```json
    [
-       {
-           "integration": "example",
-           "callers": [
-               {
-                   "id": "user-token",
-                   "rules": [
-                       {"path": "/allowed", "methods": {"GET": {}}}
-                   ]
-               }
+     {
+       "integration": "example",
+       "callers": [
+         {
+           "id": "user-token",
+           "rules": [
+             {"path": "/allowed", "methods": {"GET": {}}}
            ]
-       }
-  ]
-  ```
+         }
+       ]
+     }
+   ]
+   ```
 
 ### Allowlist Rules
 
@@ -108,11 +108,11 @@ fields and may list required values:
   "path": "/submit",
   "methods": {
     "POST": {
-  "body": {"tag": ["a", "b"]}
+      "body": {"tag": ["a", "b"]}
+    }
   }
-  }
-  }
-  ```
+}
+```
 
 #### Body Matching
 
@@ -138,8 +138,8 @@ array.
 
    - **integrations**: Defines proxy routes, rate limits and authentication methods. Secret references use the `env:` or KMS-prefixed formats described below.
    - **google_oidc**: Outgoing auth plugin that retrieves an ID token from the GCP metadata server and sets it in the `Authorization` header for backend requests. The incoming variant validates Google ID tokens against a configured audience.
-   - **jwt**: Validates generic JWTs using provided keys.
-   - **mtls**: Requires a verified client certificate and optional subject match.
+   - **jwt**: Validates generic JWTs using provided keys and can attach tokens on outgoing requests.
+   - **mtls**: Requires a verified client certificate and optional subject match, and accepts outbound certificate configuration.
    - **token**: Header token comparison for simple shared secrets.
    - **basic**: Performs HTTP Basic authentication using credentials loaded from configured secrets.
    - **hmac_signature**: Computes or verifies request HMAC digests with a configurable algorithm.
@@ -151,6 +151,10 @@ Integration plugins can bundle common allowlist rules into **capabilities**. Ass
 - `slack.post_public_as` – permit posting a message as a specific username.
 - `slack.post_channels_as` – restrict posting to a defined set of channels.
 - `github.comment` – allow creating issue comments in a given repository (requires the `repo` parameter).
+- `github.create_issue` – permit opening issues in a given repository.
+- `github.update_issue` – allow editing or closing issues in a given repository.
+- `ghe.comment`, `ghe.create_issue`, `ghe.update_issue` – GitHub Enterprise equivalents requiring the `repo` parameter.
+- `gitlab.comment`, `gitlab.create_issue`, `gitlab.update_issue` – similar capabilities for GitLab projects (use the `project` parameter).
 - `asana.create_task`, `linear.create_task`, `jira.create_task` – permit creating tasks or issues.
 - `asana.update_status`, `linear.update_status`, `jira.update_status` – allow modifying task or issue status.
 - `asana.add_comment`, `linear.add_comment`, `jira.add_comment` – permit adding comments.
@@ -248,7 +252,7 @@ go run ./app -debug
 Then run the CLI to POST a new integration configuration. The `-server` flag
 controls where the CLI sends the request (default `http://localhost:8080/integrations`).
 
-A helper CLI is available under `cmd/integrations` to create Slack, GitHub, Jira, Linear, Asana, Zendesk, ServiceNow, SendGrid, Twilio or Stripe integrations with minimal flags.
+A helper CLI is available under `cmd/integrations` to create Slack, GitHub, GitHub Enterprise, GitLab, Jira, Linear, Asana, Zendesk, ServiceNow, SendGrid, Twilio or Stripe integrations with minimal flags.
 
 Add Slack:
 ```bash
@@ -260,6 +264,16 @@ Add GitHub:
 ```bash
 go run ./cmd/integrations -server http://localhost:8080/integrations \
   github -token env:GITHUB_TOKEN -webhook-secret env:GITHUB_SECRET
+```
+Add GitHub Enterprise:
+```bash
+go run ./cmd/integrations -server http://localhost:8080/integrations \
+  ghe -domain ghe.example.com -token env:GHE_TOKEN -webhook-secret env:GHE_SECRET
+```
+Add GitLab:
+```bash
+go run ./cmd/integrations -server http://localhost:8080/integrations \
+  gitlab -token env:GITLAB_TOKEN
 ```
 Add Jira:
 ```bash

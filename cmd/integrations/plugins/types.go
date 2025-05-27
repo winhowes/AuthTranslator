@@ -14,5 +14,4 @@ type Integration struct {
 	OutRateLimit   int                `json:"out_rate_limit"`
 	IncomingAuth   []AuthPluginConfig `json:"incoming_auth"`
 	OutgoingAuth   []AuthPluginConfig `json:"outgoing_auth"`
-	AllowedCallers []struct{}         `json:"allowlist,omitempty"`
 }

@@ -57,3 +57,17 @@ func TestJWTAuthFail(t *testing.T) {
 		t.Fatal("expected authentication to fail")
 	}
 }
+
+func TestJWTOutgoingAddAuth(t *testing.T) {
+	r := &http.Request{Header: http.Header{}}
+	p := JWTAuthOut{}
+	t.Setenv("TOK", "tok123")
+	cfg, err := p.ParseParams(map[string]interface{}{"secrets": []string{"env:TOK"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.AddAuth(r, cfg)
+	if got := r.Header.Get("Authorization"); got != "Bearer tok123" {
+		t.Fatalf("expected 'Bearer tok123', got %s", got)
+	}
+}

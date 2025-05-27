@@ -38,3 +38,20 @@ func TestMTLSAuthFail(t *testing.T) {
 		t.Fatal("expected failure without TLS")
 	}
 }
+
+func TestMTLSOutgoingParse(t *testing.T) {
+	p := MTLSAuthOut{}
+	cfg, err := p.ParseParams(map[string]interface{}{"cert": "env:CERT", "key": "env:KEY"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	params, ok := cfg.(*outParams)
+	if !ok || params.Cert != "env:CERT" || params.Key != "env:KEY" {
+		t.Fatalf("unexpected config %+v", cfg)
+	}
+	r := &http.Request{Header: http.Header{}}
+	p.AddAuth(r, cfg)
+	if len(r.Header) != 0 {
+		t.Fatalf("expected no headers set, got %v", r.Header)
+	}
+}

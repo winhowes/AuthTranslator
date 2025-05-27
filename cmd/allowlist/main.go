@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 
@@ -64,7 +63,7 @@ func addEntry(args []string) {
 	}
 
 	// load file
-	data, err := ioutil.ReadFile(*file)
+	data, err := os.ReadFile(*file)
 	if err != nil && !os.IsNotExist(err) {
 		fmt.Println(err)
 		return
@@ -103,5 +102,5 @@ func addEntry(args []string) {
 	callerCfg.Capabilities = append(callerCfg.Capabilities, plugins.CapabilityConfig{Name: *capName, Params: params})
 
 	out, _ := json.MarshalIndent(entries, "", "    ")
-	ioutil.WriteFile(*file, out, 0644)
+	os.WriteFile(*file, out, 0644)
 }

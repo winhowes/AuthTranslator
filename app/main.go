@@ -6,7 +6,6 @@ import (
 	"flag"
 	"log"
 	"net/http"
-	"net/http/httputil"
 	"os"
 	"os/signal"
 	"strings"
@@ -19,7 +18,9 @@ import (
 	_ "github.com/winhowes/AuthTransformer/app/authplugins/google_oidc"
 	_ "github.com/winhowes/AuthTransformer/app/authplugins/token"
 	_ "github.com/winhowes/AuthTransformer/app/integrationplugins/asana"
+	_ "github.com/winhowes/AuthTransformer/app/integrationplugins/ghe"
 	_ "github.com/winhowes/AuthTransformer/app/integrationplugins/github"
+	_ "github.com/winhowes/AuthTransformer/app/integrationplugins/gitlab"
 	_ "github.com/winhowes/AuthTransformer/app/integrationplugins/jira"
 	_ "github.com/winhowes/AuthTransformer/app/integrationplugins/linear"
 	_ "github.com/winhowes/AuthTransformer/app/integrationplugins/sendgrid"
@@ -222,13 +223,12 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if integ.destinationURL == nil {
+	if integ.proxy == nil {
 		http.Error(w, "Bad Gateway", http.StatusBadGateway)
 		return
 	}
 
-	proxy := httputil.NewSingleHostReverseProxy(integ.destinationURL)
-	proxy.ServeHTTP(w, r)
+	integ.proxy.ServeHTTP(w, r)
 }
 
 func main() {
