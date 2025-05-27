@@ -21,14 +21,14 @@ AuthTransformer is a simple Go-based reverse proxy that injects authentication t
 1. **Build or Run**
    
    ```bash
-   go run ./app
+   go run ./app -config app/config.json
    ```
    
    Or build an executable:
    
    ```bash
    go build -o authtransformer ./app
-   ./authtransformer
+   ./authtransformer -config app/config.json
    ```
 
 2. **Configuration File**
@@ -139,7 +139,7 @@ The CLI in `cmd/integrations` can be extended by creating a new helper in
 
 3. **Running**
 
-   The listen address can be configured with the `-addr` flag. By default the server listens on `:8080`. Incoming requests are matched against the `X-AT-Int` header, if present, or otherwise the host header to determine the route and associated authentication plugin. Use `-disable_x_at_int` to ignore the header entirely or `-x_at_int_host` to only respect the header when a specific host is requested. The allowlist file can be specified with `-allowlist`; it defaults to `allowlist.json`.
+   The listen address can be configured with the `-addr` flag. By default the server listens on `:8080`. Incoming requests are matched against the `X-AT-Int` header, if present, or otherwise the host header to determine the route and associated authentication plugin. Use `-disable_x_at_int` to ignore the header entirely or `-x_at_int_host` to only respect the header when a specific host is requested. The configuration file is chosen with `-config` (default `config.json`). The allowlist file can be specified with `-allowlist`; it defaults to `allowlist.json`.
 
 4. **Run Locally**
 
@@ -176,7 +176,7 @@ The CLI in `cmd/integrations` can be extended by creating a new helper in
    ```bash
    export IN_TOKEN=secret-in
    export OUT_TOKEN=secret-out
-   go run ./app -allowlist allowlist.json
+   go run ./app -config app/config.json -allowlist app/allowlist.json
    ```
 
    In another terminal, call the proxy using the integration name as the Host header:
