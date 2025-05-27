@@ -252,6 +252,11 @@ go run ./app -debug
 Then run the CLI to POST a new integration configuration. The `-server` flag
 controls where the CLI sends the request (default `http://localhost:8080/integrations`).
 
+List existing integrations:
+```bash
+go run ./cmd/integrations list
+```
+
 A helper CLI is available under `cmd/integrations` to create Slack, GitHub, GitHub Enterprise, GitLab, Jira, Linear, Asana, Zendesk, ServiceNow, SendGrid, Twilio or Stripe integrations with minimal flags.
 
 Add Slack:
