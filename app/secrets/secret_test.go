@@ -18,3 +18,26 @@ func TestLoadSecretUnknown(t *testing.T) {
 		t.Fatal("expected error for unknown secret source")
 	}
 }
+
+func TestLoadRandomSecret(t *testing.T) {
+	t.Setenv("A", "first")
+	t.Setenv("B", "second")
+
+	// Single reference
+	val, err := LoadRandomSecret([]string{"env:A"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val != "first" {
+		t.Fatalf("expected 'first', got %s", val)
+	}
+
+	// Multiple references - result should be one of the provided values
+	val, err = LoadRandomSecret([]string{"env:A", "env:B"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val != "first" && val != "second" {
+		t.Fatalf("unexpected value: %s", val)
+	}
+}

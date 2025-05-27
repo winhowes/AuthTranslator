@@ -2,7 +2,9 @@ package secrets
 
 import (
 	"fmt"
+	"math/rand"
 	"strings"
+	"time"
 )
 
 // Plugin fetches a secret value for a given identifier.
@@ -41,4 +43,19 @@ func LoadSecret(ref string) (string, error) {
 		return "", fmt.Errorf("unknown secret source: %s", prefix)
 	}
 	return p.Load(id)
+}
+
+// LoadRandomSecret selects one of the provided secret references at random and
+// resolves it via LoadSecret. When multiple references are given a unique seed
+// is used for the random generator to ensure a different selection on each
+// invocation.
+func LoadRandomSecret(refs []string) (string, error) {
+	if len(refs) == 0 {
+		return "", fmt.Errorf("no secrets provided")
+	}
+	if len(refs) > 1 {
+		rand.Seed(time.Now().UnixNano())
+	}
+	ref := refs[rand.Intn(len(refs))]
+	return LoadSecret(ref)
 }
