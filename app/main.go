@@ -67,6 +67,8 @@ var xAtIntHost = flag.String("x_at_int_host", "", "only respect X-AT-Int header 
 var addr = flag.String("addr", ":8080", "listen address")
 var allowlistFile = flag.String("allowlist", "allowlist.json", "path to allowlist configuration")
 var configFile = flag.String("config", "config.json", "path to configuration file")
+var tlsCert = flag.String("tls-cert", "", "path to TLS certificate")
+var tlsKey = flag.String("tls-key", "", "path to TLS key")
 
 func usage() {
 	fmt.Fprintf(flag.CommandLine.Output(), "Usage: authtranslator [options]\n\n")
@@ -246,6 +248,18 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Upstream response for host %s: %d", host, rec.status)
 }
 
+type server interface {
+	ListenAndServe() error
+	ListenAndServeTLS(certFile, keyFile string) error
+}
+
+func serve(s server, cert, key string) error {
+	if cert != "" && key != "" {
+		return s.ListenAndServeTLS(cert, key)
+	}
+	return s.ListenAndServe()
+}
+
 func main() {
 	flag.Usage = usage
 	flag.Parse()
@@ -281,7 +295,7 @@ func main() {
 	srv := &http.Server{Addr: *addr}
 
 	go func() {
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := serve(srv, *tlsCert, *tlsKey); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("listen: %v", err)
 		}
 	}()

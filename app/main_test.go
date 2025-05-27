@@ -40,3 +40,18 @@ func TestConfigFlagSet(t *testing.T) {
 		t.Fatalf("expected config custom.json, got %s", *configFile)
 	}
 }
+
+type stubServer struct{ tls bool }
+
+func (s *stubServer) ListenAndServe() error                    { return nil }
+func (s *stubServer) ListenAndServeTLS(cert, key string) error { s.tls = true; return nil }
+
+func TestServeUsesTLS(t *testing.T) {
+	srv := &stubServer{}
+	if err := serve(srv, "c", "k"); err != nil {
+		t.Fatal(err)
+	}
+	if !srv.tls {
+		t.Fatal("expected ListenAndServeTLS to be called")
+	}
+}
