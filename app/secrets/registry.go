@@ -1,10 +1,10 @@
 package secrets
 
 import (
+	"crypto/rand"
 	"fmt"
-	"math/rand"
+	"math/big"
 	"strings"
-	"time"
 )
 
 // Plugin fetches a secret value for a given identifier.
@@ -53,9 +53,18 @@ func LoadRandomSecret(refs []string) (string, error) {
 	if len(refs) == 0 {
 		return "", fmt.Errorf("no secrets provided")
 	}
-	if len(refs) > 1 {
-		rand.Seed(time.Now().UnixNano())
+
+	var idx int
+	if len(refs) == 1 {
+		idx = 0
+	} else {
+		nBig, err := rand.Int(rand.Reader, big.NewInt(int64(len(refs))))
+		if err != nil {
+			return "", fmt.Errorf("rand: %w", err)
+		}
+		idx = int(nBig.Int64())
 	}
-	ref := refs[rand.Intn(len(refs))]
+
+	ref := refs[idx]
 	return LoadSecret(ref)
 }

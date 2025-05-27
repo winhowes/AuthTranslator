@@ -8,6 +8,12 @@ AuthTransformer is a simple Go-based reverse proxy that injects authentication t
 - **Pluggable Authentication**: Supports "basic", "token" and Google OIDC authentication types with room for extension.=======
 - **Rate Limiting**: Limits the number of requests per caller and per host within a rolling window.
 - **Configuration Driven**: Behavior is controlled via a JSON configuration file.
+- **Clean Shutdown**: On SIGINT or SIGTERM the server and rate limiters are gracefully stopped.
+
+## Development Requirements
+
+- [Go](https://golang.org/doc/install) 1.24 or newer.
+- [`golangci-lint`](https://github.com/golangci/golangci-lint) (optional) for running lint checks.
 
 ## Getting Started
 
@@ -47,12 +53,22 @@ AuthTransformer is a simple Go-based reverse proxy that injects authentication t
    }
    ```
 
+
    - **integrations**: Defines proxy routes, rate limits and authentication methods. Secret references use the `env:` or KMS-prefixed formats described below.
    - **google_oidc**: Outgoing auth plugin that retrieves an ID token from the GCP metadata server and sets it in the `Authorization` header for backend requests.
 
+### Secret Plugin Environment Variables
+
+| Prefix | Environment Variables | Description |
+| ------ | -------------------- | ----------- |
+| `env`  | Names referenced in the configuration (e.g. `env:IN_TOKEN`) | Secrets are read directly from those environment variables. |
+| `aws`  | `AWS_KMS_KEY` | Base64 encoded 32 byte key used for decrypting `aws:` secrets. |
+| `azure`| `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET` | Credentials for fetching `azure:` secrets from Key Vault. |
+| `gcp`  | _none_ | Uses the GCP metadata service for authentication when resolving `gcp:` secrets. |
+
 3. **Running**
 
-   When started, the server listens on port `8080`. Incoming requests are matched against the `X-AT-Int` header, if present, or otherwise the host header to determine the route and associated authentication plugin. Use `-disable_x_at_int` to ignore the header entirely or `-x_at_int_host` to only respect the header when a specific host is requested.
+   The listen address can be configured with the `-addr` flag. By default the server listens on `:8080`. Incoming requests are matched against the `X-AT-Int` header, if present, or otherwise the host header to determine the route and associated authentication plugin. Use `-disable_x_at_int` to ignore the header entirely or `-x_at_int_host` to only respect the header when a specific host is requested.
 
 4. **Run Locally**
 
@@ -100,10 +116,31 @@ AuthTransformer is a simple Go-based reverse proxy that injects authentication t
 
 ## Running Tests
 
-Use the Go toolchain to run the unit tests from the repository root:
+Use the Go toolchain to vet and test the code:
 
 ```bash
-GO111MODULE=off go test ./...
+go vet ./...
+go test ./...
+```
+
+If you have [`golangci-lint`](https://github.com/golangci/golangci-lint) installed you can also run:
+
+```bash
+golangci-lint run
+```
+
+## Docker
+
+Build the container image:
+
+```bash
+docker build -t authtransformer .
+```
+
+Run the image exposing port 8080:
+
+```bash
+docker run -p 8080:8080 authtransformer
 ```
 
 ## Logging

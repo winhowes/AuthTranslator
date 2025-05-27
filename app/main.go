@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"log"
@@ -8,8 +9,10 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"os/signal"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/winhowes/AuthTransformer/app/authplugins"
@@ -25,16 +28,24 @@ type Config struct {
 var debug = flag.Bool("debug", false, "enable debug mode")
 var disableXATInt = flag.Bool("disable_x_at_int", false, "ignore X-AT-Int header for routing")
 var xAtIntHost = flag.String("x_at_int_host", "", "only respect X-AT-Int header when request Host matches this value")
+var addr = flag.String("addr", ":8080", "listen address")
 
 func loadConfig(filename string) (*Config, error) {
-	data, err := os.ReadFile(filename)
+	f, err := os.Open(filename)
 	if err != nil {
 		return nil, err
 	}
+	defer f.Close()
+
+	dec := json.NewDecoder(f)
+	dec.DisallowUnknownFields()
 
 	var config Config
-	err = json.Unmarshal(data, &config)
-	return &config, err
+	if err := dec.Decode(&config); err != nil {
+		return nil, err
+	}
+
+	return &config, nil
 }
 
 type RateLimiter struct {
@@ -189,5 +200,27 @@ func main() {
 
 	http.HandleFunc("/", proxyHandler)
 
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	srv := &http.Server{Addr: *addr}
+
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("listen: %v", err)
+		}
+	}()
+
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+	<-stop
+
+	log.Println("Shutting down...")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Printf("server shutdown: %v", err)
+	}
+
+	for _, i := range ListIntegrations() {
+		i.inLimiter.Stop()
+		i.outLimiter.Stop()
+	}
 }
