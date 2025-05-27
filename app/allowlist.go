@@ -58,7 +58,15 @@ func matchSegments(pattern, path []string) bool {
 		return len(path) == 0
 	}
 	if pattern[0] == "**" {
-		return true
+		if matchSegments(pattern[1:], path) {
+			// "**" matches zero segments
+			return true
+		}
+		if len(path) > 0 && matchSegments(pattern, path[1:]) {
+			// consume one segment and try again
+			return true
+		}
+		return false
 	}
 	if len(path) == 0 {
 		return false

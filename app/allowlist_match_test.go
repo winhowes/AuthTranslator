@@ -20,6 +20,11 @@ func TestMatchPath(t *testing.T) {
 		{"/foo/**", "/foo/bar/baz", true},
 		{"/bar/**", "/bar", true},
 		{"**", "/any/thing", true},
+		{"**/bar", "foo/bar", true},
+		{"**/bar", "bar", true},
+		{"foo/**/baz", "foo/bar/baz", true},
+		{"foo/**/baz", "foo/baz", true},
+		{"foo/**/baz", "foo/a/b/c/baz", true},
 	}
 	for _, c := range cases {
 		if got := matchPath(c.patt, c.path); got != c.ok {
