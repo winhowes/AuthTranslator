@@ -80,3 +80,22 @@ func TestAddIntegrationInvalidDestination(t *testing.T) {
 		t.Fatal("expected error for invalid destination")
 	}
 }
+
+func TestAddIntegrationDuplicateName(t *testing.T) {
+	i := &Integration{
+		Name:         "testduplicate",
+		Destination:  "http://example.com",
+		InRateLimit:  1,
+		OutRateLimit: 1,
+	}
+	if err := AddIntegration(i); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	t.Cleanup(func() {
+		i.inLimiter.Stop()
+		i.outLimiter.Stop()
+	})
+	if err := AddIntegration(i); err == nil {
+		t.Fatal("expected error for duplicate name")
+	}
+}

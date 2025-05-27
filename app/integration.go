@@ -199,10 +199,13 @@ func AddIntegration(i *Integration) error {
 	}
 
 	// ─── Rate limiters & storage ──────────────────────────────────────────────
+	integrations.Lock()
+	if _, exists := integrations.m[i.Name]; exists {
+		integrations.Unlock()
+		return fmt.Errorf("integration %s already exists", i.Name)
+	}
 	i.inLimiter = NewRateLimiter(i.InRateLimit, time.Minute)
 	i.outLimiter = NewRateLimiter(i.OutRateLimit, time.Minute)
-
-	integrations.Lock()
 	integrations.m[i.Name] = i
 	integrations.Unlock()
 
