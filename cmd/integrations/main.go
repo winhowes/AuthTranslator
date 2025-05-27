@@ -17,13 +17,15 @@ var server = flag.String("server", "http://localhost:8080/integrations", "integr
 func main() {
 	flag.Parse()
 	if flag.NArg() < 1 {
-		fmt.Fprintln(os.Stderr, "usage: integrations <plugin> [options]")
+		fmt.Fprintln(os.Stderr, "usage: integrations <list|plugin> [options]")
 		os.Exit(1)
 	}
 	plugin := flag.Arg(0)
 	args := flag.Args()[1:]
 
 	switch plugin {
+	case "list":
+		listIntegrations()
 	case "slack":
 		fs := flag.NewFlagSet("slack", flag.ExitOnError)
 		name := fs.String("name", "slack", "integration name")
@@ -219,4 +221,28 @@ func sendIntegration(i plugins.Integration) {
 		os.Exit(1)
 	}
 	fmt.Println("integration added")
+}
+
+func listIntegrations() {
+	resp, err := http.Get(*server)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		fmt.Fprintf(os.Stderr, "server error: %s\n%s\n", resp.Status, string(body))
+		os.Exit(1)
+	}
+	var list []struct {
+		Name string `json:"name"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	for _, i := range list {
+		fmt.Println(i.Name)
+	}
 }
