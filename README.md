@@ -53,6 +53,50 @@ AuthTransformer is a simple Go-based reverse proxy that injects authentication t
 
    When started, the server listens on port `8080`. Incoming requests are matched against the host header to determine the route and associated authentication plugin.
 
+4. **Run Locally**
+
+   Start a simple backend and point an integration at it to test the proxy:
+
+   ```bash
+   # terminal 1 - dummy backend
+   python3 -m http.server 9000
+   ```
+
+   Edit `app/config.json` so the integration forwards to the local backend:
+
+   ```json
+   {
+       "integrations": [
+           {
+               "name": "example",
+               "destination": "http://localhost:9000",
+               "in_rate_limit": 100,
+               "out_rate_limit": 1000,
+               "incoming_auth": [
+                   {"type": "token", "params": {"secrets": ["env:IN_TOKEN"], "header": "X-Auth"}}
+               ],
+               "outgoing_auth": [
+                   {"type": "token", "params": {"secrets": ["env:OUT_TOKEN"], "header": "X-Auth"}}
+               ]
+           }
+       ]
+   }
+   ```
+
+   Provide the environment variables referenced by the auth configuration and start the proxy:
+
+   ```bash
+   export IN_TOKEN=secret-in
+   export OUT_TOKEN=secret-out
+   go run ./app
+   ```
+
+   In another terminal, call the proxy using the integration name as the Host header:
+
+   ```bash
+   curl -H "Host: example" -H "X-Auth: $IN_TOKEN" http://localhost:8080/
+   ```
+
 ## Running Tests
 
 Use the Go toolchain to run the unit tests from the repository root:
