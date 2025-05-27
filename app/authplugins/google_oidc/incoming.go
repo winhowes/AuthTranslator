@@ -11,6 +11,7 @@ import (
 	"math/big"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/winhowes/AuthTranslator/app/authplugins"
@@ -28,6 +29,7 @@ var CertsURL = "https://www.googleapis.com/oauth2/v3/certs"
 
 // keyCache stores fetched public keys and their expiration time.
 var keyCache struct {
+	mu     sync.RWMutex
 	keys   map[string]*rsa.PublicKey
 	expiry time.Time
 }
@@ -144,18 +146,25 @@ func fetchKeys() error {
 			exp = t
 		}
 	}
+	keyCache.mu.Lock()
 	keyCache.keys = keys
 	keyCache.expiry = exp
+	keyCache.mu.Unlock()
 	return nil
 }
 
 func getKey(kid string) (*rsa.PublicKey, error) {
-	if keyCache.keys == nil || time.Now().After(keyCache.expiry) {
+	keyCache.mu.RLock()
+	needFetch := keyCache.keys == nil || time.Now().After(keyCache.expiry)
+	keyCache.mu.RUnlock()
+	if needFetch {
 		if err := fetchKeys(); err != nil {
 			return nil, err
 		}
 	}
+	keyCache.mu.RLock()
 	key, ok := keyCache.keys[kid]
+	keyCache.mu.RUnlock()
 	if !ok {
 		return nil, fmt.Errorf("key not found")
 	}

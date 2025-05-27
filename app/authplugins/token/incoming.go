@@ -1,6 +1,7 @@
 package token
 
 import (
+	"crypto/subtle"
 	"fmt"
 	"net/http"
 	"strings"
@@ -43,7 +44,10 @@ func (t *TokenAuth) Authenticate(r *http.Request, p interface{}) bool {
 	tokenValue := strings.TrimPrefix(r.Header.Get(cfg.Header), cfg.Prefix)
 	for _, ref := range cfg.Secrets {
 		token, err := secrets.LoadSecret(ref)
-		if err == nil && tokenValue == token {
+		if err != nil {
+			continue
+		}
+		if subtle.ConstantTimeCompare([]byte(tokenValue), []byte(token)) == 1 {
 			return true
 		}
 	}
