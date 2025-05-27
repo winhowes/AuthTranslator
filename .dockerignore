@@ -1,0 +1,17 @@
+# Exclude version control directories
+.git
+.github
+
+# Ignore Terraform code and state
+terraform/
+*.tfstate
+*.tfstate.*
+
+# Ignore Go test files
+app/*_test.go
+
+# Other development artifacts
+*.md
+*.log
+.env
+
