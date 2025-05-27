@@ -12,7 +12,7 @@ The project exists to make it trivial to translate one type of authentication in
 ## Features
 
 - **Reverse Proxy**: Forwards incoming HTTP requests to a target backend based on the requested host or `X-AT-Int` header. The header can be disabled or restricted to a specific host using command-line flags.
-- **Pluggable Authentication**: Supports "basic", "token" and Google OIDC authentication types with room for extension.
+- **Pluggable Authentication**: Supports "basic", "token", "jwt" and "mtls" authentication types including Google OIDC with room for extension.
 - **Rate Limiting**: Limits the number of requests per caller and per host within a rolling window.
 - **Allowlist**: Integrations can restrict specific callers to particular paths, methods and required parameters.
 - **Configuration Driven**: Behavior is controlled via a JSON configuration file.
@@ -117,6 +117,9 @@ fields and may list required values:
 
    - **integrations**: Defines proxy routes, rate limits and authentication methods. Secret references use the `env:` or KMS-prefixed formats described below.
    - **google_oidc**: Outgoing auth plugin that retrieves an ID token from the GCP metadata server and sets it in the `Authorization` header for backend requests. The incoming variant validates Google ID tokens against a configured audience.
+   - **jwt**: Validates generic JWTs using provided keys.
+   - **mtls**: Requires a verified client certificate and optional subject match.
+   - **token**: Header token comparison for simple shared secrets.
    - **basic**: Performs HTTP Basic authentication using credentials loaded from configured secrets.
 
 ### Capabilities
