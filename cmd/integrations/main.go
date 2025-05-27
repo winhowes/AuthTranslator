@@ -103,6 +103,39 @@ func main() {
 		}
 		integ := plugins.ServiceNow(*name, *token)
 		sendIntegration(integ)
+	case "sendgrid":
+		fs := flag.NewFlagSet("sendgrid", flag.ExitOnError)
+		name := fs.String("name", "sendgrid", "integration name")
+		token := fs.String("token", "", "secret reference for API token")
+		fs.Parse(args)
+		if *token == "" {
+			fmt.Fprintln(os.Stderr, "-token is required")
+			os.Exit(1)
+		}
+		integ := plugins.SendGrid(*name, *token)
+		sendIntegration(integ)
+	case "twilio":
+		fs := flag.NewFlagSet("twilio", flag.ExitOnError)
+		name := fs.String("name", "twilio", "integration name")
+		token := fs.String("token", "", "secret reference for API token")
+		fs.Parse(args)
+		if *token == "" {
+			fmt.Fprintln(os.Stderr, "-token is required")
+			os.Exit(1)
+		}
+		integ := plugins.Twilio(*name, *token)
+		sendIntegration(integ)
+	case "stripe":
+		fs := flag.NewFlagSet("stripe", flag.ExitOnError)
+		name := fs.String("name", "stripe", "integration name")
+		token := fs.String("token", "", "secret reference for API token")
+		fs.Parse(args)
+		if *token == "" {
+			fmt.Fprintln(os.Stderr, "-token is required")
+			os.Exit(1)
+		}
+		integ := plugins.Stripe(*name, *token)
+		sendIntegration(integ)
 	default:
 		fmt.Fprintf(os.Stderr, "unknown plugin %s\n", plugin)
 		os.Exit(1)
