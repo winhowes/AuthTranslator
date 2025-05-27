@@ -23,13 +23,13 @@ func TestAllowlist(t *testing.T) {
 		InRateLimit:  10,
 		OutRateLimit: 10,
 		IncomingAuth: []AuthPluginConfig{{Type: "token", Params: map[string]interface{}{"secrets": []string{"env:TOK"}, "header": "X-Auth"}}},
-		AllowedCallers: []CallerConfig{
-			{ID: "secret", Rules: []CallRule{{Path: "/allowed", Methods: map[string]RequestConstraint{"GET": {}}}}},
-		},
 	}
 	if err := AddIntegration(&integ); err != nil {
 		t.Fatalf("failed to add integration: %v", err)
 	}
+	SetAllowlist("allowlist", []CallerConfig{
+		{ID: "secret", Rules: []CallRule{{Path: "/allowed", Methods: map[string]RequestConstraint{"GET": {}}}}},
+	})
 	t.Cleanup(func() {
 		integ.inLimiter.Stop()
 		integ.outLimiter.Stop()

@@ -8,7 +8,28 @@ import (
 	"net/url"
 	"path"
 	"strings"
+	"sync"
 )
+
+var allowlists = struct {
+	sync.RWMutex
+	m map[string][]CallerConfig
+}{m: make(map[string][]CallerConfig)}
+
+// SetAllowlist registers the caller allowlist for an integration.
+func SetAllowlist(name string, callers []CallerConfig) {
+	allowlists.Lock()
+	allowlists.m[name] = callers
+	allowlists.Unlock()
+}
+
+// GetAllowlist retrieves the allowlist for an integration.
+func GetAllowlist(name string) []CallerConfig {
+	allowlists.RLock()
+	callers := allowlists.m[name]
+	allowlists.RUnlock()
+	return callers
+}
 
 // matchPath checks whether the request path matches the pattern. '*' matches a
 // single path segment while '**' matches any remaining segments.
@@ -132,7 +153,8 @@ func matchBodyMap(data map[string]interface{}, rule map[string]interface{}) bool
 // findConstraint returns the RequestConstraint for the given caller, path and
 // method if one exists.
 func findConstraint(i *Integration, callerID, pth, method string) (RequestConstraint, bool) {
-	for _, c := range i.AllowedCallers {
+	callers := GetAllowlist(i.Name)
+	for _, c := range callers {
 		if c.ID != callerID {
 			continue
 		}
