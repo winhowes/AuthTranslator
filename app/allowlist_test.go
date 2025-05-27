@@ -29,7 +29,7 @@ func TestAllowlist(t *testing.T) {
 		t.Fatalf("failed to add integration: %v", err)
 	}
 	SetAllowlist("allowlist", []CallerConfig{
-		{ID: "secret", Rules: []CallRule{{Path: "/allowed", Methods: map[string]RequestConstraint{"GET": {}}}}},
+		{ID: "*", Rules: []CallRule{{Path: "/allowed", Methods: map[string]RequestConstraint{"GET": {}}}}},
 	})
 	t.Cleanup(func() {
 		integ.inLimiter.Stop()

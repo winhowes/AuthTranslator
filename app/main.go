@@ -183,7 +183,8 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	callerID := r.RemoteAddr
+	rateKey := r.RemoteAddr
+	callerID := "*"
 	for _, cfg := range integ.IncomingAuth {
 		p := authplugins.GetIncoming(cfg.Type)
 		if p != nil {
@@ -195,13 +196,14 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 			if idp, ok := p.(authplugins.Identifier); ok {
 				if id, ok := idp.Identify(r, cfg.parsed); ok {
 					callerID = id
+					rateKey = id
 				}
 			}
 		}
 	}
 
-	if !integ.inLimiter.Allow(callerID) {
-		log.Printf("Caller %s exceeded rate limit on host %s", callerID, host)
+	if !integ.inLimiter.Allow(rateKey) {
+		log.Printf("Caller %s exceeded rate limit on host %s", rateKey, host)
 		http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
 		return
 	}

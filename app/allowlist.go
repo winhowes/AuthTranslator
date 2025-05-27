@@ -187,5 +187,14 @@ func findConstraint(i *Integration, callerID, pth, method string) (RequestConstr
 			}
 		}
 	}
+	if wildcard != nil {
+		for _, r := range wildcard.Rules {
+			if matchPath(r.Path, pth) {
+				if m, ok := r.Methods[method]; ok {
+					return m, true
+				}
+			}
+		}
+	}
 	return RequestConstraint{}, false
 }
