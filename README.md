@@ -131,7 +131,8 @@ New functionality can be added without modifying the core server.
 `init()` block.
 
 **Secret plugins** implement the `secrets.Plugin` interface in
-`app/secrets/plugins` and register themselves with `secrets.Register`.
+subdirectories of `app/secrets/plugins` and register themselves with
+`secrets.Register`.
 
 The CLI in `cmd/integrations` can be extended by creating a new helper in
 `cmd/integrations/plugins` that returns an `Integration` struct. Add a case to
