@@ -23,8 +23,11 @@ import (
 	_ "github.com/winhowes/AuthTransformer/app/integrationplugins/gitlab"
 	_ "github.com/winhowes/AuthTransformer/app/integrationplugins/jira"
 	_ "github.com/winhowes/AuthTransformer/app/integrationplugins/linear"
+	_ "github.com/winhowes/AuthTransformer/app/integrationplugins/sendgrid"
 	_ "github.com/winhowes/AuthTransformer/app/integrationplugins/servicenow"
 	_ "github.com/winhowes/AuthTransformer/app/integrationplugins/slack"
+	_ "github.com/winhowes/AuthTransformer/app/integrationplugins/stripe"
+	_ "github.com/winhowes/AuthTransformer/app/integrationplugins/twilio"
 	_ "github.com/winhowes/AuthTransformer/app/integrationplugins/zendesk"
 	_ "github.com/winhowes/AuthTransformer/app/secrets/plugins"
 )

@@ -161,6 +161,9 @@ Integration plugins can bundle common allowlist rules into **capabilities**. Ass
 - `zendesk.open_ticket`, `servicenow.open_ticket` – allow creating support tickets.
 - `zendesk.update_ticket`, `servicenow.update_ticket` – permit updating ticket details.
 - `zendesk.query_status`, `servicenow.query_status` – allow reading ticket status.
+- `sendgrid.send_email`, `sendgrid.manage_contacts`, `sendgrid.update_template` – basic SendGrid operations.
+- `twilio.send_sms`, `twilio.make_call`, `twilio.query_message` – Twilio messaging and voice APIs.
+- `stripe.create_charge`, `stripe.refund_charge`, `stripe.create_customer` – Stripe payment flows.
 
 ### Secret Plugin Environment Variables
 
@@ -249,7 +252,7 @@ go run ./app -debug
 Then run the CLI to POST a new integration configuration. The `-server` flag
 controls where the CLI sends the request (default `http://localhost:8080/integrations`).
 
-A helper CLI is available under `cmd/integrations` to create Slack, GitHub, GitHub Enterprise, GitLab, Jira, Linear, Asana, Zendesk or ServiceNow integrations with minimal flags.
+A helper CLI is available under `cmd/integrations` to create Slack, GitHub, GitHub Enterprise, GitLab, Jira, Linear, Asana, Zendesk, ServiceNow, SendGrid, Twilio or Stripe integrations with minimal flags.
 
 Add Slack:
 ```bash
@@ -291,6 +294,18 @@ go run ./cmd/integrations zendesk -token env:ZENDESK_TOKEN
 Add ServiceNow:
 ```bash
 go run ./cmd/integrations servicenow -token env:SERVICENOW_TOKEN
+```
+Add SendGrid:
+```bash
+go run ./cmd/integrations sendgrid -token env:SENDGRID_TOKEN
+```
+Add Twilio:
+```bash
+go run ./cmd/integrations twilio -token env:TWILIO_TOKEN
+```
+Add Stripe:
+```bash
+go run ./cmd/integrations stripe -token env:STRIPE_TOKEN
 ```
 
 ## Allowlist CLI
