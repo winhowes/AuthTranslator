@@ -1,19 +1,19 @@
 package main
 
 import (
-        "encoding/json"
-        "flag"
-        "log"
-        "net/http"
-        "net/http/httputil"
-        "net/url"
-        "os"
-        "sync"
-        "time"
+	"encoding/json"
+	"flag"
+	"log"
+	"net/http"
+	"net/http/httputil"
+	"net/url"
+	"os"
+	"sync"
+	"time"
 
-        "github.com/winhowes/AuthTransformer/app/authplugins"
-        _ "github.com/winhowes/AuthTransformer/app/authplugins/incoming"
-        _ "github.com/winhowes/AuthTransformer/app/authplugins/outgoing"
+	"github.com/winhowes/AuthTransformer/app/authplugins"
+	_ "github.com/winhowes/AuthTransformer/app/authplugins/incoming"
+	_ "github.com/winhowes/AuthTransformer/app/authplugins/outgoing"
 )
 
 type Config struct {
@@ -39,6 +39,7 @@ type RateLimiter struct {
 	duration    time.Duration
 	requests    map[string]int
 	resetTicker *time.Ticker
+	done        chan struct{}
 }
 
 func NewRateLimiter(limit int, duration time.Duration) *RateLimiter {
@@ -47,17 +48,29 @@ func NewRateLimiter(limit int, duration time.Duration) *RateLimiter {
 		duration:    duration,
 		requests:    make(map[string]int),
 		resetTicker: time.NewTicker(duration),
+		done:        make(chan struct{}),
 	}
 
 	go func() {
-		for range rl.resetTicker.C {
-			rl.mu.Lock()
-			rl.requests = make(map[string]int)
-			rl.mu.Unlock()
+		for {
+			select {
+			case <-rl.resetTicker.C:
+				rl.mu.Lock()
+				rl.requests = make(map[string]int)
+				rl.mu.Unlock()
+			case <-rl.done:
+				return
+			}
 		}
 	}()
 
 	return rl
+}
+
+// Stop stops the rate limiter's reset goroutine and ticker.
+func (rl *RateLimiter) Stop() {
+	rl.resetTicker.Stop()
+	close(rl.done)
 }
 
 func (rl *RateLimiter) Allow(key string) bool {

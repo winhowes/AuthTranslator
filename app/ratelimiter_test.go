@@ -7,6 +7,7 @@ import (
 
 func TestRateLimiterExceedLimit(t *testing.T) {
 	rl := NewRateLimiter(2, time.Hour)
+	t.Cleanup(rl.Stop)
 	key := "caller"
 
 	if !rl.Allow(key) {
@@ -22,6 +23,7 @@ func TestRateLimiterExceedLimit(t *testing.T) {
 
 func TestRateLimiterReset(t *testing.T) {
 	rl := NewRateLimiter(1, 10*time.Millisecond)
+	t.Cleanup(rl.Stop)
 	key := "caller"
 
 	if !rl.Allow(key) {
@@ -37,5 +39,4 @@ func TestRateLimiterReset(t *testing.T) {
 	if !rl.Allow(key) {
 		t.Fatal("rate limiter should reset after duration")
 	}
-	rl.resetTicker.Stop()
 }
