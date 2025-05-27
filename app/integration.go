@@ -12,7 +12,6 @@ import (
 	"github.com/winhowes/AuthTransformer/app/authplugins"
 )
 
-
 // paramRules is the interface every auth-plugin already satisfies.
 type paramRules interface {
 	RequiredParams() []string
