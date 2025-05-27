@@ -1,17 +1,16 @@
 {
-	"auth_plugins": {
-		"example.com": {
-			"type": "basic",
-			"owner": "admin@example.com"
-		}
-	},
-	"routes": {
-		"example.com": {
-			"target": "http://backend.example.com",
-			"rate_limit": {
-				"per_caller": 100,
-				"per_host": 1000
-			}
-		}
-	}
+    "integrations": [
+        {
+            "name": "example",
+            "destination": "http://backend.example.com",
+            "in_rate_limit": 100,
+            "out_rate_limit": 1000,
+            "incoming_auth": [
+                {"type": "token", "params": {"token": "secret", "header": "X-Auth"}}
+            ],
+            "outgoing_auth": [
+                {"type": "token", "params": {"token": "secret", "header": "X-Auth"}}
+            ]
+        }
+    ]
 }

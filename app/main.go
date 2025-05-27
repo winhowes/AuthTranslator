@@ -9,26 +9,14 @@ import (
 	"os"
 	"sync"
 	"time"
+
+	"authtransformer/app/authplugins"
+	_ "authtransformer/app/authplugins/incoming"
+	_ "authtransformer/app/authplugins/outgoing"
 )
 
 type Config struct {
-	AuthPlugins map[string]AuthPlugin `json:"auth_plugins"`
-	Routes      map[string]Route      `json:"routes"`
-}
-
-type AuthPlugin struct {
-	Type  string `json:"type"`
-	Owner string `json:"owner"`
-}
-
-type Route struct {
-	Target    string          `json:"target"`
-	RateLimit RateLimitConfig `json:"rate_limit"`
-}
-
-type RateLimitConfig struct {
-	PerCaller int `json:"per_caller"`
-	PerHost   int `json:"per_host"`
+	Integrations []Integration `json:"integrations"`
 }
 
 func loadConfig(filename string) (*Config, error) {
@@ -40,44 +28,6 @@ func loadConfig(filename string) (*Config, error) {
 	var config Config
 	err = json.Unmarshal(data, &config)
 	return &config, err
-}
-
-type Authenticator interface {
-	Authenticate(r *http.Request) bool
-	AddAuth(r *http.Request)
-}
-
-type BasicAuth struct{}
-
-func (a *BasicAuth) Authenticate(r *http.Request) bool {
-	// Basic auth logic
-	return true
-}
-
-func (a *BasicAuth) AddAuth(r *http.Request) {
-	// Add basic auth headers
-}
-
-type TokenAuth struct{}
-
-func (a *TokenAuth) Authenticate(r *http.Request) bool {
-	// Token auth logic
-	return true
-}
-
-func (a *TokenAuth) AddAuth(r *http.Request) {
-	// Add token auth headers
-}
-
-func getAuthenticator(pluginType string) Authenticator {
-	switch pluginType {
-	case "basic":
-		return &BasicAuth{}
-	case "token":
-		return &TokenAuth{}
-	default:
-		return nil
-	}
 }
 
 type RateLimiter struct {
@@ -119,63 +69,95 @@ func (rl *RateLimiter) Allow(key string) bool {
 	return true
 }
 
+// integrationsHandler manages creation and listing of integrations.
+func integrationsHandler(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodPost:
+		var i Integration
+		if err := json.NewDecoder(r.Body).Decode(&i); err != nil {
+			http.Error(w, "bad request", http.StatusBadRequest)
+			return
+		}
+		if err := AddIntegration(&i); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		w.WriteHeader(http.StatusCreated)
+	case http.MethodGet:
+		list := ListIntegrations()
+		json.NewEncoder(w).Encode(list)
+	default:
+		w.WriteHeader(http.StatusMethodNotAllowed)
+	}
+}
+
+// proxyHandler handles incoming requests and proxies them according to the integration.
+func proxyHandler(w http.ResponseWriter, r *http.Request) {
+	host := r.Host
+	log.Printf("Incoming %s request for %s%s from %s", r.Method, host, r.URL.Path, r.RemoteAddr)
+	integ, ok := GetIntegration(host)
+	if !ok {
+		log.Printf("No integration configured for host %s", host)
+		http.Error(w, "Not Found", http.StatusNotFound)
+		return
+	}
+
+	for _, cfg := range integ.IncomingAuth {
+		p := authplugins.GetIncoming(cfg.Type)
+		if p != nil && !p.Authenticate(r, cfg.Params) {
+			log.Printf("Authentication failed for host %s from %s", host, r.RemoteAddr)
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+	}
+
+	caller := r.RemoteAddr
+	if !integ.inLimiter.Allow(caller) {
+		log.Printf("Caller %s exceeded rate limit on host %s", caller, host)
+		http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
+		return
+	}
+	if !integ.outLimiter.Allow(host) {
+		log.Printf("Host %s exceeded rate limit", host)
+		http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
+		return
+	}
+
+	for _, cfg := range integ.OutgoingAuth {
+		p := authplugins.GetOutgoing(cfg.Type)
+		if p != nil {
+			p.AddAuth(r, cfg.Params)
+		}
+	}
+
+	target, err := url.Parse(integ.Destination)
+	if err != nil {
+		http.Error(w, "Bad Gateway", http.StatusBadGateway)
+		return
+	}
+
+	proxy := httputil.NewSingleHostReverseProxy(target)
+	proxy.ServeHTTP(w, r)
+}
+
 func main() {
 	config, err := loadConfig("config.json")
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	for i := range config.Integrations {
+		if err := AddIntegration(&config.Integrations[i]); err != nil {
+			log.Fatalf("failed to load integration %s: %v", config.Integrations[i].Name, err)
+		}
+	}
+
 	// Include timestamps in log output
 	log.SetFlags(log.LstdFlags)
 
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		host := r.Host
-		log.Printf("Incoming %s request for %s%s from %s", r.Method, host, r.URL.Path, r.RemoteAddr)
-		route, exists := config.Routes[host]
-		if !exists {
-			log.Printf("No route configured for host %s", host)
-			http.Error(w, "Not Found", http.StatusNotFound)
-			return
-		}
+	http.HandleFunc("/integrations", integrationsHandler)
 
-		// Authentication
-		authPlugin, exists := config.AuthPlugins[host]
-		if exists {
-			auth := getAuthenticator(authPlugin.Type)
-			if !auth.Authenticate(r) {
-				log.Printf("Authentication failed for host %s from %s", host, r.RemoteAddr)
-				http.Error(w, "Unauthorized", http.StatusUnauthorized)
-				return
-			}
-			auth.AddAuth(r)
-		}
-
-		// Rate limiting
-		caller := r.RemoteAddr
-		rlCaller := NewRateLimiter(route.RateLimit.PerCaller, time.Minute)
-		rlHost := NewRateLimiter(route.RateLimit.PerHost, time.Minute)
-
-		if !rlCaller.Allow(caller) {
-			log.Printf("Caller %s exceeded rate limit on host %s", caller, host)
-			http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
-			return
-		}
-		if !rlHost.Allow(host) {
-			log.Printf("Host %s exceeded rate limit", host)
-			http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
-			return
-		}
-
-		// Forward the request
-		target, err := url.Parse(route.Target)
-		if err != nil {
-			http.Error(w, "Bad Gateway", http.StatusBadGateway)
-			return
-		}
-
-		proxy := httputil.NewSingleHostReverseProxy(target)
-		proxy.ServeHTTP(w, r)
-	})
+	http.HandleFunc("/", proxyHandler)
 
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
