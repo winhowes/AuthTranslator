@@ -136,7 +136,7 @@ array.
 
 
 
-   - **integrations**: Defines proxy routes, rate limits and authentication methods. Secret references use the `env:` or KMS-prefixed formats described below.
+   - **integrations**: Defines proxy routes, rate limits and authentication methods. Secret references use the `env:`, `file:` or KMS-prefixed formats described below.
    - **google_oidc**: Outgoing auth plugin that retrieves an ID token from the GCP metadata server and sets it in the `Authorization` header for backend requests. The incoming variant validates Google ID tokens against a configured audience.
    - **jwt**: Validates generic JWTs using provided keys and can attach tokens on outgoing requests.
    - **mtls**: Requires a verified client certificate and optional subject match, and accepts outbound certificate configuration.
@@ -170,6 +170,7 @@ Integration plugins can bundle common allowlist rules into **capabilities**. Ass
 | Prefix | Environment Variables | Description |
 | ------ | -------------------- | ----------- |
 | `env`  | Names referenced in the configuration (e.g. `env:IN_TOKEN`) | Secrets are read directly from those environment variables. |
+| `file` | _none_ | Reads file contents from disk for `file:` secrets. |
 | `aws`  | `AWS_KMS_KEY` | Base64 encoded 32 byte key used for decrypting `aws:` secrets. |
 | `azure`| `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET` | Credentials for fetching `azure:` secrets from Key Vault. |
 | `gcp`  | _none_ | Uses the GCP metadata service for authentication when resolving `gcp:` secrets. |
