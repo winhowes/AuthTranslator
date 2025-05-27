@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -25,6 +26,8 @@ type Config struct {
 }
 
 var debug = flag.Bool("debug", false, "enable debug mode")
+var disableXATInt = flag.Bool("disable_x_at_int", false, "ignore X-AT-Int header for routing")
+var xAtIntHost = flag.String("x_at_int_host", "", "only respect X-AT-Int header when request Host matches this value")
 var addr = flag.String("addr", ":8080", "listen address")
 
 func loadConfig(filename string) (*Config, error) {
@@ -121,9 +124,12 @@ func integrationsHandler(w http.ResponseWriter, r *http.Request) {
 
 // proxyHandler handles incoming requests and proxies them according to the integration.
 func proxyHandler(w http.ResponseWriter, r *http.Request) {
-	host := r.Header.Get("X-AT-Int")
-	if host == "" {
-		host = r.Host
+	host := r.Host
+	if !*disableXATInt {
+		hdr := r.Header.Get("X-AT-Int")
+		if hdr != "" && (*xAtIntHost == "" || strings.EqualFold(r.Host, *xAtIntHost)) {
+			host = hdr
+		}
 	}
 	log.Printf("Incoming %s request for %s%s from %s", r.Method, host, r.URL.Path, r.RemoteAddr)
 	integ, ok := GetIntegration(host)
