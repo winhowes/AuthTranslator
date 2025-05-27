@@ -1,3 +1,3 @@
-module authtransformer
+module github.com/winhowes/AuthTransformer
 
-go 1.18
+go 1.23.8
