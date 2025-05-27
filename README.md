@@ -5,7 +5,7 @@ AuthTransformer is a simple Go-based reverse proxy that injects authentication t
 ## Features
 
 - **Reverse Proxy**: Forwards incoming HTTP requests to a target backend based on the requested host.
-- **Pluggable Authentication**: Supports "basic" and "token" authentication types with room for extension.
+- **Pluggable Authentication**: Supports "basic", "token" and Google OIDC authentication types with room for extension.
 - **Rate Limiting**: Limits the number of requests per caller and per host within a rolling window.
 - **Configuration Driven**: Behavior is controlled via a JSON configuration file.
 
@@ -48,6 +48,7 @@ AuthTransformer is a simple Go-based reverse proxy that injects authentication t
    ```
 
    - **integrations**: Defines proxy routes, rate limits and authentication methods. Secret references use the `env:` or KMS-prefixed formats described below.
+   - **google_oidc**: Outgoing auth plugin that retrieves an ID token from the GCP metadata server and sets it in the `Authorization` header for backend requests.
 
 3. **Running**
 
