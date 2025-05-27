@@ -1,9 +1,9 @@
 package outgoing
 
 import (
-	"authtransformer/app/secrets"
 	"encoding/json"
 	"fmt"
+	"github.com/winhowes/AuthTransformer/app/secrets"
 	"math/rand"
 	"net/http"
 	"time"
@@ -15,12 +15,12 @@ import (
 type tokenOutParams struct {
 	Secrets []string `json:"secrets"`
 	Header  string   `json:"header"`
-  Prefix  string   `json:"prefix"`
+	Prefix  string   `json:"prefix"`
 }
 
 type TokenAuthOut struct{}
 
-func (t *TokenAuthOut) Name() string { return "token" }
+func (t *TokenAuthOut) Name() string             { return "token" }
 func (t *TokenAuthOut) RequiredParams() []string { return []string{"token", "header"} }
 func (t *TokenAuthOut) OptionalParams() []string { return []string{"prefix"} }
 
@@ -52,7 +52,7 @@ func (t *TokenAuthOut) AddAuth(r *http.Request, params interface{}) {
 	if err != nil {
 		return
 	}
-  token = cfg.Prefix + token
+	token = cfg.Prefix + token
 	r.Header.Set(cfg.Header, token)
 }
 
