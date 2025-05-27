@@ -9,10 +9,11 @@ import (
 	"time"
 
 	"github.com/winhowes/AuthTransformer/app/authplugins"
+	"github.com/winhowes/AuthTransformer/app/secrets"
 )
 
 // TokenAuthOut adds a token header to outbound requests.
-type tokenOutParams struct {
+type params struct {
 	Secrets []string `json:"secrets"`
 	Header  string   `json:"header"`
 	Prefix  string   `json:"prefix"`
@@ -21,7 +22,7 @@ type tokenOutParams struct {
 type TokenAuthOut struct{}
 
 func (t *TokenAuthOut) Name() string             { return "token" }
-func (t *TokenAuthOut) RequiredParams() []string { return []string{"token", "header"} }
+func (t *TokenAuthOut) RequiredParams() []string { return []string{"secrets", "header"} }
 func (t *TokenAuthOut) OptionalParams() []string { return []string{"prefix"} }
 
 func (t *TokenAuthOut) ParseParams(m map[string]interface{}) (interface{}, error) {
@@ -29,7 +30,7 @@ func (t *TokenAuthOut) ParseParams(m map[string]interface{}) (interface{}, error
 	if err != nil {
 		return nil, err
 	}
-	var p tokenOutParams
+	var p params
 	if err := json.Unmarshal(data, &p); err != nil {
 		return nil, err
 	}
@@ -39,8 +40,8 @@ func (t *TokenAuthOut) ParseParams(m map[string]interface{}) (interface{}, error
 	return &p, nil
 }
 
-func (t *TokenAuthOut) AddAuth(r *http.Request, params interface{}) {
-	cfg, ok := params.(*tokenOutParams)
+func (t *TokenAuthOut) AddAuth(r *http.Request, p interface{}) {
+	cfg, ok := p.(*params)
 	if !ok || len(cfg.Secrets) == 0 {
 		return
 	}
