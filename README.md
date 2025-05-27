@@ -8,6 +8,7 @@ AuthTransformer is a simple Go-based reverse proxy that injects authentication t
 - **Pluggable Authentication**: Supports "basic", "token" and Google OIDC authentication types with room for extension.
 - **Rate Limiting**: Limits the number of requests per caller and per host within a rolling window.
 - **Configuration Driven**: Behavior is controlled via a JSON configuration file.
+- **Clean Shutdown**: On SIGINT or SIGTERM the server and rate limiters are gracefully stopped.
 
 ## Getting Started
 
