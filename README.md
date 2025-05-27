@@ -151,6 +151,10 @@ Integration plugins can bundle common allowlist rules into **capabilities**. Ass
 - `slack.post_public_as` – permit posting a message as a specific username.
 - `slack.post_channels_as` – restrict posting to a defined set of channels.
 - `github.comment` – allow creating issue comments in a given repository (requires the `repo` parameter).
+- `github.create_issue` – permit opening issues in a given repository.
+- `github.update_issue` – allow editing or closing issues in a given repository.
+- `ghe.comment`, `ghe.create_issue`, `ghe.update_issue` – GitHub Enterprise equivalents requiring the `repo` parameter.
+- `gitlab.comment`, `gitlab.create_issue`, `gitlab.update_issue` – similar capabilities for GitLab projects (use the `project` parameter).
 - `asana.create_task`, `linear.create_task`, `jira.create_task` – permit creating tasks or issues.
 - `asana.update_status`, `linear.update_status`, `jira.update_status` – allow modifying task or issue status.
 - `asana.add_comment`, `linear.add_comment`, `jira.add_comment` – permit adding comments.
@@ -245,7 +249,7 @@ go run ./app -debug
 Then run the CLI to POST a new integration configuration. The `-server` flag
 controls where the CLI sends the request (default `http://localhost:8080/integrations`).
 
-A helper CLI is available under `cmd/integrations` to create Slack, GitHub, Jira, Linear, Asana, Zendesk or ServiceNow integrations with minimal flags.
+A helper CLI is available under `cmd/integrations` to create Slack, GitHub, GitHub Enterprise, GitLab, Jira, Linear, Asana, Zendesk or ServiceNow integrations with minimal flags.
 
 Add Slack:
 ```bash
@@ -257,6 +261,16 @@ Add GitHub:
 ```bash
 go run ./cmd/integrations -server http://localhost:8080/integrations \
   github -token env:GITHUB_TOKEN -webhook-secret env:GITHUB_SECRET
+```
+Add GitHub Enterprise:
+```bash
+go run ./cmd/integrations -server http://localhost:8080/integrations \
+  ghe -domain ghe.example.com -token env:GHE_TOKEN -webhook-secret env:GHE_SECRET
+```
+Add GitLab:
+```bash
+go run ./cmd/integrations -server http://localhost:8080/integrations \
+  gitlab -token env:GITLAB_TOKEN
 ```
 Add Jira:
 ```bash
