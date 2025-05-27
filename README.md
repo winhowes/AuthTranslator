@@ -131,6 +131,12 @@ Integration plugins can bundle common allowlist rules into **capabilities**. Ass
 - `slack.post_public_as` – permit posting a message as a specific username.
 - `slack.post_channels_as` – restrict posting to a defined set of channels.
 - `github.comment` – allow creating issue comments in a given repository (requires the `repo` parameter).
+- `asana.create_task`, `linear.create_task`, `jira.create_task` – permit creating tasks or issues.
+- `asana.update_status`, `linear.update_status`, `jira.update_status` – allow modifying task or issue status.
+- `asana.add_comment`, `linear.add_comment`, `jira.add_comment` – permit adding comments.
+- `zendesk.open_ticket`, `servicenow.open_ticket` – allow creating support tickets.
+- `zendesk.update_ticket`, `servicenow.update_ticket` – permit updating ticket details.
+- `zendesk.query_status`, `servicenow.query_status` – allow reading ticket status.
 
 ### Secret Plugin Environment Variables
 
@@ -219,7 +225,7 @@ go run ./app -debug
 Then run the CLI to POST a new integration configuration. The `-server` flag
 controls where the CLI sends the request (default `http://localhost:8080/integrations`).
 
-A helper CLI is available under `cmd/integrations` to create Slack, GitHub, Jira or Linear integrations with minimal flags.
+A helper CLI is available under `cmd/integrations` to create Slack, GitHub, Jira, Linear, Asana, Zendesk or ServiceNow integrations with minimal flags.
 
 Add Slack:
 ```bash
@@ -239,6 +245,18 @@ go run ./cmd/integrations jira -token env:JIRA_TOKEN
 Add Linear:
 ```bash
 go run ./cmd/integrations linear -token env:LINEAR_TOKEN
+```
+Add Asana:
+```bash
+go run ./cmd/integrations asana -token env:ASANA_TOKEN
+```
+Add Zendesk:
+```bash
+go run ./cmd/integrations zendesk -token env:ZENDESK_TOKEN
+```
+Add ServiceNow:
+```bash
+go run ./cmd/integrations servicenow -token env:SERVICENOW_TOKEN
 ```
 
 ## Allowlist CLI
