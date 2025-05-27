@@ -371,7 +371,7 @@ docker run -p 8080:8080 authtransformer
 
 ## Logging
 
-AuthTransformer writes log messages to standard output. Each request generates an entry showing the HTTP method, host, path and remote address. Authentication failures and rate limiting events are also logged. The logger is configured with Go's standard time-prefixed format.
+AuthTransformer writes log messages to standard output. Each request generates an entry showing the HTTP method, host, path and remote address. Authentication failures and rate limiting events are also logged. HTTP status codes from upstream services are logged, allowing metrics to capture downstream errors. The logger is configured with Go's standard time-prefixed format.
 
 ## Deploying with Terraform
 

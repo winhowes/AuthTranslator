@@ -229,7 +229,12 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	integ.proxy.ServeHTTP(w, r)
+	rec := &statusRecorder{ResponseWriter: w}
+	integ.proxy.ServeHTTP(rec, r)
+	if rec.status == 0 {
+		rec.status = http.StatusOK
+	}
+	log.Printf("Upstream response for host %s: %d", host, rec.status)
 }
 
 func main() {
