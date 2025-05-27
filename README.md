@@ -53,8 +53,18 @@ AuthTransformer is a simple Go-based reverse proxy that injects authentication t
    }
    ```
 
+
    - **integrations**: Defines proxy routes, rate limits and authentication methods. Secret references use the `env:` or KMS-prefixed formats described below.
    - **google_oidc**: Outgoing auth plugin that retrieves an ID token from the GCP metadata server and sets it in the `Authorization` header for backend requests.
+
+### Secret Plugin Environment Variables
+
+| Prefix | Environment Variables | Description |
+| ------ | -------------------- | ----------- |
+| `env`  | Names referenced in the configuration (e.g. `env:IN_TOKEN`) | Secrets are read directly from those environment variables. |
+| `aws`  | `AWS_KMS_KEY` | Base64 encoded 32 byte key used for decrypting `aws:` secrets. |
+| `azure`| `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET` | Credentials for fetching `azure:` secrets from Key Vault. |
+| `gcp`  | _none_ | Uses the GCP metadata service for authentication when resolving `gcp:` secrets. |
 
 3. **Running**
 
