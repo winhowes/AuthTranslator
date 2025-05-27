@@ -14,5 +14,14 @@ jobs:
         uses: actions/setup-go@v4
         with:
           go-version: '1.24.3'
+      - name: Vet code
+        run: go vet ./...
+      - name: Lint (optional)
+        run: |
+          if command -v golangci-lint >/dev/null 2>&1; then
+            golangci-lint run
+          else
+            echo "golangci-lint not installed, skipping"
+          fi
       - name: Run tests
         run: go test ./...

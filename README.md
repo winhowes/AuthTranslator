@@ -4,10 +4,16 @@ AuthTransformer is a simple Go-based reverse proxy that injects authentication t
 
 ## Features
 
-- **Reverse Proxy**: Forwards incoming HTTP requests to a target backend based on the requested host.
-- **Pluggable Authentication**: Supports "basic", "token" and Google OIDC authentication types with room for extension.
+- **Reverse Proxy**: Forwards incoming HTTP requests to a target backend based on the requested host or `X-AT-Int` header.
+- **Pluggable Authentication**: Supports "basic", "token" and Google OIDC authentication types with room for extension.=======
 - **Rate Limiting**: Limits the number of requests per caller and per host within a rolling window.
 - **Configuration Driven**: Behavior is controlled via a JSON configuration file.
+- **Clean Shutdown**: On SIGINT or SIGTERM the server and rate limiters are gracefully stopped.
+
+## Development Requirements
+
+- [Go](https://golang.org/doc/install) 1.24 or newer.
+- [`golangci-lint`](https://github.com/golangci/golangci-lint) (optional) for running lint checks.
 
 ## Getting Started
 
@@ -52,14 +58,79 @@ AuthTransformer is a simple Go-based reverse proxy that injects authentication t
 
 3. **Running**
 
-   The listen address can be configured with the `-addr` flag. By default the server listens on `:8080`. Incoming requests are matched against the host header to determine the route and associated authentication plugin.
+   The listen address can be configured with the `-addr` flag. By default the server listens on `:8080`. Incoming requests are matched against the `X-AT-Int` header, if present, or otherwise the host header to determine the route and associated authentication plugin.
+
+4. **Run Locally**
+
+   Start a simple backend and point an integration at it to test the proxy:
+
+   ```bash
+   # terminal 1 - dummy backend
+   python3 -m http.server 9000
+   ```
+
+   Edit `app/config.json` so the integration forwards to the local backend:
+
+   ```json
+   {
+       "integrations": [
+           {
+               "name": "example",
+               "destination": "http://localhost:9000",
+               "in_rate_limit": 100,
+               "out_rate_limit": 1000,
+               "incoming_auth": [
+                   {"type": "token", "params": {"secrets": ["env:IN_TOKEN"], "header": "X-Auth"}}
+               ],
+               "outgoing_auth": [
+                   {"type": "token", "params": {"secrets": ["env:OUT_TOKEN"], "header": "X-Auth"}}
+               ]
+           }
+       ]
+   }
+   ```
+
+   Provide the environment variables referenced by the auth configuration and start the proxy:
+
+   ```bash
+   export IN_TOKEN=secret-in
+   export OUT_TOKEN=secret-out
+   go run ./app
+   ```
+
+   In another terminal, call the proxy using the integration name as the Host header:
+
+   ```bash
+   curl -H "Host: example" -H "X-Auth: $IN_TOKEN" http://localhost:8080/
+   ```
 
 ## Running Tests
 
-Use the Go toolchain to run the unit tests from the repository root:
+Use the Go toolchain to vet and test the code:
 
 ```bash
-GO111MODULE=off go test ./...
+go vet ./...
+go test ./...
+```
+
+If you have [`golangci-lint`](https://github.com/golangci/golangci-lint) installed you can also run:
+
+```bash
+golangci-lint run
+```
+
+## Docker
+
+Build the container image:
+
+```bash
+docker build -t authtransformer .
+```
+
+Run the image exposing port 8080:
+
+```bash
+docker run -p 8080:8080 authtransformer
 ```
 
 ## Logging

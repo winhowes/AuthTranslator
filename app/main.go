@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"log"
@@ -8,7 +9,9 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"os/signal"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/winhowes/AuthTransformer/app/authplugins"
@@ -25,14 +28,21 @@ var debug = flag.Bool("debug", false, "enable debug mode")
 var addr = flag.String("addr", ":8080", "listen address")
 
 func loadConfig(filename string) (*Config, error) {
-	data, err := os.ReadFile(filename)
+	f, err := os.Open(filename)
 	if err != nil {
 		return nil, err
 	}
+	defer f.Close()
+
+	dec := json.NewDecoder(f)
+	dec.DisallowUnknownFields()
 
 	var config Config
-	err = json.Unmarshal(data, &config)
-	return &config, err
+	if err := dec.Decode(&config); err != nil {
+		return nil, err
+	}
+
+	return &config, nil
 }
 
 type RateLimiter struct {
@@ -111,7 +121,10 @@ func integrationsHandler(w http.ResponseWriter, r *http.Request) {
 
 // proxyHandler handles incoming requests and proxies them according to the integration.
 func proxyHandler(w http.ResponseWriter, r *http.Request) {
-	host := r.Host
+	host := r.Header.Get("X-AT-Int")
+	if host == "" {
+		host = r.Host
+	}
 	log.Printf("Incoming %s request for %s%s from %s", r.Method, host, r.URL.Path, r.RemoteAddr)
 	integ, ok := GetIntegration(host)
 	if !ok {
@@ -181,5 +194,27 @@ func main() {
 
 	http.HandleFunc("/", proxyHandler)
 
-	log.Fatal(http.ListenAndServe(*addr, nil))
+	srv := &http.Server{Addr: *addr}
+
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("listen: %v", err)
+		}
+	}()
+
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+	<-stop
+
+	log.Println("Shutting down...")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Printf("server shutdown: %v", err)
+	}
+
+	for _, i := range ListIntegrations() {
+		i.inLimiter.Stop()
+		i.outLimiter.Stop()
+	}
 }

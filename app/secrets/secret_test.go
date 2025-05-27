@@ -4,6 +4,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"encoding/base64"
+	"sync"
 	"testing"
 
 	"github.com/winhowes/AuthTransformer/app/secrets"
@@ -48,6 +49,29 @@ func TestLoadRandomSecret(t *testing.T) {
 	if val != "first" && val != "second" {
 		t.Fatalf("unexpected value: %s", val)
 	}
+}
+
+func TestLoadRandomSecretConcurrent(t *testing.T) {
+	t.Setenv("A", "first")
+	t.Setenv("B", "second")
+
+	refs := []string{"env:A", "env:B"}
+	var wg sync.WaitGroup
+	for i := 0; i < 50; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			val, err := secrets.LoadRandomSecret(refs)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+				return
+			}
+			if val != "first" && val != "second" {
+				t.Errorf("unexpected value: %s", val)
+			}
+		}()
+	}
+	wg.Wait()
 }
 
 func TestLoadSecretAWSKMS(t *testing.T) {
