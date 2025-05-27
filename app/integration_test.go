@@ -5,6 +5,7 @@ import (
 
 	_ "github.com/winhowes/AuthTransformer/app/authplugins/incoming"
 	_ "github.com/winhowes/AuthTransformer/app/authplugins/outgoing"
+	_ "github.com/winhowes/AuthTransformer/app/secrets/plugins"
 )
 
 func TestAddIntegrationMissingParam(t *testing.T) {

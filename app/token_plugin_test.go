@@ -6,6 +6,7 @@ import (
 
 	"github.com/winhowes/AuthTransformer/app/authplugins/incoming"
 	"github.com/winhowes/AuthTransformer/app/authplugins/outgoing"
+	_ "github.com/winhowes/AuthTransformer/app/secrets/plugins"
 )
 
 func TestTokenOutgoingPrefix(t *testing.T) {

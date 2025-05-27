@@ -1,4 +1,6 @@
-package secrets
+package plugins
+
+import "github.com/winhowes/AuthTransformer/app/secrets"
 
 import (
 	"bytes"
@@ -90,4 +92,4 @@ func getAzureToken(tenant, client, secret string) (string, error) {
 	return out.AccessToken, nil
 }
 
-func init() { Register(azureKMSPlugin{}) }
+func init() { secrets.Register(azureKMSPlugin{}) }

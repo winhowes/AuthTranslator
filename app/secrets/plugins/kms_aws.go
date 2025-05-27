@@ -1,4 +1,4 @@
-package secrets
+package plugins
 
 import (
 	"crypto/aes"
@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"os"
 	"sync"
+
+	"github.com/winhowes/AuthTransformer/app/secrets"
 )
 
 // awsKMSPlugin decrypts secrets using a symmetric key provided via the
@@ -70,4 +72,4 @@ func (p *awsKMSPlugin) Load(id string) (string, error) {
 	return string(pt), nil
 }
 
-func init() { Register(&awsKMSPlugin{}) }
+func init() { secrets.Register(&awsKMSPlugin{}) }
