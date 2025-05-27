@@ -3,7 +3,6 @@ package authplugins
 import "net/http"
 
 // IncomingAuthPlugin processes authentication from incoming callers.
-// IncomingAuthPlugin processes authentication from incoming callers.
 // ParseParams should validate and convert the raw parameter map into a
 // plugin-specific configuration struct.
 type IncomingAuthPlugin interface {
@@ -20,7 +19,6 @@ type Identifier interface {
 	Identify(r *http.Request, params interface{}) (string, bool)
 }
 
-// OutgoingAuthPlugin applies authentication to outbound requests.
 // OutgoingAuthPlugin applies authentication to outbound requests.
 type OutgoingAuthPlugin interface {
 	Name() string
