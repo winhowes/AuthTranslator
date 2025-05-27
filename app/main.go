@@ -22,6 +22,7 @@ type Config struct {
 }
 
 var debug = flag.Bool("debug", false, "enable debug mode")
+var addr = flag.String("addr", ":8080", "listen address")
 
 func loadConfig(filename string) (*Config, error) {
 	data, err := os.ReadFile(filename)
@@ -180,5 +181,5 @@ func main() {
 
 	http.HandleFunc("/", proxyHandler)
 
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Fatal(http.ListenAndServe(*addr, nil))
 }
