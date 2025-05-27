@@ -35,16 +35,6 @@ resource "aws_ecs_task_definition" "this" {
         hostPort      = 8080
         protocol      = "tcp"
       }]
-      environment = [
-        {
-          name  = "IN_TOKEN"
-          value = var.in_token
-        },
-        {
-          name  = "OUT_TOKEN"
-          value = var.out_token
-        }
-      ]
     }
   ])
 }
