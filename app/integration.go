@@ -111,14 +111,34 @@ type AuthPluginConfig struct {
 	parsed interface{}
 }
 
+// CallerConfig defines allowed paths and methods for a specific caller
+// identifier.
+type CallerConfig struct {
+	ID    string     `json:"id"`
+	Rules []CallRule `json:"rules"`
+}
+
+// CallRule ties a path pattern to method-specific constraints.
+type CallRule struct {
+	Path    string                       `json:"path"`
+	Methods map[string]RequestConstraint `json:"methods"`
+}
+
+// RequestConstraint lists required headers and body parameters.
+type RequestConstraint struct {
+	Headers []string               `json:"headers"`
+	Body    map[string]interface{} `json:"body"`
+}
+
 // Integration represents a configured proxy integration.
 type Integration struct {
-	Name         string             `json:"name"`
-	Destination  string             `json:"destination"`
-	InRateLimit  int                `json:"in_rate_limit"`
-	OutRateLimit int                `json:"out_rate_limit"`
-	IncomingAuth []AuthPluginConfig `json:"incoming_auth"`
-	OutgoingAuth []AuthPluginConfig `json:"outgoing_auth"`
+	Name           string             `json:"name"`
+	Destination    string             `json:"destination"`
+	InRateLimit    int                `json:"in_rate_limit"`
+	OutRateLimit   int                `json:"out_rate_limit"`
+	IncomingAuth   []AuthPluginConfig `json:"incoming_auth"`
+	OutgoingAuth   []AuthPluginConfig `json:"outgoing_auth"`
+	AllowedCallers []CallerConfig     `json:"allowlist"`
 
 	inLimiter  *RateLimiter
 	outLimiter *RateLimiter

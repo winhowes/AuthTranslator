@@ -133,18 +133,25 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	callerID := r.RemoteAddr
 	for _, cfg := range integ.IncomingAuth {
 		p := authplugins.GetIncoming(cfg.Type)
-		if p != nil && !p.Authenticate(r, cfg.parsed) {
-			log.Printf("Authentication failed for host %s from %s", host, r.RemoteAddr)
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			return
+		if p != nil {
+			if !p.Authenticate(r, cfg.parsed) {
+				log.Printf("Authentication failed for host %s from %s", host, r.RemoteAddr)
+				http.Error(w, "Unauthorized", http.StatusUnauthorized)
+				return
+			}
+			if idp, ok := p.(authplugins.Identifier); ok {
+				if id, ok := idp.Identify(r, cfg.parsed); ok {
+					callerID = id
+				}
+			}
 		}
 	}
 
-	caller := r.RemoteAddr
-	if !integ.inLimiter.Allow(caller) {
-		log.Printf("Caller %s exceeded rate limit on host %s", caller, host)
+	if !integ.inLimiter.Allow(callerID) {
+		log.Printf("Caller %s exceeded rate limit on host %s", callerID, host)
 		http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
 		return
 	}
@@ -152,6 +159,18 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Host %s exceeded rate limit", host)
 		http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
 		return
+	}
+
+	if len(integ.AllowedCallers) > 0 {
+		cons, ok := findConstraint(integ, callerID, r.URL.Path, r.Method)
+		if !ok {
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+		if !validateRequest(r, cons) {
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
 	}
 
 	for _, cfg := range integ.OutgoingAuth {

@@ -50,4 +50,18 @@ func (t *TokenAuth) Authenticate(r *http.Request, p interface{}) bool {
 	return false
 }
 
+// Identify returns the raw token value provided by the caller. It is used as a
+// caller ID for allowlist checks.
+func (t *TokenAuth) Identify(r *http.Request, p interface{}) (string, bool) {
+	cfg, ok := p.(*params)
+	if !ok {
+		return "", false
+	}
+	tokenValue := strings.TrimPrefix(r.Header.Get(cfg.Header), cfg.Prefix)
+	if tokenValue == "" {
+		return "", false
+	}
+	return tokenValue, true
+}
+
 func init() { authplugins.RegisterIncoming(&TokenAuth{}) }
