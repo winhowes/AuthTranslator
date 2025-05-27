@@ -58,7 +58,7 @@ AuthTransformer is a simple Go-based reverse proxy that injects authentication t
 
 3. **Running**
 
-   When started, the server listens on port `8080`. Incoming requests are matched against the `X-AT-Int` header, if present, or otherwise the host header to determine the route and associated authentication plugin.
+   The listen address can be configured with the `-addr` flag. By default the server listens on `:8080`. Incoming requests are matched against the `X-AT-Int` header, if present, or otherwise the host header to determine the route and associated authentication plugin.
 
 4. **Run Locally**
 
