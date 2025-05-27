@@ -68,4 +68,26 @@ func (b *BasicAuth) Authenticate(r *http.Request, p interface{}) bool {
 	return false
 }
 
+// Identify returns the username from the Basic auth header when present.
+func (b *BasicAuth) Identify(r *http.Request, p interface{}) (string, bool) {
+	cfg, ok := p.(*inParams)
+	if !ok {
+		return "", false
+	}
+	header := r.Header.Get(cfg.Header)
+	if !strings.HasPrefix(header, cfg.Prefix) {
+		return "", false
+	}
+	enc := strings.TrimPrefix(header, cfg.Prefix)
+	dec, err := base64.StdEncoding.DecodeString(enc)
+	if err != nil {
+		return "", false
+	}
+	creds := string(dec)
+	if i := strings.IndexByte(creds, ':'); i > 0 {
+		return creds[:i], true
+	}
+	return "", false
+}
+
 func init() { authplugins.RegisterIncoming(&BasicAuth{}) }
