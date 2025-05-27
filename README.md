@@ -86,7 +86,7 @@ The project exists to make it trivial to translate one type of authentication in
   implement the `Identifier` interface return a string used to match the
   `id` field in the allowlist. `jwt` and `google_oidc` return the token's
   `sub` claim while `mtls` uses the client certificate's common name. The
-  `token` plugin does not supply an ID. Allowlist entries are grouped first
+  `token` plugin, for example, does not supply an ID. Allowlist entries are grouped first
   by integration name and then by caller ID. When no ID is available the
   wildcard `"*"` entry is used so all callers share those rules.
 
