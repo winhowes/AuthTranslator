@@ -1,7 +1,6 @@
 package incoming
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -24,18 +23,14 @@ func (t *TokenAuth) RequiredParams() []string { return []string{"secrets", "head
 func (t *TokenAuth) OptionalParams() []string { return []string{"prefix"} }
 
 func (t *TokenAuth) ParseParams(m map[string]interface{}) (interface{}, error) {
-	data, err := json.Marshal(m)
+	p, err := authplugins.ParseParams[params](m)
 	if err != nil {
-		return nil, err
-	}
-	var p params
-	if err := json.Unmarshal(data, &p); err != nil {
 		return nil, err
 	}
 	if len(p.Secrets) == 0 || p.Header == "" {
 		return nil, fmt.Errorf("missing secrets or header")
 	}
-	return &p, nil
+	return p, nil
 }
 
 func (t *TokenAuth) Authenticate(r *http.Request, p interface{}) bool {
