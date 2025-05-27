@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"authtransformer/app/authplugins"
+	"github.com/winhowes/AuthTransformer/app/authplugins"
 )
 
 // AuthPluginConfig ties an auth plugin type to its parameters.
@@ -47,9 +47,19 @@ func AddIntegration(i *Integration) error {
 		if p == nil {
 			return fmt.Errorf("unknown incoming auth type %s", a.Type)
 		}
+		known := map[string]struct{}{}
 		for _, req := range p.RequiredParams() {
 			if _, ok := a.Params[req]; !ok {
 				return fmt.Errorf("missing param %s for auth %s", req, a.Type)
+			}
+			known[req] = struct{}{}
+		}
+		for _, opt := range p.OptionalParams() {
+			known[opt] = struct{}{}
+		}
+		for k := range a.Params {
+			if _, ok := known[k]; !ok {
+				return fmt.Errorf("unknown param %s for auth %s", k, a.Type)
 			}
 		}
 	}
@@ -59,9 +69,19 @@ func AddIntegration(i *Integration) error {
 		if p == nil {
 			return fmt.Errorf("unknown outgoing auth type %s", a.Type)
 		}
+		known := map[string]struct{}{}
 		for _, req := range p.RequiredParams() {
 			if _, ok := a.Params[req]; !ok {
 				return fmt.Errorf("missing param %s for auth %s", req, a.Type)
+			}
+			known[req] = struct{}{}
+		}
+		for _, opt := range p.OptionalParams() {
+			known[opt] = struct{}{}
+		}
+		for k := range a.Params {
+			if _, ok := known[k]; !ok {
+				return fmt.Errorf("unknown param %s for auth %s", k, a.Type)
 			}
 		}
 	}

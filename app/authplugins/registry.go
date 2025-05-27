@@ -6,6 +6,7 @@ import "net/http"
 type IncomingAuthPlugin interface {
 	Name() string
 	RequiredParams() []string
+	OptionalParams() []string
 	Authenticate(r *http.Request, params map[string]string) bool
 }
 
@@ -13,6 +14,7 @@ type IncomingAuthPlugin interface {
 type OutgoingAuthPlugin interface {
 	Name() string
 	RequiredParams() []string
+	OptionalParams() []string
 	AddAuth(r *http.Request, params map[string]string)
 }
 
