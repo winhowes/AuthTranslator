@@ -196,6 +196,8 @@ go run ./app -debug
 Then run the CLI to POST a new integration configuration. The `-server` flag
 controls where the CLI sends the request (default `http://localhost:8080/integrations`).
 
+A helper CLI is available under `cmd/integrations` to create Slack, GitHub, Jira or Linear integrations with minimal flags.
+
 Add Slack:
 ```bash
 go run ./cmd/integrations -server http://localhost:8080/integrations \
@@ -206,6 +208,14 @@ Add GitHub:
 ```bash
 go run ./cmd/integrations -server http://localhost:8080/integrations \
   github -token env:GITHUB_TOKEN -webhook-secret env:GITHUB_SECRET
+```
+Add Jira:
+```bash
+go run ./cmd/integrations jira -token env:JIRA_TOKEN
+```
+Add Linear:
+```bash
+go run ./cmd/integrations linear -token env:LINEAR_TOKEN
 ```
 
 ## Running Tests
