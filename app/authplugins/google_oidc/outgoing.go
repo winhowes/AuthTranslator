@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/winhowes/AuthTransformer/app/authplugins"
 )
@@ -22,6 +23,9 @@ type GoogleOIDC struct{}
 
 // MetadataHost is the base URL for the metadata server. It is overridden in tests.
 var MetadataHost = "http://metadata.google.internal"
+
+// HTTPClient is used for metadata requests and can be overridden in tests.
+var HTTPClient = &http.Client{Timeout: 5 * time.Second}
 
 func (g *GoogleOIDC) Name() string { return "google_oidc" }
 
@@ -59,7 +63,7 @@ func (g *GoogleOIDC) AddAuth(r *http.Request, params interface{}) {
 		return
 	}
 	req.Header.Set("Metadata-Flavor", "Google")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := HTTPClient.Do(req)
 	if err != nil {
 		return
 	}
