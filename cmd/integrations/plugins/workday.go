@@ -1,6 +1,10 @@
 package plugins
 
-import "strings"
+import (
+	"flag"
+	"fmt"
+	"strings"
+)
 
 // Workday returns an Integration configured for the Workday API.
 func Workday(name, domain, tokenRef string) Integration {
@@ -22,4 +26,20 @@ func Workday(name, domain, tokenRef string) Integration {
 			},
 		}},
 	}
+}
+
+func init() { Register("workday", workdayBuilder) }
+
+func workdayBuilder(args []string) (Integration, error) {
+	fs := flag.NewFlagSet("workday", flag.ContinueOnError)
+	name := fs.String("name", "workday", "integration name")
+	domain := fs.String("domain", "", "workday domain, e.g. myorg.workday.com")
+	token := fs.String("token", "", "secret reference for API token")
+	if err := fs.Parse(args); err != nil {
+		return Integration{}, err
+	}
+	if *token == "" || *domain == "" {
+		return Integration{}, fmt.Errorf("-token and -domain are required")
+	}
+	return Workday(*name, *domain, *token), nil
 }
