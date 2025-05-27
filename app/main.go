@@ -1,19 +1,19 @@
 package main
 
 import (
-	"encoding/json"
-	"flag"
-	"log"
-	"net/http"
-	"net/http/httputil"
-	"net/url"
-	"os"
-	"sync"
-	"time"
+        "encoding/json"
+        "flag"
+        "log"
+        "net/http"
+        "net/http/httputil"
+        "net/url"
+        "os"
+        "sync"
+        "time"
 
-	"authtransformer/app/authplugins"
-	_ "authtransformer/app/authplugins/incoming"
-	_ "authtransformer/app/authplugins/outgoing"
+        "github.com/winhowes/AuthTransformer/app/authplugins"
+        _ "github.com/winhowes/AuthTransformer/app/authplugins/incoming"
+        _ "github.com/winhowes/AuthTransformer/app/authplugins/outgoing"
 )
 
 type Config struct {

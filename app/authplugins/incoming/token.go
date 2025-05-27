@@ -1,22 +1,27 @@
 package incoming
 
 import (
-	"authtransformer/app/authplugins"
-	"authtransformer/app/secrets"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
+
+	"github.com/winhowes/AuthTransformer/app/authplugins"
+  "github.com/winhowes/AuthTransformer/app/secrets"
 )
 
 // TokenAuth checks that the caller supplied one of the configured tokens.
 type tokenParams struct {
 	Secrets []string `json:"secrets"`
 	Header  string   `json:"header"`
+  Prefix  string   `json:"prefix"`
 }
 
 type TokenAuth struct{}
 
 func (t *TokenAuth) Name() string { return "token" }
+func (t *TokenAuth) RequiredParams() []string { return []string{"token", "header"} }
+func (t *TokenAuth) OptionalParams() []string { return []string{"prefix"} }
 
 func (t *TokenAuth) ParseParams(m map[string]interface{}) (interface{}, error) {
 	data, err := json.Marshal(m)
@@ -39,6 +44,7 @@ func (t *TokenAuth) Authenticate(r *http.Request, params interface{}) bool {
 		return false
 	}
 	tokenValue := r.Header.Get(cfg.Header)
+	tokenValue = strings.TrimPrefix(tokenValue, prefix)
 	for _, ref := range cfg.Secrets {
 		token, err := secrets.LoadSecret(ref)
 		if err == nil && tokenValue == token {

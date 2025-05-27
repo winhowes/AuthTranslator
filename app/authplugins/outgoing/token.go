@@ -8,18 +8,21 @@ import (
 	"net/http"
 	"time"
 
-	"authtransformer/app/authplugins"
+	"github.com/winhowes/AuthTransformer/app/authplugins"
 )
 
 // TokenAuthOut adds a token header to outbound requests.
 type tokenOutParams struct {
 	Secrets []string `json:"secrets"`
 	Header  string   `json:"header"`
+  Prefix  string   `json:"prefix"`
 }
 
 type TokenAuthOut struct{}
 
 func (t *TokenAuthOut) Name() string { return "token" }
+func (t *TokenAuthOut) RequiredParams() []string { return []string{"token", "header"} }
+func (t *TokenAuthOut) OptionalParams() []string { return []string{"prefix"} }
 
 func (t *TokenAuthOut) ParseParams(m map[string]interface{}) (interface{}, error) {
 	data, err := json.Marshal(m)
@@ -49,6 +52,7 @@ func (t *TokenAuthOut) AddAuth(r *http.Request, params interface{}) {
 	if err != nil {
 		return
 	}
+  token = cfg.Prefix + token
 	r.Header.Set(cfg.Header, token)
 }
 

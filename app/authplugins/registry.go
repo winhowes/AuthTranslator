@@ -10,6 +10,8 @@ type IncomingAuthPlugin interface {
 	Name() string
 	ParseParams(map[string]interface{}) (interface{}, error)
 	Authenticate(r *http.Request, params interface{}) bool
+	RequiredParams() []string
+	OptionalParams() []string
 }
 
 // OutgoingAuthPlugin applies authentication to outbound requests.
@@ -18,6 +20,8 @@ type OutgoingAuthPlugin interface {
 	Name() string
 	ParseParams(map[string]interface{}) (interface{}, error)
 	AddAuth(r *http.Request, params interface{})
+	RequiredParams() []string
+	OptionalParams() []string
 }
 
 var incomingRegistry = map[string]IncomingAuthPlugin{}
