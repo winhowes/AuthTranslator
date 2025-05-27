@@ -22,6 +22,12 @@ func TestLoadSecretEnv(t *testing.T) {
 	}
 }
 
+func TestLoadSecretEnvMissing(t *testing.T) {
+	if _, err := secrets.LoadSecret("env:UNSET_VAR"); err == nil {
+		t.Fatal("expected error when variable is missing")
+	}
+}
+
 func TestLoadSecretUnknown(t *testing.T) {
 	if _, err := secrets.LoadSecret("unknown:id"); err == nil {
 		t.Fatal("expected error for unknown secret source")

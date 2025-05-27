@@ -1,6 +1,7 @@
 package plugins
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/winhowes/AuthTransformer/app/secrets"
@@ -11,6 +12,12 @@ type envPlugin struct{}
 
 func (envPlugin) Prefix() string { return "env" }
 
-func (envPlugin) Load(id string) (string, error) { return os.Getenv(id), nil }
+func (envPlugin) Load(id string) (string, error) {
+	val, ok := os.LookupEnv(id)
+	if !ok {
+		return "", fmt.Errorf("%s not set", id)
+	}
+	return val, nil
+}
 
 func init() { secrets.Register(envPlugin{}) }
