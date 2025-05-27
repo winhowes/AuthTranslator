@@ -2,6 +2,7 @@ package plugins
 
 import (
 	"os"
+	"strings"
 
 	"github.com/winhowes/AuthTransformer/app/secrets"
 )
@@ -16,7 +17,7 @@ func (filePlugin) Load(id string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return string(b), nil
+	return strings.TrimSpace(string(b)), nil
 }
 
 func init() { secrets.Register(filePlugin{}) }
