@@ -3,7 +3,7 @@ package plugins
 import (
 	"os"
 
-	"github.com/winhowes/AuthTransformer/app/secrets"
+	"github.com/winhowes/AuthTranslator/app/secrets"
 )
 
 // filePlugin reads secrets from files on disk.

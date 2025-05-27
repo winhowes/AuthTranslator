@@ -12,8 +12,8 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/winhowes/AuthTransformer/app/authplugins"
-	"github.com/winhowes/AuthTransformer/app/secrets"
+	"github.com/winhowes/AuthTranslator/app/authplugins"
+	"github.com/winhowes/AuthTranslator/app/secrets"
 )
 
 // outParams configures HMAC signing of outgoing requests.

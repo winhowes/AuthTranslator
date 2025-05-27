@@ -1,6 +1,6 @@
 package monday
 
-import integrationplugins "github.com/winhowes/AuthTransformer/app/integrationplugins"
+import integrationplugins "github.com/winhowes/AuthTranslator/app/integrationplugins"
 
 func init() {
 	integrationplugins.RegisterCapability("monday", "create_item", integrationplugins.CapabilitySpec{

@@ -1,6 +1,6 @@
 package sendgrid
 
-import integrationplugins "github.com/winhowes/AuthTransformer/app/integrationplugins"
+import integrationplugins "github.com/winhowes/AuthTranslator/app/integrationplugins"
 
 func init() {
 	integrationplugins.RegisterCapability("sendgrid", "send_email", integrationplugins.CapabilitySpec{

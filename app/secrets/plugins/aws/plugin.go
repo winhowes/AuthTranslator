@@ -8,7 +8,7 @@ import (
 	"os"
 	"sync"
 
-	"github.com/winhowes/AuthTransformer/app/secrets"
+	"github.com/winhowes/AuthTranslator/app/secrets"
 )
 
 // awsKMSPlugin decrypts secrets using a symmetric key provided via the

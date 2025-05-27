@@ -6,12 +6,12 @@ WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN go build -o authtransformer ./app
+RUN go build -o authtranslator ./app
 
 # Runtime stage
 FROM alpine:3.19
 WORKDIR /app
-COPY --from=build /src/authtransformer .
+COPY --from=build /src/authtranslator .
 COPY app/config.json ./config.json
 EXPOSE 8080
-CMD ["./authtransformer"]
+CMD ["./authtranslator"]

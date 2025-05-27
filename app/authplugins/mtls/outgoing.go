@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/winhowes/AuthTransformer/app/authplugins"
+	"github.com/winhowes/AuthTranslator/app/authplugins"
 )
 
 // outParams holds outbound mTLS configuration. Currently unused beyond validation.

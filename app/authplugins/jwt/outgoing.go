@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/winhowes/AuthTransformer/app/authplugins"
-	"github.com/winhowes/AuthTransformer/app/secrets"
+	"github.com/winhowes/AuthTranslator/app/authplugins"
+	"github.com/winhowes/AuthTranslator/app/secrets"
 )
 
 // outParams configures JWT forwarding on outgoing requests.

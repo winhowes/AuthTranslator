@@ -3,10 +3,10 @@ package main
 import (
 	"testing"
 
-	_ "github.com/winhowes/AuthTransformer/app/authplugins/basic"
-	_ "github.com/winhowes/AuthTransformer/app/authplugins/google_oidc"
-	_ "github.com/winhowes/AuthTransformer/app/authplugins/token"
-	_ "github.com/winhowes/AuthTransformer/app/secrets/plugins"
+	_ "github.com/winhowes/AuthTranslator/app/authplugins/basic"
+	_ "github.com/winhowes/AuthTranslator/app/authplugins/google_oidc"
+	_ "github.com/winhowes/AuthTranslator/app/authplugins/token"
+	_ "github.com/winhowes/AuthTranslator/app/secrets/plugins"
 )
 
 func TestAddIntegrationMissingParam(t *testing.T) {

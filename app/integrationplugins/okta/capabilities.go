@@ -1,6 +1,6 @@
 package okta
 
-import integrationplugins "github.com/winhowes/AuthTransformer/app/integrationplugins"
+import integrationplugins "github.com/winhowes/AuthTranslator/app/integrationplugins"
 
 func init() {
 	integrationplugins.RegisterCapability("okta", "create_user", integrationplugins.CapabilitySpec{

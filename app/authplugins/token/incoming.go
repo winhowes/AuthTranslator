@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/winhowes/AuthTransformer/app/authplugins"
-	"github.com/winhowes/AuthTransformer/app/secrets"
+	"github.com/winhowes/AuthTranslator/app/authplugins"
+	"github.com/winhowes/AuthTranslator/app/secrets"
 )
 
 // TokenAuth checks that the caller supplied one of the configured tokens.

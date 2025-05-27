@@ -1,6 +1,6 @@
 package plugins
 
-import "github.com/winhowes/AuthTransformer/app/secrets"
+import "github.com/winhowes/AuthTranslator/app/secrets"
 
 import (
 	"bytes"

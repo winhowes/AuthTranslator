@@ -5,7 +5,7 @@ import (
 	"net/url"
 	"testing"
 
-	_ "github.com/winhowes/AuthTransformer/app/secrets/plugins"
+	_ "github.com/winhowes/AuthTranslator/app/secrets/plugins"
 )
 
 func TestURLPathOutgoingAddAuth(t *testing.T) {

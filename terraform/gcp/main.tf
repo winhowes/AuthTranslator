@@ -14,7 +14,7 @@ provider "google" {
 }
 
 resource "google_cloud_run_service" "this" {
-  name     = "auth-transformer"
+  name     = "auth-translator"
   location = var.gcp_region
 
   template {

@@ -7,8 +7,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/winhowes/AuthTransformer/app/secrets"
-	_ "github.com/winhowes/AuthTransformer/app/secrets/plugins"
+	"github.com/winhowes/AuthTranslator/app/secrets"
+	_ "github.com/winhowes/AuthTranslator/app/secrets/plugins"
 )
 
 func TestLoadSecretEnv(t *testing.T) {

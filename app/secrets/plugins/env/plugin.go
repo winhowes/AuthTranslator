@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/winhowes/AuthTransformer/app/secrets"
+	"github.com/winhowes/AuthTranslator/app/secrets"
 )
 
 // envPlugin loads secrets from environment variables.

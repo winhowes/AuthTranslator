@@ -11,8 +11,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/winhowes/AuthTransformer/app/authplugins"
-	"github.com/winhowes/AuthTransformer/app/secrets"
+	"github.com/winhowes/AuthTranslator/app/authplugins"
+	"github.com/winhowes/AuthTranslator/app/secrets"
 )
 
 // slackSigParams holds config for Slack signature validation.
