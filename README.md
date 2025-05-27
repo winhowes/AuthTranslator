@@ -27,22 +27,22 @@ The project exists to make it trivial to translate one type of authentication in
 ## Getting Started
 
 1. **Build or Run**
-   
+
    ```bash
    go run ./app -config app/config.json
    ```
-   
+
    Or build an executable:
-   
+
    ```bash
    go build -o authtransformer ./app
    ./authtransformer -config app/config.json
    ```
 
 2. **Configuration File**
-   
+
    Edit `app/config.json` to define auth plugins and route targets:
-   
+
    ```json
    {
         "integrations": [
@@ -113,12 +113,9 @@ fields and may list required values:
   }
   }
   ```
-
-
-
-   - **integrations**: Defines proxy routes, rate limits and authentication methods. Secret references use the `env:` or KMS-prefixed formats described below.
-   - **google_oidc**: Outgoing auth plugin that retrieves an ID token from the GCP metadata server and sets it in the `Authorization` header for backend requests. The incoming variant validates Google ID tokens against a configured audience.
-   - **basic**: Performs HTTP Basic authentication using credentials loaded from configured secrets.
+- **integrations**: Defines proxy routes, rate limits and authentication methods. Secret references use the `env:` or KMS-prefixed formats described below.
+- **google_oidc**: Outgoing auth plugin that retrieves an ID token from the GCP metadata server and sets it in the `Authorization` header for backend requests. The incoming variant validates Google ID tokens against a configured audience.
+- **basic**: Performs HTTP Basic authentication using credentials loaded from configured secrets.
 
 ### Capabilities
 
