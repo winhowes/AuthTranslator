@@ -121,36 +121,47 @@ func matchForm(vals url.Values, rule map[string]interface{}) bool {
 }
 
 func matchBodyMap(data map[string]interface{}, rule map[string]interface{}) bool {
-	for k, v := range rule {
-		dv, ok := data[k]
+	return matchValue(data, rule)
+}
+
+func matchValue(data, rule interface{}) bool {
+	switch rv := rule.(type) {
+	case map[string]interface{}:
+		dm, ok := data.(map[string]interface{})
 		if !ok {
 			return false
 		}
-		switch rv := v.(type) {
-		case []interface{}:
-			arr, ok := dv.([]interface{})
+		for k, v := range rv {
+			dv, ok := dm[k]
 			if !ok {
 				return false
 			}
-			for _, want := range rv {
-				found := false
-				for _, elem := range arr {
-					if elem == want {
-						found = true
-						break
-					}
-				}
-				if !found {
-					return false
-				}
-			}
-		default:
-			if dv != v {
+			if !matchValue(dv, v) {
 				return false
 			}
 		}
+		return true
+	case []interface{}:
+		da, ok := data.([]interface{})
+		if !ok {
+			return false
+		}
+		for _, want := range rv {
+			found := false
+			for _, elem := range da {
+				if matchValue(elem, want) {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return false
+			}
+		}
+		return true
+	default:
+		return data == rule
 	}
-	return true
 }
 
 // findConstraint returns the RequestConstraint for the given caller, path and
