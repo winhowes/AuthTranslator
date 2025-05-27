@@ -3,8 +3,8 @@ package main
 import (
 	"testing"
 
-	_ "authtransformer/app/authplugins/incoming"
-	_ "authtransformer/app/authplugins/outgoing"
+	_ "github.com/winhowes/AuthTransformer/app/authplugins/incoming"
+	_ "github.com/winhowes/AuthTransformer/app/authplugins/outgoing"
 )
 
 func TestAddIntegrationMissingParam(t *testing.T) {
@@ -30,5 +30,31 @@ func TestAddIntegrationValid(t *testing.T) {
 	}
 	if err := AddIntegration(i); err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestAddIntegrationOptionalParam(t *testing.T) {
+	i := &Integration{
+		Name:         "testoptional",
+		Destination:  "http://example.com",
+		InRateLimit:  1,
+		OutRateLimit: 1,
+		IncomingAuth: []AuthPluginConfig{{Type: "token", Params: map[string]string{"token": "x", "header": "X-Auth", "prefix": "Bearer "}}},
+	}
+	if err := AddIntegration(i); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestAddIntegrationUnknownParam(t *testing.T) {
+	i := &Integration{
+		Name:         "testunknown",
+		Destination:  "http://example.com",
+		InRateLimit:  1,
+		OutRateLimit: 1,
+		IncomingAuth: []AuthPluginConfig{{Type: "token", Params: map[string]string{"token": "x", "header": "X-Auth", "bogus": "y"}}},
+	}
+	if err := AddIntegration(i); err == nil {
+		t.Fatal("expected error for unknown param")
 	}
 }
