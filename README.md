@@ -82,6 +82,25 @@ The project exists to make it trivial to translate one type of authentication in
    ]
    ```
 
+   Capabilities can be listed instead of explicit rules. Each capability expands
+   to one or more rules when loaded, making it easy to audit access by name:
+
+   ```json
+   [
+     {
+       "integration": "slack",
+       "callers": [
+         {
+           "id": "ci-bot-token",
+           "capabilities": [
+             {"name": "post_public_as", "params": {"username": "ci-bot"}}
+           ]
+         }
+       ]
+     }
+   ]
+   ```
+
 ### Allowlist Rules
 
 Each caller entry lists path patterns and method constraints. `*` matches a
