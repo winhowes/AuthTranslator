@@ -1,6 +1,11 @@
 package secrets
 
-import "testing"
+import (
+	"crypto/aes"
+	"crypto/cipher"
+	"encoding/base64"
+	"testing"
+)
 
 func TestLoadSecretEnv(t *testing.T) {
 	t.Setenv("MY_SECRET", "val")
@@ -39,5 +44,39 @@ func TestLoadRandomSecret(t *testing.T) {
 	}
 	if val != "first" && val != "second" {
 		t.Fatalf("unexpected value: %s", val)
+	}
+}
+
+func TestLoadSecretAWSKMS(t *testing.T) {
+	// Prepare key
+	key := make([]byte, 32)
+	for i := range key {
+		key[i] = byte(i)
+	}
+	t.Setenv("AWS_KMS_KEY", base64.StdEncoding.EncodeToString(key))
+
+	// Encrypt a value using the same algorithm as the plugin
+	nonce := make([]byte, 12)
+	for i := range nonce {
+		nonce[i] = byte(i)
+	}
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		t.Fatalf("cipher: %v", err)
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		t.Fatalf("gcm: %v", err)
+	}
+	ct := gcm.Seal(nil, nonce, []byte("secret"), nil)
+	ct = append(nonce, ct...)
+	ref := "aws:" + base64.StdEncoding.EncodeToString(ct)
+
+	val, err := LoadSecret(ref)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val != "secret" {
+		t.Fatalf("expected 'secret', got %s", val)
 	}
 }
