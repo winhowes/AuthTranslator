@@ -54,3 +54,44 @@ func TestAllowlist(t *testing.T) {
 		t.Fatalf("expected 403, got %d", rr2.Code)
 	}
 }
+
+func TestSetAllowlistIndexing(t *testing.T) {
+	allowlists.Lock()
+	allowlists.m = make(map[string]map[string]CallerConfig)
+	allowlists.Unlock()
+
+	SetAllowlist("idx", []CallerConfig{{ID: "id"}, {}})
+
+	allowlists.RLock()
+	callers := allowlists.m["idx"]
+	_, haveID := callers["id"]
+	_, haveWildcard := callers["*"]
+	allowlists.RUnlock()
+
+	if !haveID || !haveWildcard {
+		t.Fatalf("allowlist indexing failed: id=%v wildcard=%v", haveID, haveWildcard)
+	}
+}
+
+func TestFindConstraintWildcard(t *testing.T) {
+	allowlists.Lock()
+	allowlists.m = make(map[string]map[string]CallerConfig)
+	allowlists.Unlock()
+
+	SetAllowlist("fc", []CallerConfig{
+		{ID: "abc", Rules: []CallRule{{Path: "/abc", Methods: map[string]RequestConstraint{"GET": {}}}}},
+		{Rules: []CallRule{{Path: "/wild", Methods: map[string]RequestConstraint{"GET": {}}}}},
+	})
+
+	integ := &Integration{Name: "fc"}
+
+	if _, ok := findConstraint(integ, "abc", "/abc", http.MethodGet); !ok {
+		t.Fatal("expected specific constraint")
+	}
+	if _, ok := findConstraint(integ, "xyz", "/wild", http.MethodGet); !ok {
+		t.Fatal("expected wildcard constraint")
+	}
+	if _, ok := findConstraint(integ, "xyz", "/none", http.MethodGet); ok {
+		t.Fatal("unexpected match for unknown path")
+	}
+}

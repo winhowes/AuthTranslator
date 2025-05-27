@@ -1,6 +1,7 @@
 package basic
 
 import (
+	"crypto/subtle"
 	"encoding/base64"
 	"fmt"
 	"net/http"
@@ -54,10 +55,13 @@ func (b *BasicAuth) Authenticate(r *http.Request, p interface{}) bool {
 	if err != nil {
 		return false
 	}
-	creds := string(dec)
+	creds := dec
 	for _, ref := range cfg.Secrets {
 		sec, err := secrets.LoadSecret(ref)
-		if err == nil && creds == sec {
+		if err != nil {
+			continue
+		}
+		if subtle.ConstantTimeCompare(creds, []byte(sec)) == 1 {
 			return true
 		}
 	}

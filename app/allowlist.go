@@ -22,7 +22,11 @@ func SetAllowlist(name string, callers []CallerConfig) {
 	callers = integrationplugins.ExpandCapabilities(name, callers)
 	m := make(map[string]CallerConfig, len(callers))
 	for _, c := range callers {
-		m[c.ID] = c
+		id := c.ID
+		if id == "" {
+			id = "*"
+		}
+		m[id] = c
 	}
 	allowlists.Lock()
 	allowlists.m[name] = m
@@ -177,14 +181,15 @@ func findConstraint(i *Integration, callerID, pth, method string) (RequestConstr
 	callers := allowlists.m[i.Name]
 	wildcard, hasWildcard := callers["*"]
 	c, ok := callers[callerID]
+	wildcard, wOK := callers["*"]
 	allowlists.RUnlock()
-	if !ok {
-		return RequestConstraint{}, false
-	}
-	for _, r := range c.Rules {
-		if matchPath(r.Path, pth) {
-			if m, ok := r.Methods[method]; ok {
-				return m, true
+
+	if ok {
+		for _, r := range c.Rules {
+			if matchPath(r.Path, pth) {
+				if m, ok := r.Methods[method]; ok {
+					return m, true
+				}
 			}
 		}
 	}
