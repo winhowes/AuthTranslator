@@ -1,6 +1,10 @@
 package plugins
 
-import "strings"
+import (
+	"flag"
+	"fmt"
+	"strings"
+)
 
 // Okta returns an Integration configured for the Okta API.
 func Okta(name, domain, tokenRef string) Integration {
@@ -22,4 +26,20 @@ func Okta(name, domain, tokenRef string) Integration {
 			},
 		}},
 	}
+}
+
+func init() { Register("okta", oktaBuilder) }
+
+func oktaBuilder(args []string) (Integration, error) {
+	fs := flag.NewFlagSet("okta", flag.ContinueOnError)
+	name := fs.String("name", "okta", "integration name")
+	domain := fs.String("domain", "", "okta domain, e.g. myorg.okta.com")
+	token := fs.String("token", "", "secret reference for API token")
+	if err := fs.Parse(args); err != nil {
+		return Integration{}, err
+	}
+	if *token == "" || *domain == "" {
+		return Integration{}, fmt.Errorf("-token and -domain are required")
+	}
+	return Okta(*name, *domain, *token), nil
 }

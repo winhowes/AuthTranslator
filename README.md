@@ -191,7 +191,10 @@ New functionality can be added without modifying the core server. There are thre
 subdirectories of `app/secrets/plugins` and register themselves with
 `secrets.Register`.
 
-Integration plugins live under `cmd/integrations/plugins`. Each function returns an `Integration` struct and may define capabilities. Add a case to `cmd/integrations/main.go` so the CLI recognizes the new plugin.
+Integration plugins live under `cmd/integrations/plugins`. Each plugin registers
+itself in an `init()` block using `plugins.Register`. The `Register` call
+associates the plugin name with a function that parses CLI flags and returns an
+`Integration` struct, so the CLI automatically recognizes new plugins.
 
 3. **Running**
 

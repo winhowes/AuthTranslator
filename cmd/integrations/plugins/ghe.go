@@ -1,6 +1,9 @@
 package plugins
 
-import "fmt"
+import (
+	"flag"
+	"fmt"
+)
 
 // GitHubEnterprise returns an Integration configured for a GitHub Enterprise instance.
 func GitHubEnterprise(name, domain, tokenRef, webhookSecretRef string) Integration {
@@ -24,4 +27,21 @@ func GitHubEnterprise(name, domain, tokenRef, webhookSecretRef string) Integrati
 			},
 		}},
 	}
+}
+
+func init() { Register("ghe", gheBuilder) }
+
+func gheBuilder(args []string) (Integration, error) {
+	fs := flag.NewFlagSet("ghe", flag.ContinueOnError)
+	name := fs.String("name", "ghe", "integration name")
+	domain := fs.String("domain", "", "GitHub Enterprise domain")
+	token := fs.String("token", "", "secret reference for API token")
+	secret := fs.String("webhook-secret", "", "secret reference for webhook secret")
+	if err := fs.Parse(args); err != nil {
+		return Integration{}, err
+	}
+	if *domain == "" || *token == "" || *secret == "" {
+		return Integration{}, fmt.Errorf("-domain, -token and -webhook-secret are required")
+	}
+	return GitHubEnterprise(*name, *domain, *token, *secret), nil
 }
