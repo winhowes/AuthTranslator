@@ -48,6 +48,19 @@ func main() {
 		}
 		integ := plugins.GitHub(*name, *token, *secret)
 		sendIntegration(integ)
+	case "ghe":
+		fs := flag.NewFlagSet("ghe", flag.ExitOnError)
+		name := fs.String("name", "ghe", "integration name")
+		domain := fs.String("domain", "", "GitHub Enterprise domain")
+		token := fs.String("token", "", "secret reference for API token")
+		secret := fs.String("webhook-secret", "", "secret reference for webhook secret")
+		fs.Parse(args)
+		if *domain == "" || *token == "" || *secret == "" {
+			fmt.Fprintln(os.Stderr, "-domain, -token and -webhook-secret are required")
+			os.Exit(1)
+		}
+		integ := plugins.GitHubEnterprise(*name, *domain, *token, *secret)
+		sendIntegration(integ)
 	case "jira":
 		fs := flag.NewFlagSet("jira", flag.ExitOnError)
 		name := fs.String("name", "jira", "integration name")
@@ -69,6 +82,17 @@ func main() {
 			os.Exit(1)
 		}
 		integ := plugins.Linear(*name, *token)
+		sendIntegration(integ)
+	case "gitlab":
+		fs := flag.NewFlagSet("gitlab", flag.ExitOnError)
+		name := fs.String("name", "gitlab", "integration name")
+		token := fs.String("token", "", "secret reference for API token")
+		fs.Parse(args)
+		if *token == "" {
+			fmt.Fprintln(os.Stderr, "-token is required")
+			os.Exit(1)
+		}
+		integ := plugins.GitLab(*name, *token)
 		sendIntegration(integ)
 	case "asana":
 		fs := flag.NewFlagSet("asana", flag.ExitOnError)

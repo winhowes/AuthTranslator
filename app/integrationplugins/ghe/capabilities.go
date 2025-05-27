@@ -1,11 +1,12 @@
-package github
+package ghe
 
-import "fmt"
-
-import integrationplugins "github.com/winhowes/AuthTransformer/app/integrationplugins"
+import (
+	"fmt"
+	integrationplugins "github.com/winhowes/AuthTransformer/app/integrationplugins"
+)
 
 func init() {
-	integrationplugins.RegisterCapability("github", "comment", integrationplugins.CapabilitySpec{
+	integrationplugins.RegisterCapability("ghe", "comment", integrationplugins.CapabilitySpec{
 		Params: []string{"repo"},
 		Generate: func(p map[string]interface{}) ([]integrationplugins.CallRule, error) {
 			repo, _ := p["repo"].(string)
@@ -18,7 +19,7 @@ func init() {
 		},
 	})
 
-	integrationplugins.RegisterCapability("github", "create_issue", integrationplugins.CapabilitySpec{
+	integrationplugins.RegisterCapability("ghe", "create_issue", integrationplugins.CapabilitySpec{
 		Params: []string{"repo"},
 		Generate: func(p map[string]interface{}) ([]integrationplugins.CallRule, error) {
 			repo, _ := p["repo"].(string)
@@ -31,7 +32,7 @@ func init() {
 		},
 	})
 
-	integrationplugins.RegisterCapability("github", "update_issue", integrationplugins.CapabilitySpec{
+	integrationplugins.RegisterCapability("ghe", "update_issue", integrationplugins.CapabilitySpec{
 		Params: []string{"repo"},
 		Generate: func(p map[string]interface{}) ([]integrationplugins.CallRule, error) {
 			repo, _ := p["repo"].(string)
