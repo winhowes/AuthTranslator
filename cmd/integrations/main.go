@@ -48,6 +48,28 @@ func main() {
 		}
 		integ := plugins.GitHub(*name, *token, *secret)
 		sendIntegration(integ)
+	case "jira":
+		fs := flag.NewFlagSet("jira", flag.ExitOnError)
+		name := fs.String("name", "jira", "integration name")
+		token := fs.String("token", "", "secret reference for API token")
+		fs.Parse(args)
+		if *token == "" {
+			fmt.Fprintln(os.Stderr, "-token is required")
+			os.Exit(1)
+		}
+		integ := plugins.Jira(*name, *token)
+		sendIntegration(integ)
+	case "linear":
+		fs := flag.NewFlagSet("linear", flag.ExitOnError)
+		name := fs.String("name", "linear", "integration name")
+		token := fs.String("token", "", "secret reference for API token")
+		fs.Parse(args)
+		if *token == "" {
+			fmt.Fprintln(os.Stderr, "-token is required")
+			os.Exit(1)
+		}
+		integ := plugins.Linear(*name, *token)
+		sendIntegration(integ)
 	default:
 		fmt.Fprintf(os.Stderr, "unknown plugin %s\n", plugin)
 		os.Exit(1)
