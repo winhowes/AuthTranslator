@@ -69,7 +69,7 @@ AuthTransformer writes log messages to standard output. Each request generates a
 
 Example Terraform files are provided in the `terraform` directory for AWS, GCP and Azure.
 
-- `terraform` (root) contains the AWS configuration for ECS Fargate.
+- `terraform/aws` contains the AWS configuration for ECS Fargate.
 - `terraform/gcp` contains a configuration for deploying to Google Cloud Run.
 - `terraform/azure` contains a configuration for deploying to Azure Container Instances.
 
