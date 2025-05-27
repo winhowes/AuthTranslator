@@ -12,7 +12,14 @@ import (
 
 var file = flag.String("file", "allowlist.json", "allowlist file")
 
+func usage() {
+	fmt.Fprintf(flag.CommandLine.Output(), `Usage: allowlist [options] <command>\n\n`)
+	fmt.Fprintf(flag.CommandLine.Output(), "Commands:\n  list   show plugin capabilities\n  add    update the allowlist\n\nOptions:\n")
+	flag.PrintDefaults()
+}
+
 func main() {
+	flag.Usage = usage
 	flag.Parse()
 	if flag.NArg() < 1 {
 		usage()
@@ -27,11 +34,6 @@ func main() {
 	}
 }
 
-func usage() {
-	fmt.Println("usage: allowlist <list|add> [options]")
-	os.Exit(1)
-}
-
 func listCaps() {
 	for integ, caps := range plugins.List() {
 		fmt.Println(integ + ":")
@@ -43,6 +45,10 @@ func listCaps() {
 
 func addEntry(args []string) {
 	fs := flag.NewFlagSet("add", flag.ExitOnError)
+	fs.Usage = func() {
+		fmt.Fprintf(fs.Output(), "Usage: allowlist add [flags]\n\n")
+		fs.PrintDefaults()
+	}
 	integ := fs.String("integration", "", "integration name")
 	caller := fs.String("caller", "", "caller id")
 	capName := fs.String("capability", "", "capability name")
