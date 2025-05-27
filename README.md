@@ -64,6 +64,11 @@ GO111MODULE=off go test ./...
 ## Logging
 
 AuthTransformer writes log messages to standard output. Each request generates an entry showing the HTTP method, host, path and remote address. Authentication failures and rate limiting events are also logged. The logger is configured with Go's standard time-prefixed format.
+
+## Deploying with Terraform
+
+Example Terraform files are provided in the `terraform` directory to simplify deploying AuthTransformer to AWS using ECS Fargate. Set the required variables for your environment and run `terraform apply` to create the cluster and service.
+
 ## License
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
