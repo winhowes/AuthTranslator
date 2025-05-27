@@ -83,11 +83,11 @@ func (b *BasicAuth) Identify(r *http.Request, p interface{}) (string, bool) {
 	if err != nil {
 		return "", false
 	}
-	creds := string(dec)
-	if i := strings.IndexByte(creds, ':'); i > 0 {
-		return creds[:i], true
+	parts := strings.SplitN(string(dec), ":", 2)
+	if len(parts) != 2 || parts[0] == "" {
+		return "", false
 	}
-	return "", false
+	return parts[0], true
 }
 
 func init() { authplugins.RegisterIncoming(&BasicAuth{}) }

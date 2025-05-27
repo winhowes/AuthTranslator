@@ -55,6 +55,24 @@ func TestBasicIncomingAuthFail(t *testing.T) {
 	}
 }
 
+func TestBasicIdentify(t *testing.T) {
+	cred := base64.StdEncoding.EncodeToString([]byte("user:pass"))
+	r := &http.Request{Header: http.Header{"Authorization": []string{"Basic " + cred}}}
+	p := BasicAuth{}
+	t.Setenv("CREDS", "user:pass")
+	cfg, err := p.ParseParams(map[string]interface{}{"secrets": []string{"env:CREDS"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !p.Authenticate(r, cfg) {
+		t.Fatal("expected authentication to succeed")
+	}
+	id, ok := p.Identify(r, cfg)
+	if !ok || id != "user" {
+		t.Fatalf("unexpected id %s", id)
+	}
+}
+
 func TestBasicPluginOptionalParams(t *testing.T) {
 	in := BasicAuth{}
 	out := BasicAuthOut{}

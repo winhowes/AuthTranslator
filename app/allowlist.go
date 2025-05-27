@@ -179,6 +179,7 @@ func matchValue(data, rule interface{}) bool {
 func findConstraint(i *Integration, callerID, pth, method string) (RequestConstraint, bool) {
 	allowlists.RLock()
 	callers := allowlists.m[i.Name]
+	wildcard, hasWildcard := callers["*"]
 	c, ok := callers[callerID]
 	wildcard, wOK := callers["*"]
 	allowlists.RUnlock()
@@ -192,7 +193,7 @@ func findConstraint(i *Integration, callerID, pth, method string) (RequestConstr
 			}
 		}
 	}
-	if wOK {
+	if hasWildcard {
 		for _, r := range wildcard.Rules {
 			if matchPath(r.Path, pth) {
 				if m, ok := r.Methods[method]; ok {
