@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/winhowes/AuthTransformer/app/authplugins"
+	integrationplugins "github.com/winhowes/AuthTransformer/app/integrationplugins"
 	"github.com/winhowes/AuthTransformer/app/secrets"
 )
 
@@ -114,22 +115,9 @@ type AuthPluginConfig struct {
 
 // CallerConfig defines allowed paths and methods for a specific caller
 // identifier.
-type CallerConfig struct {
-	ID    string     `json:"id"`
-	Rules []CallRule `json:"rules"`
-}
-
-// CallRule ties a path pattern to method-specific constraints.
-type CallRule struct {
-	Path    string                       `json:"path"`
-	Methods map[string]RequestConstraint `json:"methods"`
-}
-
-// RequestConstraint lists required headers and body parameters.
-type RequestConstraint struct {
-	Headers []string               `json:"headers"`
-	Body    map[string]interface{} `json:"body"`
-}
+type CallerConfig = integrationplugins.CallerConfig
+type CallRule = integrationplugins.CallRule
+type RequestConstraint = integrationplugins.RequestConstraint
 
 // Integration represents a configured proxy integration.
 type Integration struct {

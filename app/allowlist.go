@@ -9,6 +9,8 @@ import (
 	"path"
 	"strings"
 	"sync"
+
+	integrationplugins "github.com/winhowes/AuthTransformer/app/integrationplugins"
 )
 
 var allowlists = struct {
@@ -18,6 +20,7 @@ var allowlists = struct {
 
 // SetAllowlist registers the caller allowlist for an integration.
 func SetAllowlist(name string, callers []CallerConfig) {
+	callers = integrationplugins.ExpandCapabilities(name, callers)
 	allowlists.Lock()
 	allowlists.m[name] = callers
 	allowlists.Unlock()

@@ -18,6 +18,8 @@ import (
 	_ "github.com/winhowes/AuthTransformer/app/authplugins/basic"
 	_ "github.com/winhowes/AuthTransformer/app/authplugins/google_oidc"
 	_ "github.com/winhowes/AuthTransformer/app/authplugins/token"
+	_ "github.com/winhowes/AuthTransformer/app/integrationplugins/github"
+	_ "github.com/winhowes/AuthTransformer/app/integrationplugins/slack"
 	_ "github.com/winhowes/AuthTransformer/app/secrets/plugins"
 )
 
