@@ -67,3 +67,15 @@ func TestAddIntegrationUnknownParam(t *testing.T) {
 		t.Fatal("expected error for unknown param")
 	}
 }
+
+func TestAddIntegrationInvalidDestination(t *testing.T) {
+	i := &Integration{
+		Name:         "badurl",
+		Destination:  "://bad url",
+		InRateLimit:  1,
+		OutRateLimit: 1,
+	}
+	if err := AddIntegration(i); err == nil {
+		t.Fatal("expected error for invalid destination")
+	}
+}
