@@ -18,6 +18,40 @@ var allowlists = struct {
 	m map[string]map[string]CallerConfig
 }{m: make(map[string]map[string]CallerConfig)}
 
+// validateCallerDefs checks that caller rules and capabilities are well formed
+// before expansion.
+func validateCallerDefs(integration string, callers []CallerConfig) error {
+	caps := integrationplugins.CapabilitiesFor(integration)
+	for _, c := range callers {
+		id := c.ID
+		if id == "" {
+			id = "*"
+		}
+		for ri, r := range c.Rules {
+			if r.Path == "" {
+				return fmt.Errorf("caller %q rule %d missing path", id, ri)
+			}
+			if len(r.Methods) == 0 {
+				return fmt.Errorf("caller %q rule %d missing methods", id, ri)
+			}
+			for m := range r.Methods {
+				if m == "" {
+					return fmt.Errorf("caller %q rule %d has empty method", id, ri)
+				}
+			}
+		}
+		for _, cap := range c.Capabilities {
+			if cap.Name == "" {
+				return fmt.Errorf("caller %q has capability with empty name", id)
+			}
+			if _, ok := caps[cap.Name]; !ok {
+				return fmt.Errorf("unknown capability %q for integration %s", cap.Name, integration)
+			}
+		}
+	}
+	return nil
+}
+
 // validateAllowlist ensures callers and rules are unique after capability
 // expansion. The ID "" is treated as "*".
 func validateAllowlist(name string, callers []CallerConfig) error {
@@ -52,7 +86,14 @@ func validateAllowlist(name string, callers []CallerConfig) error {
 // SetAllowlist registers the caller allowlist for an integration. It returns an
 // error if duplicate caller IDs or rules are detected.
 func SetAllowlist(name string, callers []CallerConfig) error {
-	callers = integrationplugins.ExpandCapabilities(name, callers)
+	if err := validateCallerDefs(name, callers); err != nil {
+		return err
+	}
+	var err error
+	callers, err = integrationplugins.ExpandCapabilities(name, callers)
+	if err != nil {
+		return err
+	}
 	if err := validateAllowlist(name, callers); err != nil {
 		return err
 	}

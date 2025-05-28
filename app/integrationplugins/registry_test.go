@@ -20,7 +20,10 @@ func TestExpandCapabilities(t *testing.T) {
 		Capabilities: []CapabilityConfig{{Name: "cap"}},
 	}}
 
-	expanded := ExpandCapabilities("test", callers)
+	expanded, err := ExpandCapabilities("test", callers)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	if len(expanded) != 1 {
 		t.Fatalf("expected one caller, got %d", len(expanded))
