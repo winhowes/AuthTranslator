@@ -2,10 +2,11 @@
     "integrations": [
         {
             "name": "example",
-            "destination": "http://backend.example.com",
-            "in_rate_limit": 100,
-            "out_rate_limit": 1000,
-            "incoming_auth": [
+        "destination": "http://backend.example.com",
+        "in_rate_limit": 100,
+        "out_rate_limit": 1000,
+        "rate_limit_window": "1m",
+        "incoming_auth": [
                 {"type": "token", "params": {"secrets": ["env:IN_TOKEN"], "header": "X-Auth"}}
             ],
             "outgoing_auth": [

@@ -16,10 +16,11 @@ The project exists to make it trivial to translate one type of authentication in
 - **Reverse Proxy**: Forwards incoming HTTP requests to a target backend based on the requested host or `X-AT-Int` header. The header can be disabled or restricted to a specific host using command-line flags.
 - **Pluggable Authentication**: Supports "basic", "token", `hmac_signature`, `jwt`, `mtls`, `url_path`, `github_signature` and `slack_signature` authentication types for both incoming and outgoing requests including Google OIDC with room for extension.
 - **Extensible Plugins**: Add new auth, secret and integration plugins to cover different systems.
-- **Rate Limiting**: Limits the number of requests per caller and per host within a rolling window. A value of `0` disables limiting.
+- **Rate Limiting**: Limits the number of requests per caller and per host within a rolling window (default `1m` but configurable per integration via `rate_limit_window`). A value of `0` disables limiting.
 - **Allowlist**: Integrations can restrict specific callers to particular paths, methods and required parameters.
 - **Configuration Driven**: Behavior is controlled via a JSON configuration file.
 - **Clean Shutdown**: On SIGINT or SIGTERM the server and rate limiters are gracefully stopped.
+- **Hot Reload**: Send `SIGHUP` to reload the configuration and allowlist without restarting.
 
 ## Development Requirements
 
@@ -55,10 +56,11 @@ The project exists to make it trivial to translate one type of authentication in
      "integrations": [
        {
          "name": "example",
-         "destination": "http://backend.example.com",
-         "in_rate_limit": 100,
-         "out_rate_limit": 1000,
-         "incoming_auth": [
+      "destination": "http://backend.example.com",
+      "in_rate_limit": 100,
+      "out_rate_limit": 1000,
+      "rate_limit_window": "1m",
+      "incoming_auth": [
            {"type": "token", "params": {"secrets": ["env:IN_TOKEN"], "header": "X-Auth"}}
          ],
          "outgoing_auth": [
@@ -70,6 +72,7 @@ The project exists to make it trivial to translate one type of authentication in
    ```
 
    Use `0` (or a negative number) for `in_rate_limit` or `out_rate_limit` to disable rate limiting for that direction.
+   The optional `rate_limit_window` sets the rolling window duration using Go's duration syntax; it defaults to `1m`.
 
    The allowlist configuration lives in a separate `allowlist.json` file:
 
@@ -120,6 +123,7 @@ The project exists to make it trivial to translate one type of authentication in
 3. **Running**
 
    The listen address can be configured with the `-addr` flag. By default the server listens on `:8080`. Incoming requests are matched against the `X-AT-Int` header, if present, or otherwise the host header to determine the route and associated authentication plugin. Use `-disable_x_at_int` to ignore the header entirely or `-x_at_int_host` to only respect the header when a specific host is requested. The configuration file is chosen with `-config` (default `config.json`). The allowlist file can be specified with `-allowlist`; it defaults to `allowlist.json`.
+   Send `SIGHUP` to the process to reload these files without restarting.
 
 4. **Run Locally**
 
@@ -137,10 +141,11 @@ The project exists to make it trivial to translate one type of authentication in
        "integrations": [
            {
                "name": "example",
-               "destination": "http://localhost:9000",
-               "in_rate_limit": 100,
-               "out_rate_limit": 1000,
-               "incoming_auth": [
+            "destination": "http://localhost:9000",
+            "in_rate_limit": 100,
+            "out_rate_limit": 1000,
+            "rate_limit_window": "1m",
+            "incoming_auth": [
                    {"type": "token", "params": {"secrets": ["env:IN_TOKEN"], "header": "X-Auth"}}
                ],
                "outgoing_auth": [
@@ -264,6 +269,7 @@ Integration plugins can bundle common allowlist rules into **capabilities**. Ass
 | `aws`  | `AWS_KMS_KEY` | Base64 encoded 32 byte key used for decrypting `aws:` secrets. |
 | `azure`| `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET` | Credentials for fetching `azure:` secrets from Key Vault. |
 | `gcp`  | _none_ | Uses the GCP metadata service for authentication when resolving `gcp:` secrets. |
+| `vault`| `VAULT_ADDR`, `VAULT_TOKEN` | Fetches secrets from HashiCorp Vault via the HTTP API. |
 
 ### Writing Plugins
 
@@ -453,10 +459,11 @@ AuthTranslator writes log messages to standard output using Go's `log/slog` pack
 
 AuthTranslator exposes a readiness endpoint at `/healthz` which returns HTTP `200` when the server is running.
 
-Metrics are available at `/metrics` using the Prometheus text format. Two counters are exported:
+Metrics are available at `/metrics` using the Prometheus text format. The following metrics are exported:
 
 - `authtranslator_requests_total{integration="<name>"}` – total requests processed per integration.
 - `authtranslator_rate_limit_events_total{integration="<name>"}` – requests rejected due to rate limits.
+- `authtranslator_request_duration_seconds` – histogram of request processing duration per integration.
 
 To scrape metrics with Prometheus, add a job such as:
 

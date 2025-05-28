@@ -99,6 +99,48 @@ func parseLevel(s string) slog.Level {
 	}
 }
 
+// reload reparses the configuration and allowlist files, replacing all
+// registered integrations and allowlists. Existing rate limiters are
+// stopped before the new configuration is loaded.
+func reload() error {
+	logger.Info("reloading configuration")
+
+	cfg, err := loadConfig(*configFile)
+	if err != nil {
+		return err
+	}
+
+	// Clear existing integrations and stop their limiters.
+	integrations.Lock()
+	for _, i := range integrations.m {
+		i.inLimiter.Stop()
+		i.outLimiter.Stop()
+	}
+	integrations.m = make(map[string]*Integration)
+	integrations.Unlock()
+
+	for i := range cfg.Integrations {
+		if err := AddIntegration(&cfg.Integrations[i]); err != nil {
+			return fmt.Errorf("failed to load integration %s: %w", cfg.Integrations[i].Name, err)
+		}
+	}
+
+	entries, err := loadAllowlists(*allowlistFile)
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to load allowlist: %w", err)
+	}
+
+	allowlists.Lock()
+	allowlists.m = make(map[string]map[string]CallerConfig)
+	allowlists.Unlock()
+
+	for _, al := range entries {
+		SetAllowlist(al.Integration, al.Callers)
+	}
+
+	return nil
+}
+
 type RateLimiter struct {
 	mu          sync.Mutex
 	limit       int
@@ -227,6 +269,10 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer incRequest(integ.Name)
+	start := time.Now()
+	defer func() {
+		recordDuration(integ.Name, time.Since(start))
+	}()
 
 	clientIP, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
@@ -319,23 +365,8 @@ func main() {
 
 	logger = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: parseLevel(*logLevel)}))
 
-	config, err := loadConfig(*configFile)
-	if err != nil {
+	if err := reload(); err != nil {
 		log.Fatal(err)
-	}
-
-	for i := range config.Integrations {
-		if err := AddIntegration(&config.Integrations[i]); err != nil {
-			log.Fatalf("failed to load integration %s: %v", config.Integrations[i].Name, err)
-		}
-	}
-
-	entries, err := loadAllowlists(*allowlistFile)
-	if err != nil && !os.IsNotExist(err) {
-		log.Fatalf("failed to load allowlist: %v", err)
-	}
-	for _, al := range entries {
-		SetAllowlist(al.Integration, al.Callers)
 	}
 
 	if *debug {
@@ -356,8 +387,24 @@ func main() {
 	}()
 
 	stop := make(chan os.Signal, 1)
+	reloadSig := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
-	<-stop
+	signal.Notify(reloadSig, syscall.SIGHUP)
+
+	for {
+		select {
+		case <-reloadSig:
+			if err := reload(); err != nil {
+				logger.Error("reload failed", "error", err)
+			} else {
+				logger.Info("reloaded configuration")
+			}
+		case <-stop:
+			goto shutdown
+		}
+	}
+
+shutdown:
 
 	logger.Info("shutting down")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
