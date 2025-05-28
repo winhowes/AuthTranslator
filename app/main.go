@@ -85,6 +85,10 @@ func loadConfig(filename string) (*Config, error) {
 		return nil, err
 	}
 
+	if err := validateConfig(&config); err != nil {
+		return nil, err
+	}
+
 	return &config, nil
 }
 
@@ -141,6 +145,8 @@ func reload() error {
 	for _, al := range entries {
 		SetAllowlist(al.Integration, al.Callers)
 	}
+
+	lastReloadTime.Set(time.Now().Format(time.RFC3339))
 
 	return nil
 }
@@ -313,6 +319,7 @@ func integrationsHandler(w http.ResponseWriter, r *http.Request) {
 
 // healthzHandler reports server readiness.
 func healthzHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("X-Last-Reload", lastReloadTime.Value())
 	w.WriteHeader(http.StatusOK)
 }
 

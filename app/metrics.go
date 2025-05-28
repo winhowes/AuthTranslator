@@ -15,6 +15,7 @@ var (
 	requestCounts    = expvar.NewMap("authtranslator_requests_total")
 	rateLimitCounts  = expvar.NewMap("authtranslator_rate_limit_events_total")
 	requestDurations = expvar.NewMap("authtranslator_request_duration_seconds")
+	lastReloadTime   = expvar.NewString("authtranslator_last_reload")
 	durationHistsMu  sync.Mutex
 	durationHists    = make(map[string]*histogram)
 	durationBuckets  = []float64{0.1, 0.25, 0.5, 1, 2.5, 5, 10}
@@ -32,6 +33,10 @@ func newHistogram() *histogram {
 		buckets: durationBuckets,
 		counts:  make([]uint64, len(durationBuckets)+1),
 	}
+}
+
+func init() {
+	lastReloadTime.Set(time.Now().Format(time.RFC3339))
 }
 
 func (h *histogram) Observe(v float64) {
