@@ -142,6 +142,13 @@ func reload() error {
 			logger.Error("failed to load allowlist; keeping existing entries", "error", err)
 		}
 	} else {
+		if err := validateAllowlistEntries(entries); err != nil {
+			allowlists.Lock()
+			allowlists.m = old
+			allowlists.Unlock()
+			return fmt.Errorf("invalid allowlist: %w", err)
+		}
+
 		allowlists.Lock()
 		allowlists.m = make(map[string]map[string]CallerConfig)
 		allowlists.Unlock()
