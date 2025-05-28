@@ -20,6 +20,7 @@ The project exists to make it trivial to translate one type of authentication in
 - **Allowlist**: Integrations can restrict specific callers to particular paths, methods and required parameters.
 - **Configuration Driven**: Behavior is controlled via a JSON configuration file.
 - **Clean Shutdown**: On SIGINT or SIGTERM the server and rate limiters are gracefully stopped.
+- **Hot Reload**: Send `SIGHUP` to reload the configuration and allowlist without restarting.
 
 ## Development Requirements
 
@@ -122,6 +123,7 @@ The project exists to make it trivial to translate one type of authentication in
 3. **Running**
 
    The listen address can be configured with the `-addr` flag. By default the server listens on `:8080`. Incoming requests are matched against the `X-AT-Int` header, if present, or otherwise the host header to determine the route and associated authentication plugin. Use `-disable_x_at_int` to ignore the header entirely or `-x_at_int_host` to only respect the header when a specific host is requested. The configuration file is chosen with `-config` (default `config.json`). The allowlist file can be specified with `-allowlist`; it defaults to `allowlist.json`.
+   Send `SIGHUP` to the process to reload these files without restarting.
 
 4. **Run Locally**
 
