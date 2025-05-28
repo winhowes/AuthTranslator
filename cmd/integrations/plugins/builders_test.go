@@ -23,6 +23,7 @@ func TestBuilders(t *testing.T) {
 		{"monday", []string{"-name", "mon", "-token", "tok"}, Monday("mon", "tok")},
 		{"okta", []string{"-name", "ok", "-domain", "okta.example.com", "-token", "tok"}, Okta("ok", "okta.example.com", "tok")},
 		{"sendgrid", []string{"-name", "sg", "-token", "tok"}, SendGrid("sg", "tok")},
+		{"trufflehog", []string{"-name", "th", "-token", "tok"}, TruffleHog("th", "tok")},
 		{"servicenow", []string{"-name", "sn", "-token", "tok"}, ServiceNow("sn", "tok")},
 		{"slack", []string{"-name", "sl", "-token", "tok", "-signing-secret", "sec"}, Slack("sl", "tok", "sec")},
 		{"stripe", []string{"-name", "st", "-token", "tok"}, Stripe("st", "tok")},

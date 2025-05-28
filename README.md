@@ -209,6 +209,7 @@ Integration plugins can bundle common allowlist rules into **capabilities**. Ass
 - `twilio.send_sms`, `twilio.make_call`, `twilio.query_message` – Twilio messaging and voice APIs.
 - `okta.create_user`, `okta.update_user`, `okta.deactivate_user` – manage Okta user accounts.
 - `stripe.create_charge`, `stripe.refund_charge`, `stripe.create_customer` – Stripe payment flows.
+- `trufflehog.start_scan`, `trufflehog.get_results`, `trufflehog.list_scans` – scan management operations.
 
 ### Secret Plugin Environment Variables
 
@@ -308,7 +309,7 @@ List existing integrations:
 go run ./cmd/integrations list
 ```
 
-A helper CLI is available under `cmd/integrations` to create Slack, GitHub, GitHub Enterprise, GitLab, Jira, Confluence, Linear, Asana, Zendesk, ServiceNow, SendGrid, Twilio or Stripe integrations with minimal flags.
+A helper CLI is available under `cmd/integrations` to create Slack, GitHub, GitHub Enterprise, GitLab, Jira, Confluence, Linear, Asana, Zendesk, ServiceNow, SendGrid, TruffleHog, Twilio or Stripe integrations with minimal flags.
 
 Add Slack:
 ```bash
@@ -362,6 +363,10 @@ go run ./cmd/integrations servicenow -token env:SERVICENOW_TOKEN
 Add SendGrid:
 ```bash
 go run ./cmd/integrations sendgrid -token env:SENDGRID_TOKEN
+```
+Add TruffleHog:
+```bash
+go run ./cmd/integrations trufflehog -token env:TRUFFLEHOG_TOKEN
 ```
 Add Twilio:
 ```bash
