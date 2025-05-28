@@ -144,7 +144,6 @@ func reload() error {
 type RateLimiter struct {
 	mu          sync.Mutex
 	limit       int
-	duration    time.Duration
 	requests    map[string]int
 	resetTicker *time.Ticker
 	done        chan struct{}
@@ -153,7 +152,6 @@ type RateLimiter struct {
 func NewRateLimiter(limit int, duration time.Duration) *RateLimiter {
 	rl := &RateLimiter{
 		limit:    limit,
-		duration: duration,
 		requests: make(map[string]int),
 		done:     make(chan struct{}),
 	}

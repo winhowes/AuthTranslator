@@ -2,6 +2,7 @@ package main
 
 import (
 	"testing"
+	"time"
 
 	_ "github.com/winhowes/AuthTranslator/app/authplugins/basic"
 	_ "github.com/winhowes/AuthTranslator/app/authplugins/google_oidc"
@@ -163,5 +164,46 @@ func TestDeleteIntegration(t *testing.T) {
 	DeleteIntegration("delete")
 	if _, ok := GetIntegration("delete"); ok {
 		t.Fatalf("integration not deleted")
+	}
+}
+
+func TestIntegrationRateLimitWindow(t *testing.T) {
+	i := &Integration{
+		Name:            "window",
+		Destination:     "http://example.com",
+		InRateLimit:     1,
+		OutRateLimit:    1,
+		RateLimitWindow: "10ms",
+	}
+	if err := AddIntegration(i); err != nil {
+		t.Fatalf("add: %v", err)
+	}
+	t.Cleanup(func() {
+		i.inLimiter.Stop()
+		i.outLimiter.Stop()
+	})
+
+	if !i.inLimiter.Allow("a") {
+		t.Fatal("first call not allowed")
+	}
+	if i.inLimiter.Allow("a") {
+		t.Fatal("limit should be enforced")
+	}
+	time.Sleep(15 * time.Millisecond)
+	if !i.inLimiter.Allow("a") {
+		t.Fatal("limit did not reset after window")
+	}
+}
+
+func TestIntegrationInvalidWindow(t *testing.T) {
+	i := &Integration{
+		Name:            "badwindow",
+		Destination:     "http://example.com",
+		InRateLimit:     1,
+		OutRateLimit:    1,
+		RateLimitWindow: "0",
+	}
+	if err := AddIntegration(i); err == nil {
+		t.Fatal("expected error for non-positive window")
 	}
 }
