@@ -201,7 +201,7 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 			host = hdr
 		}
 	}
-  hostLookup := strings.ToLower(host)
+	hostLookup := strings.ToLower(host)
 	logger.Info("incoming request", "method", r.Method, "host", host, "path", r.URL.Path, "remote", r.RemoteAddr)
 	integ, ok := GetIntegration(hostLookup)
 	if !ok {
