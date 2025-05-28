@@ -20,6 +20,13 @@ var secretCache = struct {
 	m map[string]string
 }{m: make(map[string]string)}
 
+// ClearCache empties the cached secret values.
+func ClearCache() {
+	secretCache.Lock()
+	secretCache.m = make(map[string]string)
+	secretCache.Unlock()
+}
+
 // Register adds a secret plugin for a prefix.
 func Register(p Plugin) { registry[p.Prefix()] = p }
 
