@@ -28,9 +28,11 @@ func TestAllowlist(t *testing.T) {
 	if err := AddIntegration(&integ); err != nil {
 		t.Fatalf("failed to add integration: %v", err)
 	}
-	SetAllowlist("allowlist", []CallerConfig{
+	if err := SetAllowlist("allowlist", []CallerConfig{
 		{ID: "*", Rules: []CallRule{{Path: "/allowed", Methods: map[string]RequestConstraint{"GET": {}}}}},
-	})
+	}); err != nil {
+		t.Fatalf("failed to set allowlist: %v", err)
+	}
 	t.Cleanup(func() {
 		integ.inLimiter.Stop()
 		integ.outLimiter.Stop()
@@ -60,7 +62,9 @@ func TestSetAllowlistIndexing(t *testing.T) {
 	allowlists.m = make(map[string]map[string]CallerConfig)
 	allowlists.Unlock()
 
-	SetAllowlist("idx", []CallerConfig{{ID: "id"}, {}})
+	if err := SetAllowlist("idx", []CallerConfig{{ID: "id"}, {}}); err != nil {
+		t.Fatalf("failed to set allowlist: %v", err)
+	}
 
 	allowlists.RLock()
 	callers := allowlists.m["idx"]
@@ -78,10 +82,12 @@ func TestFindConstraintWildcard(t *testing.T) {
 	allowlists.m = make(map[string]map[string]CallerConfig)
 	allowlists.Unlock()
 
-	SetAllowlist("fc", []CallerConfig{
+	if err := SetAllowlist("fc", []CallerConfig{
 		{ID: "abc", Rules: []CallRule{{Path: "/abc", Methods: map[string]RequestConstraint{"GET": {}}}}},
 		{Rules: []CallRule{{Path: "/wild", Methods: map[string]RequestConstraint{"GET": {}}}}},
-	})
+	}); err != nil {
+		t.Fatalf("failed to set allowlist: %v", err)
+	}
 
 	integ := &Integration{Name: "fc"}
 
@@ -93,5 +99,34 @@ func TestFindConstraintWildcard(t *testing.T) {
 	}
 	if _, ok := findConstraint(integ, "xyz", "/none", http.MethodGet); ok {
 		t.Fatal("unexpected match for unknown path")
+	}
+}
+
+func TestSetAllowlistDuplicateCaller(t *testing.T) {
+	allowlists.Lock()
+	allowlists.m = make(map[string]map[string]CallerConfig)
+	allowlists.Unlock()
+
+	err := SetAllowlist("dup", []CallerConfig{{ID: "a"}, {ID: "a"}})
+	if err == nil {
+		t.Fatal("expected error for duplicate caller id")
+	}
+}
+
+func TestSetAllowlistDuplicateRule(t *testing.T) {
+	allowlists.Lock()
+	allowlists.m = make(map[string]map[string]CallerConfig)
+	allowlists.Unlock()
+
+	callers := []CallerConfig{{
+		ID: "a",
+		Rules: []CallRule{
+			{Path: "/x", Methods: map[string]RequestConstraint{"GET": {}}},
+			{Path: "/x", Methods: map[string]RequestConstraint{"GET": {}}},
+		},
+	}}
+	err := SetAllowlist("dup", callers)
+	if err == nil {
+		t.Fatal("expected error for duplicate rule")
 	}
 }

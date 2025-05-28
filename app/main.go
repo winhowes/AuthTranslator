@@ -143,7 +143,9 @@ func reload() error {
 	allowlists.Unlock()
 
 	for _, al := range entries {
-		SetAllowlist(al.Integration, al.Callers)
+		if err := SetAllowlist(al.Integration, al.Callers); err != nil {
+			return fmt.Errorf("failed to load allowlist for %s: %w", al.Integration, err)
+		}
 	}
 
 	lastReloadTime.Set(time.Now().Format(time.RFC3339))
