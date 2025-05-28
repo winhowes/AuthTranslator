@@ -196,9 +196,9 @@ Integration plugins can bundle common allowlist rules into **capabilities**. Ass
 - `github.update_issue` – allow editing or closing issues in a given repository.
 - `ghe.comment`, `ghe.create_issue`, `ghe.update_issue` – GitHub Enterprise equivalents requiring the `repo` parameter.
 - `gitlab.comment`, `gitlab.create_issue`, `gitlab.update_issue` – similar capabilities for GitLab projects (use the `project` parameter).
-- `asana.create_task`, `linear.create_task`, `jira.create_task` – permit creating tasks or issues.
-- `asana.update_status`, `linear.update_status`, `jira.update_status` – allow modifying task or issue status.
-- `asana.add_comment`, `linear.add_comment`, `jira.add_comment` – permit adding comments.
+- `asana.create_task`, `linear.create_task`, `jira.create_task`, `confluence.create_page` – permit creating tasks, issues or pages.
+- `asana.update_status`, `linear.update_status`, `jira.update_status`, `confluence.update_page` – allow editing tasks, issues or pages.
+- `asana.add_comment`, `linear.add_comment`, `jira.add_comment`, `confluence.add_comment` – permit adding comments.
 - `zendesk.open_ticket`, `servicenow.open_ticket` – allow creating support tickets.
 - `zendesk.update_ticket`, `servicenow.update_ticket` – permit updating ticket details.
 - `zendesk.query_status`, `servicenow.query_status` – allow reading ticket status.
@@ -305,7 +305,7 @@ List existing integrations:
 go run ./cmd/integrations list
 ```
 
-A helper CLI is available under `cmd/integrations` to create Slack, GitHub, GitHub Enterprise, GitLab, Jira, Linear, Asana, Zendesk, ServiceNow, SendGrid, Twilio or Stripe integrations with minimal flags.
+A helper CLI is available under `cmd/integrations` to create Slack, GitHub, GitHub Enterprise, GitLab, Jira, Confluence, Linear, Asana, Zendesk, ServiceNow, SendGrid, Twilio or Stripe integrations with minimal flags.
 
 Add Slack:
 ```bash
@@ -331,6 +331,10 @@ go run ./cmd/integrations -server http://localhost:8080/integrations \
 Add Jira:
 ```bash
 go run ./cmd/integrations jira -token env:JIRA_TOKEN
+```
+Add Confluence:
+```bash
+go run ./cmd/integrations confluence -token env:CONFLUENCE_TOKEN
 ```
 Add Linear:
 ```bash
