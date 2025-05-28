@@ -55,3 +55,22 @@ func TestServeUsesTLS(t *testing.T) {
 		t.Fatal("expected ListenAndServeTLS to be called")
 	}
 }
+
+func TestServeMissingTLSArgs(t *testing.T) {
+	cases := []struct {
+		cert string
+		key  string
+	}{
+		{cert: "c", key: ""},
+		{cert: "", key: "k"},
+	}
+	for i, tc := range cases {
+		srv := &stubServer{}
+		if err := serve(srv, tc.cert, tc.key); err == nil {
+			t.Fatalf("case %d: expected error", i)
+		}
+		if srv.tls {
+			t.Fatalf("case %d: unexpected TLS start", i)
+		}
+	}
+}

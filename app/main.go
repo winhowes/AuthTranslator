@@ -287,10 +287,14 @@ type server interface {
 }
 
 func serve(s server, cert, key string) error {
-	if cert != "" && key != "" {
+	switch {
+	case cert != "" && key != "":
 		return s.ListenAndServeTLS(cert, key)
+	case cert == "" && key == "":
+		return s.ListenAndServe()
+	default:
+		return fmt.Errorf("both cert and key must be provided")
 	}
-	return s.ListenAndServe()
 }
 
 func main() {

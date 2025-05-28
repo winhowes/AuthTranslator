@@ -35,8 +35,9 @@ The project exists to make it trivial to translate one type of authentication in
    ```
 
    Run `go run ./app --help` to see all available flags.
-   Provide `-tls-cert` and `-tls-key` to serve HTTPS using the specified
-   certificate and key.
+   Provide `-tls-cert` and `-tls-key` together to serve HTTPS using the
+   specified certificate and key. Supplying only one of these options
+   results in an error.
    
    Or build an executable:
    
