@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/url"
 	"path"
@@ -17,9 +18,45 @@ var allowlists = struct {
 	m map[string]map[string]CallerConfig
 }{m: make(map[string]map[string]CallerConfig)}
 
-// SetAllowlist registers the caller allowlist for an integration.
-func SetAllowlist(name string, callers []CallerConfig) {
+// validateAllowlist ensures callers and rules are unique after capability
+// expansion. The ID "" is treated as "*".
+func validateAllowlist(name string, callers []CallerConfig) error {
+	seenIDs := make(map[string]struct{})
+	for ci, c := range callers {
+		id := c.ID
+		if id == "" {
+			id = "*"
+		}
+		if _, dup := seenIDs[id]; dup {
+			return fmt.Errorf("duplicate caller id %q in allowlist %s", id, name)
+		}
+		seenIDs[id] = struct{}{}
+
+		// track path+method combos to prevent duplicates
+		ruleSeen := make(map[string]map[string]struct{})
+		for ri, r := range c.Rules {
+			if ruleSeen[r.Path] == nil {
+				ruleSeen[r.Path] = make(map[string]struct{})
+			}
+			for m := range r.Methods {
+				if _, dup := ruleSeen[r.Path][m]; dup {
+					return fmt.Errorf("duplicate rule for caller %q path %q method %s (index %d rule %d)", id, r.Path, m, ci, ri)
+				}
+				ruleSeen[r.Path][m] = struct{}{}
+			}
+		}
+	}
+	return nil
+}
+
+// SetAllowlist registers the caller allowlist for an integration. It returns an
+// error if duplicate caller IDs or rules are detected.
+func SetAllowlist(name string, callers []CallerConfig) error {
 	callers = integrationplugins.ExpandCapabilities(name, callers)
+	if err := validateAllowlist(name, callers); err != nil {
+		return err
+	}
+
 	m := make(map[string]CallerConfig, len(callers))
 	for _, c := range callers {
 		id := c.ID
@@ -31,6 +68,7 @@ func SetAllowlist(name string, callers []CallerConfig) {
 	allowlists.Lock()
 	allowlists.m[name] = m
 	allowlists.Unlock()
+	return nil
 }
 
 // GetAllowlist retrieves the allowlist for an integration.
