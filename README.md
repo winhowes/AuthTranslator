@@ -257,6 +257,7 @@ Integration plugins can bundle common allowlist rules into **capabilities**. Ass
 - `okta.create_user`, `okta.update_user`, `okta.deactivate_user` – manage Okta user accounts.
 - `stripe.create_charge`, `stripe.refund_charge`, `stripe.create_customer` – Stripe payment flows.
 - `trufflehog.start_scan`, `trufflehog.get_results`, `trufflehog.list_scans` – scan management operations.
+- `openai.chat_completion`, `openai.list_models`, `openai.create_embedding` – basic OpenAI API calls.
 
 ### Secret Plugin Environment Variables
 
@@ -308,7 +309,7 @@ List existing integrations:
 go run ./cmd/integrations list
 ```
 
-A helper CLI is available under `cmd/integrations` to create Slack, GitHub, GitHub Enterprise, GitLab, Jira, Confluence, Linear, Asana, Zendesk, ServiceNow, SendGrid, TruffleHog, Twilio or Stripe integrations with minimal flags.
+A helper CLI is available under `cmd/integrations` to create Slack, GitHub, GitHub Enterprise, GitLab, Jira, Confluence, Linear, Asana, Zendesk, ServiceNow, SendGrid, TruffleHog, Twilio, OpenAI or Stripe integrations with minimal flags.
 
 Add Slack:
 ```bash
@@ -378,6 +379,10 @@ go run ./cmd/integrations okta -domain okta.example.com -token env:OKTA_TOKEN
 Add Workday:
 ```bash
 go run ./cmd/integrations workday -domain workday.example.com -token env:WORKDAY_TOKEN
+```
+Add OpenAI:
+```bash
+go run ./cmd/integrations openai -token env:OPENAI_TOKEN
 ```
 Add Stripe:
 ```bash
