@@ -297,8 +297,9 @@ Start the server with `-debug` so the `/integrations` endpoint is available:
 go run ./app -debug
 ```
 
-Then run the CLI to POST a new integration configuration. The `-server` flag
-controls where the CLI sends the request (default `http://localhost:8080/integrations`).
+Then run the CLI to manage integrations. The `-server` flag controls where
+requests are sent (default `http://localhost:8080/integrations`). `POST` adds a
+new integration, `PUT` updates an existing one and `DELETE` removes it.
 
 List existing integrations:
 ```bash
@@ -383,6 +384,16 @@ go run ./cmd/integrations openai -token env:OPENAI_TOKEN
 Add Stripe:
 ```bash
 go run ./cmd/integrations stripe -token env:STRIPE_TOKEN
+```
+
+Update an existing integration (same flags as add):
+```bash
+go run ./cmd/integrations update slack -token env:NEW_TOKEN -signing-secret env:NEW_SIGNING
+```
+
+Delete an integration by name:
+```bash
+go run ./cmd/integrations delete slack
 ```
 
 ## Allowlist CLI
