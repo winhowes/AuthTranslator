@@ -99,3 +99,26 @@ func TestAddIntegrationDuplicateName(t *testing.T) {
 		t.Fatal("expected error for duplicate name")
 	}
 }
+
+func TestGetIntegrationCaseInsensitive(t *testing.T) {
+	i := &Integration{
+		Name:         "MiXeD",
+		Destination:  "http://example.com",
+		InRateLimit:  1,
+		OutRateLimit: 1,
+	}
+	if err := AddIntegration(i); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	t.Cleanup(func() {
+		i.inLimiter.Stop()
+		i.outLimiter.Stop()
+	})
+
+	if _, ok := GetIntegration("mixed"); !ok {
+		t.Fatal("lookup by lowercase failed")
+	}
+	if _, ok := GetIntegration("MIXED"); !ok {
+		t.Fatal("lookup by uppercase failed")
+	}
+}

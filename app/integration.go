@@ -145,6 +145,7 @@ var nameRegexp = regexp.MustCompile(`^[a-zA-Z0-9-]+$`)
 
 // AddIntegration validates and stores a new integration.
 func AddIntegration(i *Integration) error {
+	i.Name = strings.ToLower(i.Name)
 	if !nameRegexp.MatchString(i.Name) {
 		return errors.New("invalid integration name")
 	}
@@ -218,7 +219,7 @@ func AddIntegration(i *Integration) error {
 // GetIntegration retrieves an integration by name.
 func GetIntegration(name string) (*Integration, bool) {
 	integrations.RLock()
-	i, ok := integrations.m[name]
+	i, ok := integrations.m[strings.ToLower(name)]
 	integrations.RUnlock()
 	return i, ok
 }
