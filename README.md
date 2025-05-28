@@ -129,6 +129,19 @@ The project exists to make it trivial to translate one type of authentication in
    allowlist fails to load during reload, the previously loaded entries remain in
    effect.
 
+   **Service flags**
+
+   - `-addr` – listen address (default `:8080`)
+   - `-config` – path to the configuration file (`config.json` by default)
+   - `-allowlist` – path to the allowlist file (`allowlist.json` by default)
+   - `-disable_x_at_int` – ignore the `X-AT-Int` header
+   - `-x_at_int_host` – only respect `X-AT-Int` when this host is requested
+   - `-tls-cert` and `-tls-key` – TLS certificate and key to serve HTTPS
+   - `-redis-addr` – Redis address for rate limit counters
+   - `-log-level` – log verbosity (`DEBUG`, `INFO`, `WARN`, `ERROR`)
+   - `-log-format` – log output format (`text` or `json`)
+   - `-debug` – expose the `/integrations` endpoint for the CLI
+
 4. **Run Locally**
 
    Start a simple backend and point an integration at it to test the proxy:
@@ -464,7 +477,7 @@ docker run -p 8080:8080 authtranslator
 
 ## Logging
 
-AuthTranslator writes log messages to standard output using Go's `log/slog` package. Use the `-log-level` flag to control verbosity. Valid levels are `DEBUG`, `INFO`, `WARN` and `ERROR` with `INFO` as the default. Each request generates an entry showing the HTTP method, host, path and remote address. Authentication failures, rate limiting events and upstream status codes are also logged.
+AuthTranslator writes log messages to standard output using Go's `log/slog` package. Use the `-log-level` flag to control verbosity. Valid levels are `DEBUG`, `INFO`, `WARN` and `ERROR` with `INFO` as the default. Specify `-log-format json` to emit structured JSON instead of plain text. Each request generates an entry showing the HTTP method, host, path and remote address. Authentication failures, rate limiting events and upstream status codes are also logged.
 
 ## Health Checks and Metrics
 
