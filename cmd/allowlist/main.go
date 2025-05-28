@@ -23,6 +23,7 @@ func main() {
 	flag.Parse()
 	if flag.NArg() < 1 {
 		usage()
+		os.Exit(1)
 	}
 	switch flag.Arg(0) {
 	case "list":
@@ -31,6 +32,7 @@ func main() {
 		addEntry(flag.Args()[1:])
 	default:
 		usage()
+		os.Exit(1)
 	}
 }
 
