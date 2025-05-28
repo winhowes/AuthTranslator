@@ -106,19 +106,17 @@ The project exists to make it trivial to translate one type of authentication in
    to one or more rules when loaded, making it easy to audit access by name:
 
    ```json
-   [
-     {
-       "integration": "slack",
-       "callers": [
-         {
-           "id": "ci-bot-token",
-           "capabilities": [
-             {"name": "post_public_as", "params": {"username": "ci-bot"}}
-           ]
-         }
-       ]
-     }
-   ]
+   {
+     "integration": "slack",
+     "callers": [
+       {
+         "id": "ci-bot-token",
+          "capabilities": [
+            {"name": "post_public_as", "params": {"username": "ci-bot"}}
+          ]
+       }
+     ]
+   }
    ```
 
 3. **Running**
