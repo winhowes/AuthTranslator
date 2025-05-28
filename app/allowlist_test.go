@@ -8,6 +8,7 @@ import (
 	_ "github.com/winhowes/AuthTranslator/app/authplugins/basic"
 	_ "github.com/winhowes/AuthTranslator/app/authplugins/google_oidc"
 	_ "github.com/winhowes/AuthTranslator/app/authplugins/token"
+	integrationplugins "github.com/winhowes/AuthTranslator/app/integrationplugins"
 	_ "github.com/winhowes/AuthTranslator/app/secrets/plugins"
 )
 
@@ -128,5 +129,33 @@ func TestSetAllowlistDuplicateRule(t *testing.T) {
 	err := SetAllowlist("dup", callers)
 	if err == nil {
 		t.Fatal("expected error for duplicate rule")
+	}
+}
+
+func TestSetAllowlistInvalidRule(t *testing.T) {
+	allowlists.Lock()
+	allowlists.m = make(map[string]map[string]CallerConfig)
+	allowlists.Unlock()
+
+	callers := []CallerConfig{{
+		ID:    "a",
+		Rules: []CallRule{{Path: "", Methods: map[string]RequestConstraint{"GET": {}}}},
+	}}
+	if err := SetAllowlist("bad", callers); err == nil {
+		t.Fatal("expected error for invalid rule")
+	}
+}
+
+func TestSetAllowlistUnknownCapability(t *testing.T) {
+	allowlists.Lock()
+	allowlists.m = make(map[string]map[string]CallerConfig)
+	allowlists.Unlock()
+
+	callers := []CallerConfig{{
+		ID:           "a",
+		Capabilities: []integrationplugins.CapabilityConfig{{Name: "bogus"}},
+	}}
+	if err := SetAllowlist("foo", callers); err == nil {
+		t.Fatal("expected error for unknown capability")
 	}
 }

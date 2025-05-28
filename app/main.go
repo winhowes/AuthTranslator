@@ -142,7 +142,12 @@ func reload() error {
 	allowlists.m = make(map[string]map[string]CallerConfig)
 	allowlists.Unlock()
 
+	seenAllow := make(map[string]struct{})
 	for _, al := range entries {
+		if _, dup := seenAllow[al.Integration]; dup {
+			return fmt.Errorf("duplicate allowlist entry for %s", al.Integration)
+		}
+		seenAllow[al.Integration] = struct{}{}
 		if err := SetAllowlist(al.Integration, al.Callers); err != nil {
 			return fmt.Errorf("failed to load allowlist for %s: %w", al.Integration, err)
 		}
