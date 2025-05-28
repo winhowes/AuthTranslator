@@ -125,7 +125,9 @@ The project exists to make it trivial to translate one type of authentication in
 3. **Running**
 
    The listen address can be configured with the `-addr` flag. By default the server listens on `:8080`. Incoming requests are matched against the `X-AT-Int` header, if present, or otherwise the host header to determine the route and associated authentication plugin. Use `-disable_x_at_int` to ignore the header entirely or `-x_at_int_host` to only respect the header when a specific host is requested. The configuration file is chosen with `-config` (default `config.json`). The allowlist file can be specified with `-allowlist`; it defaults to `allowlist.json`. Set `-redis-addr` to persist rate limits in Redis; failures fall back to memory with an error log.
-   Send `SIGHUP` to the process to reload these files without restarting.
+   Send `SIGHUP` to the process to reload these files without restarting. If the
+   allowlist fails to load during reload, the previously loaded entries remain in
+   effect.
 
 4. **Run Locally**
 
