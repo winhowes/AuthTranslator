@@ -40,3 +40,27 @@ func TestRateLimiterReset(t *testing.T) {
 		t.Fatal("rate limiter should reset after duration")
 	}
 }
+
+func TestRateLimiterUnlimited(t *testing.T) {
+	rl := NewRateLimiter(0, time.Hour)
+	t.Cleanup(rl.Stop)
+	key := "caller"
+
+	for i := 0; i < 100; i++ {
+		if !rl.Allow(key) {
+			t.Fatalf("call %d should be allowed", i)
+		}
+	}
+}
+
+func TestRateLimiterUnlimitedNegative(t *testing.T) {
+	rl := NewRateLimiter(-1, time.Hour)
+	t.Cleanup(rl.Stop)
+	key := "caller"
+
+	for i := 0; i < 100; i++ {
+		if !rl.Allow(key) {
+			t.Fatalf("call %d should be allowed", i)
+		}
+	}
+}

@@ -16,7 +16,7 @@ The project exists to make it trivial to translate one type of authentication in
 - **Reverse Proxy**: Forwards incoming HTTP requests to a target backend based on the requested host or `X-AT-Int` header. The header can be disabled or restricted to a specific host using command-line flags.
 - **Pluggable Authentication**: Supports "basic", "token", `hmac_signature`, `jwt`, `mtls`, `url_path`, `github_signature` and `slack_signature` authentication types for both incoming and outgoing requests including Google OIDC with room for extension.
 - **Extensible Plugins**: Add new auth, secret and integration plugins to cover different systems.
-- **Rate Limiting**: Limits the number of requests per caller and per host within a rolling window.
+- **Rate Limiting**: Limits the number of requests per caller and per host within a rolling window. A value of `0` disables limiting.
 - **Allowlist**: Integrations can restrict specific callers to particular paths, methods and required parameters.
 - **Configuration Driven**: Behavior is controlled via a JSON configuration file.
 - **Clean Shutdown**: On SIGINT or SIGTERM the server and rate limiters are gracefully stopped.
@@ -67,6 +67,8 @@ The project exists to make it trivial to translate one type of authentication in
      ]
    }
    ```
+
+   Use `0` (or a negative number) for `in_rate_limit` or `out_rate_limit` to disable rate limiting for that direction.
 
    The allowlist configuration lives in a separate `allowlist.json` file:
 
