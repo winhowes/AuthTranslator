@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"flag"
@@ -11,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -58,6 +61,7 @@ var configFile = flag.String("config", "config.json", "path to configuration fil
 var tlsCert = flag.String("tls-cert", "", "path to TLS certificate")
 var tlsKey = flag.String("tls-key", "", "path to TLS key")
 var logLevel = flag.String("log-level", "INFO", "log level: DEBUG, INFO, WARN, ERROR")
+var redisAddr = flag.String("redis-addr", "", "redis address for rate limits (host:port)")
 var logger = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 
 func usage() {
@@ -144,16 +148,20 @@ func reload() error {
 type RateLimiter struct {
 	mu          sync.Mutex
 	limit       int
+	window      time.Duration
 	requests    map[string]int
 	resetTicker *time.Ticker
 	done        chan struct{}
+	useRedis    bool
 }
 
 func NewRateLimiter(limit int, duration time.Duration) *RateLimiter {
 	rl := &RateLimiter{
 		limit:    limit,
-		requests: make(map[string]int),
+		window:   duration,
 		done:     make(chan struct{}),
+		useRedis: *redisAddr != "",
+		requests: make(map[string]int),
 	}
 
 	if limit > 0 {
@@ -181,12 +189,24 @@ func (rl *RateLimiter) Stop() {
 	if rl.resetTicker != nil {
 		rl.resetTicker.Stop()
 	}
-	close(rl.done)
+	select {
+	case <-rl.done:
+	default:
+		close(rl.done)
+	}
 }
 
 func (rl *RateLimiter) Allow(key string) bool {
 	if rl.limit <= 0 {
 		return true
+	}
+	if rl.useRedis {
+		ok, err := rl.allowRedis(key)
+		if err != nil {
+			logger.Error("redis limiter failed, falling back to memory", "error", err)
+		} else {
+			return ok
+		}
 	}
 
 	rl.mu.Lock()
@@ -198,6 +218,54 @@ func (rl *RateLimiter) Allow(key string) bool {
 
 	rl.requests[key]++
 	return true
+}
+
+func (rl *RateLimiter) allowRedis(key string) (bool, error) {
+	conn, err := net.Dial("tcp", *redisAddr)
+	if err != nil {
+		return false, err
+	}
+	defer conn.Close()
+
+	n, err := redisCmdInt(conn, "INCR", key)
+	if err != nil {
+		return false, err
+	}
+	if n == 1 {
+		_, err = redisCmdInt(conn, "EXPIRE", key, strconv.Itoa(int(rl.window.Seconds())))
+		if err != nil {
+			return false, err
+		}
+	}
+	return n <= rl.limit, nil
+}
+
+func redisCmdInt(conn net.Conn, args ...string) (int, error) {
+	var buf bytes.Buffer
+	fmt.Fprintf(&buf, "*%d\r\n", len(args))
+	for _, a := range args {
+		fmt.Fprintf(&buf, "$%d\r\n%s\r\n", len(a), a)
+	}
+	if _, err := conn.Write(buf.Bytes()); err != nil {
+		return 0, err
+	}
+	br := bufio.NewReader(conn)
+	prefix, err := br.ReadByte()
+	if err != nil {
+		return 0, err
+	}
+	line, err := br.ReadString('\n')
+	if err != nil {
+		return 0, err
+	}
+	switch prefix {
+	case ':', '+':
+		return strconv.Atoi(strings.TrimSpace(line))
+	case '-':
+		return 0, fmt.Errorf("redis error: %s", strings.TrimSpace(line))
+	default:
+		return 0, fmt.Errorf("unexpected reply: %q", prefix)
+	}
 }
 
 // integrationsHandler manages creation and listing of integrations.
