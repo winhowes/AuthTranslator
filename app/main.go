@@ -22,6 +22,7 @@ import (
 	"github.com/winhowes/AuthTranslator/app/authplugins"
 	_ "github.com/winhowes/AuthTranslator/app/authplugins/plugins"
 	_ "github.com/winhowes/AuthTranslator/app/integrationplugins/plugins"
+	"github.com/winhowes/AuthTranslator/app/secrets"
 	_ "github.com/winhowes/AuthTranslator/app/secrets/plugins"
 )
 
@@ -132,6 +133,9 @@ func reload() error {
 	}
 	integrations.m = make(map[string]*Integration)
 	integrations.Unlock()
+
+	// Clear secret cache so reloaded integrations use fresh values.
+	secrets.ClearCache()
 
 	for i := range cfg.Integrations {
 		if err := AddIntegration(&cfg.Integrations[i]); err != nil {
