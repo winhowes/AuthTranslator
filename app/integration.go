@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"reflect"
@@ -208,6 +209,14 @@ func prepareIntegration(i *Integration) error {
 			}
 		}
 		i.OutgoingAuth[idx].parsed = cfg
+
+		if tp, ok := p.(interface {
+			Transport(interface{}) *http.Transport
+		}); ok {
+			if t := tp.Transport(cfg); t != nil {
+				i.proxy.Transport = t
+			}
+		}
 	}
 
 	return nil
