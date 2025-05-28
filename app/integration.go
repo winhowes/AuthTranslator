@@ -122,12 +122,13 @@ type RequestConstraint = integrationplugins.RequestConstraint
 
 // Integration represents a configured proxy integration.
 type Integration struct {
-	Name         string             `json:"name"`
-	Destination  string             `json:"destination"`
-	InRateLimit  int                `json:"in_rate_limit"`
-	OutRateLimit int                `json:"out_rate_limit"`
-	IncomingAuth []AuthPluginConfig `json:"incoming_auth"`
-	OutgoingAuth []AuthPluginConfig `json:"outgoing_auth"`
+	Name            string             `json:"name"`
+	Destination     string             `json:"destination"`
+	InRateLimit     int                `json:"in_rate_limit"`
+	OutRateLimit    int                `json:"out_rate_limit"`
+	IncomingAuth    []AuthPluginConfig `json:"incoming_auth"`
+	OutgoingAuth    []AuthPluginConfig `json:"outgoing_auth"`
+	RateLimitWindow string             `json:"rate_limit_window"`
 
 	inLimiter  *RateLimiter
 	outLimiter *RateLimiter
@@ -157,6 +158,16 @@ func AddIntegration(i *Integration) error {
 	}
 	i.destinationURL = u
 	i.proxy = httputil.NewSingleHostReverseProxy(u)
+
+	// Default rate limit window is one minute if not specified.
+	window := time.Minute
+	if i.RateLimitWindow != "" {
+		var err error
+		window, err = time.ParseDuration(i.RateLimitWindow)
+		if err != nil {
+			return fmt.Errorf("invalid rate_limit_window: %w", err)
+		}
+	}
 
 	// ─── Validate incoming-auth configs ───────────────────────────────────────
 	for idx, a := range i.IncomingAuth {
@@ -208,8 +219,8 @@ func AddIntegration(i *Integration) error {
 		integrations.Unlock()
 		return fmt.Errorf("integration %s already exists", i.Name)
 	}
-	i.inLimiter = NewRateLimiter(i.InRateLimit, time.Minute)
-	i.outLimiter = NewRateLimiter(i.OutRateLimit, time.Minute)
+	i.inLimiter = NewRateLimiter(i.InRateLimit, window)
+	i.outLimiter = NewRateLimiter(i.OutRateLimit, window)
 	integrations.m[i.Name] = i
 	integrations.Unlock()
 
