@@ -1,4 +1,4 @@
-package incoming
+package githubsignature
 
 import (
 	"crypto/hmac"

@@ -424,7 +424,7 @@ docker run -p 8080:8080 authtranslator
 
 ## Logging
 
-AuthTranslator writes log messages to standard output. Each request generates an entry showing the HTTP method, host, path and remote address. Authentication failures and rate limiting events are also logged. HTTP status codes from upstream services are logged, allowing metrics to capture downstream errors. The logger is configured with Go's standard time-prefixed format.
+AuthTranslator writes log messages to standard output using Go's `log/slog` package. Use the `-log-level` flag to control verbosity. Valid levels are `DEBUG`, `INFO`, `WARN` and `ERROR` with `INFO` as the default. Each request generates an entry showing the HTTP method, host, path and remote address. Authentication failures, rate limiting events and upstream status codes are also logged.
 
 ## Health Checks and Metrics
 

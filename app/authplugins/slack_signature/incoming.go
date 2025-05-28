@@ -1,4 +1,4 @@
-package incoming
+package slacksignature
 
 import (
 	"crypto/hmac"
