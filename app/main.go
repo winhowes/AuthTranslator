@@ -25,6 +25,10 @@ import (
 	_ "github.com/winhowes/AuthTranslator/app/secrets/plugins"
 )
 
+// version is the application version. It can be overridden at build time using
+// the -ldflags "-X main.version=<version>" option.
+var version = "dev"
+
 type AllowlistEntry struct {
 	Integration string         `json:"integration"`
 	Callers     []CallerConfig `json:"callers"`
@@ -63,6 +67,7 @@ var tlsKey = flag.String("tls-key", "", "path to TLS key")
 var logLevel = flag.String("log-level", "INFO", "log level: DEBUG, INFO, WARN, ERROR")
 var logFormat = flag.String("log-format", "text", "log output format: text or json")
 var redisAddr = flag.String("redis-addr", "", "redis address for rate limits (host:port)")
+var showVersion = flag.Bool("version", false, "print version and exit")
 var logger = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 
 func usage() {
@@ -453,6 +458,11 @@ func serve(s server, cert, key string) error {
 func main() {
 	flag.Usage = usage
 	flag.Parse()
+
+	if *showVersion {
+		fmt.Println(version)
+		return
+	}
 
 	var handler slog.Handler
 	if strings.ToLower(*logFormat) == "json" {

@@ -141,6 +141,7 @@ The project exists to make it trivial to translate one type of authentication in
    - `-log-level` – log verbosity (`DEBUG`, `INFO`, `WARN`, `ERROR`)
    - `-log-format` – log output format (`text` or `json`)
    - `-debug` – expose the `/integrations` endpoint for the CLI
+   - `-version` – print the build version and exit
 
 4. **Run Locally**
 
