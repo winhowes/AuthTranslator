@@ -264,6 +264,7 @@ Integration plugins can bundle common allowlist rules into **capabilities**. Ass
 | `aws`  | `AWS_KMS_KEY` | Base64 encoded 32 byte key used for decrypting `aws:` secrets. |
 | `azure`| `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET` | Credentials for fetching `azure:` secrets from Key Vault. |
 | `gcp`  | _none_ | Uses the GCP metadata service for authentication when resolving `gcp:` secrets. |
+| `vault`| `VAULT_ADDR`, `VAULT_TOKEN` | Fetches secrets from HashiCorp Vault via the HTTP API. |
 
 ### Writing Plugins
 
