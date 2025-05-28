@@ -134,17 +134,25 @@ func reload() error {
 	}
 
 	entries, err := loadAllowlists(*allowlistFile)
-	if err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("failed to load allowlist: %w", err)
-	}
+	old := allowlists.m
+	if err != nil {
+		if os.IsNotExist(err) {
+			logger.Warn("allowlist file missing; keeping existing entries", "file", *allowlistFile)
+		} else {
+			logger.Error("failed to load allowlist; keeping existing entries", "error", err)
+		}
+	} else {
+		allowlists.Lock()
+		allowlists.m = make(map[string]map[string]CallerConfig)
+		allowlists.Unlock()
 
-	allowlists.Lock()
-	allowlists.m = make(map[string]map[string]CallerConfig)
-	allowlists.Unlock()
-
-	for _, al := range entries {
-		if err := SetAllowlist(al.Integration, al.Callers); err != nil {
-			return fmt.Errorf("failed to load allowlist for %s: %w", al.Integration, err)
+		for _, al := range entries {
+			if err := SetAllowlist(al.Integration, al.Callers); err != nil {
+				allowlists.Lock()
+				allowlists.m = old
+				allowlists.Unlock()
+				return fmt.Errorf("failed to load allowlist for %s: %w", al.Integration, err)
+			}
 		}
 	}
 
