@@ -187,6 +187,11 @@ func integrationsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// healthzHandler reports server readiness.
+func healthzHandler(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
+}
+
 // proxyHandler handles incoming requests and proxies them according to the integration.
 func proxyHandler(w http.ResponseWriter, r *http.Request) {
 	host := r.Host
@@ -201,9 +206,11 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 	integ, ok := GetIntegration(hostLookup)
 	if !ok {
 		logger.Warn("no integration configured", "host", host)
+		incRequest("unknown")
 		http.Error(w, "Not Found", http.StatusNotFound)
 		return
 	}
+	defer incRequest(integ.Name)
 
 	clientIP, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
@@ -230,11 +237,13 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 
 	if !integ.inLimiter.Allow(rateKey) {
 		logger.Warn("caller exceeded rate limit", "caller", rateKey, "host", host)
+		incRateLimit(integ.Name)
 		http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
 		return
 	}
 	if !integ.outLimiter.Allow(host) {
 		logger.Warn("host exceeded rate limit", "host", host)
+		incRateLimit(integ.Name)
 		http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
 		return
 	}
@@ -312,6 +321,9 @@ func main() {
 	if *debug {
 		http.HandleFunc("/integrations", integrationsHandler)
 	}
+
+	http.HandleFunc("/healthz", healthzHandler)
+	http.HandleFunc("/metrics", metricsHandler)
 
 	http.HandleFunc("/", proxyHandler)
 
