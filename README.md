@@ -127,8 +127,9 @@ The project exists to make it trivial to translate one type of authentication in
    by integration and then by caller ID so lookups are fast during request
    processing.
 
-   Capabilities can be listed instead of explicit rules. Each capability expands
-   to one or more rules when loaded, making it easy to audit access by name:
+  Capabilities can be listed instead of explicit rules. Each capability expands
+  to one or more rules when loaded, making it easy to audit access by name and
+  easier for folks to add new entries to the allowlist:
 
   ```json
   [
@@ -280,7 +281,7 @@ array.
 
 ### Capabilities
 
-Integration plugins can bundle common allowlist rules into **capabilities**. Assigning a capability to a caller expands to one or more rules automatically. A few examples:
+Integration plugins can bundle common allowlist rules into **capabilities**. Assigning a capability to a caller expands to one or more rules automatically. Two of the goals are to make it simpler for folks to add entries to the allowlist and to make it easier to audit access. A few examples:
 
 - `slack.post_public_as` – permit posting a message as a specific username.
 - `slack.post_channels_as` – restrict posting to a defined set of channels.
