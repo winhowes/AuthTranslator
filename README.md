@@ -1,4 +1,4 @@
-[![Go Report Card](https://goreportcard.com/badge/github.com/winhowes/AuthTranslator)](https://goreportcard.com/report/github.com/winhowes/AuthTranslator) [![Socket Badge](https://socket.dev/api/badge/go/package/github.com/winhowes/authtranslator?version=v0.0.0-20250527213047-5e705b24a489)](https://socket.dev/go/package/github.com/winhowes/authtranslator?version=v0.0.0-20250527213047-5e705b24a489)
+[![Go Report Card](https://goreportcard.com/badge/github.com/winhowes/AuthTranslator)](https://goreportcard.com/report/github.com/winhowes/AuthTranslator)
 
 # AuthTranslator
 
