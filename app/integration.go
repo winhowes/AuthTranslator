@@ -159,12 +159,8 @@ func prepareIntegration(i *Integration) error {
 	i.destinationURL = u
 	i.proxy = httputil.NewSingleHostReverseProxy(u)
 
-	// Default rate limit window is one minute if not specified.
-	window := time.Minute
 	if i.RateLimitWindow != "" {
-		var err error
-		window, err = time.ParseDuration(i.RateLimitWindow)
-		if err != nil {
+		if _, err := time.ParseDuration(i.RateLimitWindow); err != nil {
 			return fmt.Errorf("invalid rate_limit_window: %w", err)
 		}
 	}
@@ -218,6 +214,14 @@ func AddIntegration(i *Integration) error {
 	if err := prepareIntegration(i); err != nil {
 		return err
 	}
+	window := time.Minute
+	if i.RateLimitWindow != "" {
+		var err error
+		window, err = time.ParseDuration(i.RateLimitWindow)
+		if err != nil {
+			return fmt.Errorf("invalid rate_limit_window: %w", err)
+		}
+	}
 	integrations.Lock()
 	if _, exists := integrations.m[i.Name]; exists {
 		integrations.Unlock()
@@ -255,13 +259,21 @@ func UpdateIntegration(i *Integration) error {
 	if err := prepareIntegration(i); err != nil {
 		return err
 	}
+	window := time.Minute
+	if i.RateLimitWindow != "" {
+		var err error
+		window, err = time.ParseDuration(i.RateLimitWindow)
+		if err != nil {
+			return fmt.Errorf("invalid rate_limit_window: %w", err)
+		}
+	}
 	integrations.Lock()
 	if old, exists := integrations.m[i.Name]; exists {
 		old.inLimiter.Stop()
 		old.outLimiter.Stop()
 	}
-	i.inLimiter = NewRateLimiter(i.InRateLimit, time.Minute)
-	i.outLimiter = NewRateLimiter(i.OutRateLimit, time.Minute)
+	i.inLimiter = NewRateLimiter(i.InRateLimit, window)
+	i.outLimiter = NewRateLimiter(i.OutRateLimit, window)
 	integrations.m[i.Name] = i
 	integrations.Unlock()
 	return nil
