@@ -130,8 +130,9 @@ type Integration struct {
 	OutgoingAuth    []AuthPluginConfig `json:"outgoing_auth"`
 	RateLimitWindow string             `json:"rate_limit_window"`
 
-	inLimiter  *RateLimiter
-	outLimiter *RateLimiter
+	rateLimitWindow time.Duration
+	inLimiter       *RateLimiter
+	outLimiter      *RateLimiter
 
 	destinationURL *url.URL               `json:"-"`
 	proxy          *httputil.ReverseProxy `json:"-"`
@@ -160,10 +161,10 @@ func prepareIntegration(i *Integration) error {
 	i.proxy = httputil.NewSingleHostReverseProxy(u)
 
 	// Default rate limit window is one minute if not specified.
-	window := time.Minute
+	i.rateLimitWindow = time.Minute
 	if i.RateLimitWindow != "" {
 		var err error
-		window, err = time.ParseDuration(i.RateLimitWindow)
+		i.rateLimitWindow, err = time.ParseDuration(i.RateLimitWindow)
 		if err != nil {
 			return fmt.Errorf("invalid rate_limit_window: %w", err)
 		}
@@ -223,8 +224,8 @@ func AddIntegration(i *Integration) error {
 		integrations.Unlock()
 		return fmt.Errorf("integration %s already exists", i.Name)
 	}
-	i.inLimiter = NewRateLimiter(i.InRateLimit, window)
-	i.outLimiter = NewRateLimiter(i.OutRateLimit, window)
+	i.inLimiter = NewRateLimiter(i.InRateLimit, i.rateLimitWindow)
+	i.outLimiter = NewRateLimiter(i.OutRateLimit, i.rateLimitWindow)
 	integrations.m[i.Name] = i
 	integrations.Unlock()
 
@@ -260,8 +261,8 @@ func UpdateIntegration(i *Integration) error {
 		old.inLimiter.Stop()
 		old.outLimiter.Stop()
 	}
-	i.inLimiter = NewRateLimiter(i.InRateLimit, time.Minute)
-	i.outLimiter = NewRateLimiter(i.OutRateLimit, time.Minute)
+	i.inLimiter = NewRateLimiter(i.InRateLimit, i.rateLimitWindow)
+	i.outLimiter = NewRateLimiter(i.OutRateLimit, i.rateLimitWindow)
 	integrations.m[i.Name] = i
 	integrations.Unlock()
 	return nil
