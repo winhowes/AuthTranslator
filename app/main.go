@@ -196,8 +196,9 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 			host = hdr
 		}
 	}
+  hostLookup := strings.ToLower(host)
 	logger.Info("incoming request", "method", r.Method, "host", host, "path", r.URL.Path, "remote", r.RemoteAddr)
-	integ, ok := GetIntegration(host)
+	integ, ok := GetIntegration(hostLookup)
 	if !ok {
 		logger.Warn("no integration configured", "host", host)
 		http.Error(w, "Not Found", http.StatusNotFound)
