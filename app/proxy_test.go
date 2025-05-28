@@ -80,6 +80,32 @@ func TestProxyHandlerUsesHost(t *testing.T) {
 	}
 }
 
+func TestProxyHandlerHostCaseInsensitive(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusAccepted)
+	}))
+	defer srv.Close()
+
+	hostInt := Integration{Name: "casehost", Destination: srv.URL, InRateLimit: 1, OutRateLimit: 1}
+	if err := AddIntegration(&hostInt); err != nil {
+		t.Fatalf("failed to add integration: %v", err)
+	}
+	t.Cleanup(func() {
+		hostInt.inLimiter.Stop()
+		hostInt.outLimiter.Stop()
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "http://CASEHOST/test", nil)
+	req.Host = "CASEHOST"
+	rr := httptest.NewRecorder()
+
+	proxyHandler(rr, req)
+
+	if rr.Code != http.StatusAccepted {
+		t.Fatalf("expected status from host integration, got %d", rr.Code)
+	}
+}
+
 func TestProxyHandlerDisableXAtInt(t *testing.T) {
 	*disableXATInt = true
 	defer func() { *disableXATInt = false }()
