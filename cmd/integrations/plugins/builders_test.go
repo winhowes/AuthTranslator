@@ -29,6 +29,7 @@ func TestBuilders(t *testing.T) {
 		{"stripe", []string{"-name", "st", "-token", "tok"}, Stripe("st", "tok")},
 		{"twilio", []string{"-name", "tw", "-token", "tok"}, Twilio("tw", "tok")},
 		{"workday", []string{"-name", "wd", "-domain", "work.example.com", "-token", "tok"}, Workday("wd", "work.example.com", "tok")},
+		{"openai", []string{"-name", "oa", "-token", "tok"}, OpenAI("oa", "tok")},
 		{"zendesk", []string{"-name", "zd", "-token", "tok"}, Zendesk("zd", "tok")},
 	}
 

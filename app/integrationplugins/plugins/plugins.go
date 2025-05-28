@@ -10,6 +10,7 @@ import (
 	_ "github.com/winhowes/AuthTranslator/app/integrationplugins/linear"
 	_ "github.com/winhowes/AuthTranslator/app/integrationplugins/monday"
 	_ "github.com/winhowes/AuthTranslator/app/integrationplugins/okta"
+	_ "github.com/winhowes/AuthTranslator/app/integrationplugins/openai"
 	_ "github.com/winhowes/AuthTranslator/app/integrationplugins/sendgrid"
 	_ "github.com/winhowes/AuthTranslator/app/integrationplugins/servicenow"
 	_ "github.com/winhowes/AuthTranslator/app/integrationplugins/slack"
