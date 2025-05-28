@@ -160,8 +160,12 @@ func prepareIntegration(i *Integration) error {
 	i.proxy = httputil.NewSingleHostReverseProxy(u)
 
 	if i.RateLimitWindow != "" {
-		if _, err := time.ParseDuration(i.RateLimitWindow); err != nil {
+		d, err := time.ParseDuration(i.RateLimitWindow)
+		if err != nil {
 			return fmt.Errorf("invalid rate_limit_window: %w", err)
+		}
+		if d <= 0 {
+			return fmt.Errorf("rate_limit_window must be > 0")
 		}
 	}
 
@@ -221,6 +225,9 @@ func AddIntegration(i *Integration) error {
 		if err != nil {
 			return fmt.Errorf("invalid rate_limit_window: %w", err)
 		}
+		if window <= 0 {
+			return fmt.Errorf("rate_limit_window must be > 0")
+		}
 	}
 	integrations.Lock()
 	if _, exists := integrations.m[i.Name]; exists {
@@ -265,6 +272,9 @@ func UpdateIntegration(i *Integration) error {
 		window, err = time.ParseDuration(i.RateLimitWindow)
 		if err != nil {
 			return fmt.Errorf("invalid rate_limit_window: %w", err)
+		}
+		if window <= 0 {
+			return fmt.Errorf("rate_limit_window must be > 0")
 		}
 	}
 	integrations.Lock()
