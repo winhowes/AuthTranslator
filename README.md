@@ -316,26 +316,32 @@ Integration plugins can bundle common allowlist rules into **capabilities**. Ass
 
 ### Writing Plugins
 
-New functionality can be added without modifying the core server. There are three plugin categories:
+New functionality can be added without touching the core server. Three plugin
+categories are supported:
 
-- **Auth plugins** handle incoming and outgoing authentication.
-- **Secret plugins** resolve secret references from external providers.
-- **Integration plugins** generate predefined integration definitions and capability helpers for the CLI.
+- **Auth plugins** – implement incoming or outgoing authentication logic.
+- **Secret plugins** – resolve secret references from external providers.
+- **Integration plugins** – define reusable integration configurations and
+  capability helpers for the CLI.
 
-**Auth plugins** live under `app/authplugins`. Implement the
-`IncomingAuthPlugin` or `OutgoingAuthPlugin` interface and call the appropriate
-`authplugins.RegisterIncoming` or `authplugins.RegisterOutgoing` function in an
-`init()` block.
-See `app/authplugins/example` for a minimal template.
+Auth plugins live in `app/authplugins`. Implement the
+`IncomingAuthPlugin` or `OutgoingAuthPlugin` interface and register your type in
+an `init()` function using `authplugins.RegisterIncoming` or
+`authplugins.RegisterOutgoing`. The registered name is referenced in the
+configuration. See
+[app/authplugins/example/README.md](app/authplugins/example/README.md) for a
+minimal template, which shows how to exclude example code from normal builds
+with a `//go:build` tag.
 
-**Secret plugins** implement the `secrets.Plugin` interface in
-subdirectories of `app/secrets/plugins` and register themselves with
-`secrets.Register`.
+Secret plugins implement the `secrets.Plugin` interface in subdirectories of
+`app/secrets/plugins` and register themselves with `secrets.Register`. The prefix
+they register becomes the identifier for secret references such as `env:` or
+`vault:`.
 
-Integration plugins live under `cmd/integrations/plugins`. Each plugin registers
-itself in an `init()` block using `plugins.Register`. The `Register` call
-associates the plugin name with a function that parses CLI flags and returns an
-`Integration` struct, so the CLI automatically recognizes new plugins.
+Integration plugins reside in `cmd/integrations/plugins`. Each plugin provides a
+`plugins.Builder` that parses CLI arguments and returns an `Integration`.
+Register the builder in an `init()` function using `plugins.Register` so the CLI
+automatically discovers new plugins.
 
 ## Integration CLI
 
