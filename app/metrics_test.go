@@ -5,11 +5,16 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 func resetMetrics() {
 	requestCounts.Init()
 	rateLimitCounts.Init()
+	durationHistsMu.Lock()
+	durationHists = make(map[string]*histogram)
+	durationHistsMu.Unlock()
+	requestDurations.Init()
 }
 
 func TestMetricsHandlerEmpty(t *testing.T) {
@@ -32,6 +37,9 @@ func TestMetricsHandlerOutput(t *testing.T) {
 	incRequest("foo")
 	incRateLimit("foo")
 	incRequest("bar")
+	recordDuration("foo", 100*time.Millisecond)
+	recordDuration("foo", 200*time.Millisecond)
+	recordDuration("bar", 50*time.Millisecond)
 
 	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
 	rr := httptest.NewRecorder()
@@ -43,8 +51,8 @@ func TestMetricsHandlerOutput(t *testing.T) {
 
 	body := rr.Body.String()
 	lines := strings.Split(strings.TrimSpace(body), "\n")
-	if len(lines) != 3 {
-		t.Fatalf("expected 3 metrics lines, got %d", len(lines))
+	if len(lines) < 23 {
+		t.Fatalf("expected at least 23 metrics lines, got %d", len(lines))
 	}
 	if !strings.Contains(body, `authtranslator_requests_total{integration="foo"} 2`) {
 		t.Fatal("missing foo request metric")
@@ -54,5 +62,11 @@ func TestMetricsHandlerOutput(t *testing.T) {
 	}
 	if !strings.Contains(body, `authtranslator_requests_total{integration="bar"} 1`) {
 		t.Fatal("missing bar request metric")
+	}
+	if !strings.Contains(body, `authtranslator_request_duration_seconds_sum{integration="foo"}`) {
+		t.Fatal("missing foo duration histogram")
+	}
+	if !strings.Contains(body, `authtranslator_request_duration_seconds_sum{integration="bar"}`) {
+		t.Fatal("missing bar duration histogram")
 	}
 }

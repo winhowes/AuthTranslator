@@ -206,6 +206,8 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer incRequest(integ.Name)
+	start := time.Now()
+	defer recordDuration(integ.Name, time.Since(start))
 
 	clientIP, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
