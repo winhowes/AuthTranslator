@@ -21,6 +21,7 @@ import (
 	_ "github.com/winhowes/AuthTranslator/app/authplugins/google_oidc"
 	_ "github.com/winhowes/AuthTranslator/app/authplugins/token"
 	_ "github.com/winhowes/AuthTranslator/app/integrationplugins/asana"
+	_ "github.com/winhowes/AuthTranslator/app/integrationplugins/confluence"
 	_ "github.com/winhowes/AuthTranslator/app/integrationplugins/ghe"
 	_ "github.com/winhowes/AuthTranslator/app/integrationplugins/github"
 	_ "github.com/winhowes/AuthTranslator/app/integrationplugins/gitlab"

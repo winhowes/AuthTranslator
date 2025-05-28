@@ -16,6 +16,7 @@ func TestBuilders(t *testing.T) {
 		{"ghe", []string{"-name", "ghe1", "-domain", "corp.example.com", "-token", "tok", "-webhook-secret", "sec"}, GitHubEnterprise("ghe1", "corp.example.com", "tok", "sec")},
 		{"gitlab", []string{"-name", "gl", "-token", "tok"}, GitLab("gl", "tok")},
 		{"jira", []string{"-name", "j1", "-token", "tok"}, Jira("j1", "tok")},
+		{"confluence", []string{"-name", "c1", "-token", "tok"}, Confluence("c1", "tok")},
 		{"linear", []string{"-name", "lin", "-token", "tok"}, Linear("lin", "tok")},
 		{"monday", []string{"-name", "mon", "-token", "tok"}, Monday("mon", "tok")},
 		{"okta", []string{"-name", "ok", "-domain", "okta.example.com", "-token", "tok"}, Okta("ok", "okta.example.com", "tok")},
