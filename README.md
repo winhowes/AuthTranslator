@@ -536,14 +536,14 @@ scrape_configs:
 
 Example Terraform files are provided in the `terraform` directory for AWS, GCP and Azure.
 
-- `terraform/quickstart` provides a minimal example using the Docker provider to run a local container.
+- [`terraform/quickstart`](terraform/quickstart/README.md) provides a minimal example using the Docker provider to run a local container.
 
-- `terraform/aws` contains the AWS configuration for ECS Fargate.
-- `terraform/gcp` contains a configuration for deploying to Google Cloud Run.
-- `terraform/azure` contains a configuration for deploying to Azure Container Instances.
+- [`terraform/aws`](terraform/aws/README.md) contains the AWS configuration for ECS Fargate.
+- [`terraform/gcp`](terraform/gcp/README.md) contains a configuration for deploying to Google Cloud Run.
+- [`terraform/azure`](terraform/azure/README.md) contains a configuration for deploying to Azure Container Instances.
 
 Set the required variables for your environment and run `terraform apply` inside the desired folder to create the service.
-All modules accept an optional `redis_address` variable to pass the `-redis-addr` flag to the container if you have a Redis instance.
+All modules accept an optional `redis_address` variable to pass the `-redis-addr` flag to the container if you have a Redis instance. Each README lists the required variables along with example commands for initialization and deployment.
 
 ## License
 
