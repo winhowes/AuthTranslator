@@ -426,6 +426,24 @@ docker run -p 8080:8080 authtranslator
 
 AuthTranslator writes log messages to standard output. Each request generates an entry showing the HTTP method, host, path and remote address. Authentication failures and rate limiting events are also logged. HTTP status codes from upstream services are logged, allowing metrics to capture downstream errors. The logger is configured with Go's standard time-prefixed format.
 
+## Health Checks and Metrics
+
+AuthTranslator exposes a readiness endpoint at `/healthz` which returns HTTP `200` when the server is running.
+
+Metrics are available at `/metrics` using the Prometheus text format. Two counters are exported:
+
+- `authtranslator_requests_total{integration="<name>"}` – total requests processed per integration.
+- `authtranslator_rate_limit_events_total{integration="<name>"}` – requests rejected due to rate limits.
+
+To scrape metrics with Prometheus, add a job such as:
+
+```yaml
+scrape_configs:
+  - job_name: 'authtranslator'
+    static_configs:
+      - targets: ['localhost:8080']
+```
+
 ## Deploying with Terraform
 
 Example Terraform files are provided in the `terraform` directory for AWS, GCP and Azure.
