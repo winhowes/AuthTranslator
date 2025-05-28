@@ -74,19 +74,17 @@ The project exists to make it trivial to translate one type of authentication in
    The allowlist configuration lives in a separate `allowlist.json` file:
 
    ```json
-   [
-     {
-       "integration": "example",
-       "callers": [
-         {
-           "id": "user-token",
-           "rules": [
-             {"path": "/allowed", "methods": {"GET": {}}}
-           ]
-         }
-       ]
-     }
-   ]
+   {
+     "integration": "example",
+     "callers": [
+       {
+         "id": "user-token",
+         "rules": [
+           {"path": "/allowed", "methods": {"GET": {}}}
+         ]
+       }
+     ]
+   }
    ```
 
    Caller IDs are derived by the incoming auth plugins. Plugins that
