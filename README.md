@@ -545,6 +545,10 @@ Example Terraform files are provided in the `terraform` directory for AWS, GCP a
 Set the required variables for your environment and run `terraform apply` inside the desired folder to create the service.
 All modules accept an optional `redis_address` variable to pass the `-redis-addr` flag to the container if you have a Redis instance.
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines. Formatting, vetting and tests are required as described there.
+
 ## License
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
