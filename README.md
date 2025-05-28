@@ -130,7 +130,7 @@ The project exists to make it trivial to translate one type of authentication in
    Start a simple backend and point an integration at it to test the proxy:
 
    ```bash
-   # terminal 1 - dummy backend
+   # dummy backend
    python3 -m http.server 9000
    ```
 
