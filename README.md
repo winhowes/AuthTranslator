@@ -331,13 +331,13 @@ Add GitLab:
 go run ./cmd/integrations -server http://localhost:8080/integrations \
   gitlab -token env:GITLAB_TOKEN
 ```
-Add Jira:
+Add Jira (domain optional):
 ```bash
-go run ./cmd/integrations jira -token env:JIRA_TOKEN
+go run ./cmd/integrations jira -token env:JIRA_TOKEN -domain jira.example.com
 ```
-Add Confluence:
+Add Confluence (domain optional):
 ```bash
-go run ./cmd/integrations confluence -token env:CONFLUENCE_TOKEN
+go run ./cmd/integrations confluence -token env:CONFLUENCE_TOKEN -domain confluence.example.com
 ```
 Add Linear:
 ```bash
