@@ -20,6 +20,7 @@ The project exists to make it trivial to translate one type of authentication in
 - **Redis Support**: Provide `-redis-addr` to use Redis for rate limit counters instead of in-memory tracking. If Redis is unavailable the limiter falls back to memory and logs an error.
 - **Allowlist**: Integrations can restrict specific callers to particular paths, methods and required parameters.
 - **Configuration Driven**: Behavior is controlled via a JSON configuration file.
+- **Validated Startup**: The configuration is checked at startup and errors are reported before serving traffic.
 - **Clean Shutdown**: On SIGINT or SIGTERM the server and rate limiters are gracefully stopped.
 - **Hot Reload**: Send `SIGHUP` to reload the configuration and allowlist without restarting.
 
@@ -284,6 +285,7 @@ New functionality can be added without modifying the core server. There are thre
 `IncomingAuthPlugin` or `OutgoingAuthPlugin` interface and call the appropriate
 `authplugins.RegisterIncoming` or `authplugins.RegisterOutgoing` function in an
 `init()` block.
+See `app/authplugins/example` for a minimal template.
 
 **Secret plugins** implement the `secrets.Plugin` interface in
 subdirectories of `app/secrets/plugins` and register themselves with
@@ -446,6 +448,12 @@ Build the container image:
 docker build -t authtranslator .
 ```
 
+Prebuilt images are also published to GitHub Container Registry:
+
+```bash
+docker pull ghcr.io/winhowes/authtranslator:latest
+```
+
 Run the image exposing port 8080:
 
 ```bash
@@ -459,6 +467,7 @@ AuthTranslator writes log messages to standard output using Go's `log/slog` pack
 ## Health Checks and Metrics
 
 AuthTranslator exposes a readiness endpoint at `/healthz` which returns HTTP `200` when the server is running.
+The response includes an `X-Last-Reload` header indicating the last time configuration was reloaded.
 
 Metrics are available at `/metrics` using the Prometheus text format. The following metrics are exported:
 
@@ -478,6 +487,8 @@ scrape_configs:
 ## Deploying with Terraform
 
 Example Terraform files are provided in the `terraform` directory for AWS, GCP and Azure.
+
+- `terraform/quickstart` provides a minimal example using the Docker provider to run a local container.
 
 - `terraform/aws` contains the AWS configuration for ECS Fargate.
 - `terraform/gcp` contains a configuration for deploying to Google Cloud Run.

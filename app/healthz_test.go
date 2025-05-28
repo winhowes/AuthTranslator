@@ -13,4 +13,7 @@ func TestHealthz(t *testing.T) {
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rr.Code)
 	}
+	if rr.Header().Get("X-Last-Reload") == "" {
+		t.Fatal("missing X-Last-Reload header")
+	}
 }
