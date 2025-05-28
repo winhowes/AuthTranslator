@@ -125,36 +125,45 @@ type RateLimiter struct {
 
 func NewRateLimiter(limit int, duration time.Duration) *RateLimiter {
 	rl := &RateLimiter{
-		limit:       limit,
-		duration:    duration,
-		requests:    make(map[string]int),
-		resetTicker: time.NewTicker(duration),
-		done:        make(chan struct{}),
+		limit:    limit,
+		duration: duration,
+		requests: make(map[string]int),
+		done:     make(chan struct{}),
 	}
 
-	go func() {
-		for {
-			select {
-			case <-rl.resetTicker.C:
-				rl.mu.Lock()
-				rl.requests = make(map[string]int)
-				rl.mu.Unlock()
-			case <-rl.done:
-				return
+	if limit > 0 {
+		rl.resetTicker = time.NewTicker(duration)
+
+		go func() {
+			for {
+				select {
+				case <-rl.resetTicker.C:
+					rl.mu.Lock()
+					rl.requests = make(map[string]int)
+					rl.mu.Unlock()
+				case <-rl.done:
+					return
+				}
 			}
-		}
-	}()
+		}()
+	}
 
 	return rl
 }
 
 // Stop stops the rate limiter's reset goroutine and ticker.
 func (rl *RateLimiter) Stop() {
-	rl.resetTicker.Stop()
+	if rl.resetTicker != nil {
+		rl.resetTicker.Stop()
+	}
 	close(rl.done)
 }
 
 func (rl *RateLimiter) Allow(key string) bool {
+	if rl.limit <= 0 {
+		return true
+	}
+
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
 
