@@ -216,6 +216,27 @@ func integrationsHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		w.WriteHeader(http.StatusCreated)
+	case http.MethodPut:
+		var i Integration
+		if err := json.NewDecoder(r.Body).Decode(&i); err != nil {
+			http.Error(w, "bad request", http.StatusBadRequest)
+			return
+		}
+		if err := UpdateIntegration(&i); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	case http.MethodDelete:
+		var req struct {
+			Name string `json:"name"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Name == "" {
+			http.Error(w, "bad request", http.StatusBadRequest)
+			return
+		}
+		DeleteIntegration(req.Name)
+		w.WriteHeader(http.StatusNoContent)
 	case http.MethodGet:
 		list := ListIntegrations()
 		json.NewEncoder(w).Encode(list)

@@ -15,7 +15,7 @@ import (
 var server = flag.String("server", "http://localhost:8080/integrations", "integration endpoint")
 
 func usage() {
-	fmt.Fprintf(flag.CommandLine.Output(), `Usage: integrations [options] <list|plugin> [plugin options]\n\n`)
+	fmt.Fprintf(flag.CommandLine.Output(), `Usage: integrations [options] <list|update|delete|plugin> [plugin options]\n\n`)
 	fmt.Fprintf(flag.CommandLine.Output(), "Options:\n")
 	flag.PrintDefaults()
 	fmt.Fprintln(flag.CommandLine.Output(), "\nRun \"integrations <plugin> -help\" to see plugin flags.")
@@ -28,17 +28,43 @@ func main() {
 		usage()
 		os.Exit(1)
 	}
-	plugin := flag.Arg(0)
+	cmd := flag.Arg(0)
 	args := flag.Args()[1:]
 
-	if plugin == "list" {
+	if cmd == "list" {
 		listIntegrations()
 		return
 	}
+	if cmd == "delete" {
+		if len(args) < 1 {
+			fmt.Fprintln(os.Stderr, "delete requires integration name")
+			os.Exit(1)
+		}
+		deleteIntegration(args[0])
+		return
+	}
+	if cmd == "update" {
+		if len(args) < 1 {
+			fmt.Fprintln(os.Stderr, "update requires plugin name")
+			os.Exit(1)
+		}
+		builder := plugins.Get(args[0])
+		if builder == nil {
+			fmt.Fprintf(os.Stderr, "unknown plugin %s\n", args[0])
+			os.Exit(1)
+		}
+		integ, err := builder(args[1:])
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		sendIntegrationWithMethod(http.MethodPut, integ)
+		return
+	}
 
-	builder := plugins.Get(plugin)
+	builder := plugins.Get(cmd)
 	if builder == nil {
-		fmt.Fprintf(os.Stderr, "unknown plugin %s\n", plugin)
+		fmt.Fprintf(os.Stderr, "unknown plugin %s\n", cmd)
 		os.Exit(1)
 	}
 	integ, err := builder(args)
@@ -46,27 +72,66 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	sendIntegration(integ)
+	sendIntegrationWithMethod(http.MethodPost, integ)
 }
 
-func sendIntegration(i plugins.Integration) {
+func sendIntegrationWithMethod(method string, i plugins.Integration) {
 	data, err := json.Marshal(i)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	resp, err := http.Post(*server, "application/json", bytes.NewBuffer(data))
+	req, err := http.NewRequest(method, *server, bytes.NewBuffer(data))
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusCreated {
+	success := http.StatusCreated
+	if method == http.MethodPut {
+		success = http.StatusOK
+	}
+	if resp.StatusCode != success {
 		body, _ := io.ReadAll(resp.Body)
 		fmt.Fprintf(os.Stderr, "server error: %s\n%s\n", resp.Status, string(body))
 		os.Exit(1)
 	}
-	fmt.Println("integration added")
+	if method == http.MethodPost {
+		fmt.Println("integration added")
+	} else {
+		fmt.Println("integration updated")
+	}
+}
+
+func deleteIntegration(name string) {
+	payload := struct {
+		Name string `json:"name"`
+	}{Name: name}
+	data, _ := json.Marshal(payload)
+	req, err := http.NewRequest(http.MethodDelete, *server, bytes.NewBuffer(data))
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		body, _ := io.ReadAll(resp.Body)
+		fmt.Fprintf(os.Stderr, "server error: %s\n%s\n", resp.Status, string(body))
+		os.Exit(1)
+	}
+	fmt.Println("integration deleted")
 }
 
 func listIntegrations() {

@@ -144,14 +144,14 @@ var integrations = struct {
 
 var nameRegexp = regexp.MustCompile(`^[a-zA-Z0-9-]+$`)
 
-// AddIntegration validates and stores a new integration.
-func AddIntegration(i *Integration) error {
+// prepareIntegration validates the config and populates parsed fields
+// without storing it in the global map.
+func prepareIntegration(i *Integration) error {
 	i.Name = strings.ToLower(i.Name)
 	if !nameRegexp.MatchString(i.Name) {
 		return errors.New("invalid integration name")
 	}
 
-	// Parse the destination URL once upfront.
 	u, err := url.Parse(i.Destination)
 	if err != nil {
 		return fmt.Errorf("invalid destination URL: %w", err)
@@ -175,8 +175,7 @@ func AddIntegration(i *Integration) error {
 		if p == nil {
 			return fmt.Errorf("unknown incoming auth type %s", a.Type)
 		}
-
-		cfg, err := p.ParseParams(a.Params) // plugin handles json + unknown fields
+		cfg, err := p.ParseParams(a.Params)
 		if err != nil {
 			return fmt.Errorf("invalid params for auth %s: %v", a.Type, err)
 		}
@@ -191,13 +190,11 @@ func AddIntegration(i *Integration) error {
 		i.IncomingAuth[idx].parsed = cfg
 	}
 
-	// ─── Validate outgoing-auth configs ───────────────────────────────────────
 	for idx, a := range i.OutgoingAuth {
 		p := authplugins.GetOutgoing(a.Type)
 		if p == nil {
 			return fmt.Errorf("unknown outgoing auth type %s", a.Type)
 		}
-
 		cfg, err := p.ParseParams(a.Params)
 		if err != nil {
 			return fmt.Errorf("invalid params for auth %s: %v", a.Type, err)
@@ -213,7 +210,14 @@ func AddIntegration(i *Integration) error {
 		i.OutgoingAuth[idx].parsed = cfg
 	}
 
-	// ─── Rate limiters & storage ──────────────────────────────────────────────
+	return nil
+}
+
+// AddIntegration validates and stores a new integration.
+func AddIntegration(i *Integration) error {
+	if err := prepareIntegration(i); err != nil {
+		return err
+	}
 	integrations.Lock()
 	if _, exists := integrations.m[i.Name]; exists {
 		integrations.Unlock()
@@ -244,4 +248,37 @@ func ListIntegrations() []*Integration {
 		res = append(res, i)
 	}
 	return res
+}
+
+// UpdateIntegration replaces an existing integration or adds it if missing.
+func UpdateIntegration(i *Integration) error {
+	if err := prepareIntegration(i); err != nil {
+		return err
+	}
+	integrations.Lock()
+	if old, exists := integrations.m[i.Name]; exists {
+		old.inLimiter.Stop()
+		old.outLimiter.Stop()
+	}
+	i.inLimiter = NewRateLimiter(i.InRateLimit, time.Minute)
+	i.outLimiter = NewRateLimiter(i.OutRateLimit, time.Minute)
+	integrations.m[i.Name] = i
+	integrations.Unlock()
+	return nil
+}
+
+// DeleteIntegration removes an integration by name.
+func DeleteIntegration(name string) {
+	n := strings.ToLower(name)
+	integrations.Lock()
+	if old, ok := integrations.m[n]; ok {
+		old.inLimiter.Stop()
+		old.outLimiter.Stop()
+		delete(integrations.m, n)
+	}
+	integrations.Unlock()
+
+	allowlists.Lock()
+	delete(allowlists.m, n)
+	allowlists.Unlock()
 }

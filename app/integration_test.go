@@ -122,3 +122,46 @@ func TestGetIntegrationCaseInsensitive(t *testing.T) {
 		t.Fatal("lookup by uppercase failed")
 	}
 }
+
+func TestUpdateIntegration(t *testing.T) {
+	i := &Integration{
+		Name:         "update",
+		Destination:  "http://a.com",
+		InRateLimit:  1,
+		OutRateLimit: 1,
+	}
+	if err := AddIntegration(i); err != nil {
+		t.Fatalf("add: %v", err)
+	}
+	updated := &Integration{
+		Name:         "update",
+		Destination:  "http://b.com",
+		InRateLimit:  2,
+		OutRateLimit: 2,
+	}
+	if err := UpdateIntegration(updated); err != nil {
+		t.Fatalf("update: %v", err)
+	}
+	got, ok := GetIntegration("update")
+	if !ok || got.destinationURL.String() != "http://b.com" {
+		t.Fatalf("integration not updated")
+	}
+	t.Cleanup(func() {
+		got.inLimiter.Stop()
+		got.outLimiter.Stop()
+	})
+}
+
+func TestDeleteIntegration(t *testing.T) {
+	i := &Integration{
+		Name:        "delete",
+		Destination: "http://c.com",
+	}
+	if err := AddIntegration(i); err != nil {
+		t.Fatalf("add: %v", err)
+	}
+	DeleteIntegration("delete")
+	if _, ok := GetIntegration("delete"); ok {
+		t.Fatalf("integration not deleted")
+	}
+}
