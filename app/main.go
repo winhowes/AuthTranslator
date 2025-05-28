@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -70,6 +71,8 @@ var allowlistFile = flag.String("allowlist", "allowlist.json", "path to allowlis
 var configFile = flag.String("config", "config.json", "path to configuration file")
 var tlsCert = flag.String("tls-cert", "", "path to TLS certificate")
 var tlsKey = flag.String("tls-key", "", "path to TLS key")
+var logLevel = flag.String("log-level", "INFO", "log level: DEBUG, INFO, WARN, ERROR")
+var logger = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 
 func usage() {
 	fmt.Fprintf(flag.CommandLine.Output(), "Usage: authtranslator [options]\n\n")
@@ -93,6 +96,21 @@ func loadConfig(filename string) (*Config, error) {
 	}
 
 	return &config, nil
+}
+
+func parseLevel(s string) slog.Level {
+	switch strings.ToUpper(s) {
+	case "DEBUG":
+		return slog.LevelDebug
+	case "INFO":
+		return slog.LevelInfo
+	case "WARN", "WARNING":
+		return slog.LevelWarn
+	case "ERROR":
+		return slog.LevelError
+	default:
+		return slog.LevelInfo
+	}
 }
 
 type RateLimiter struct {
@@ -178,10 +196,10 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 			host = hdr
 		}
 	}
-	log.Printf("Incoming %s request for %s%s from %s", r.Method, host, r.URL.Path, r.RemoteAddr)
+	logger.Info("incoming request", "method", r.Method, "host", host, "path", r.URL.Path, "remote", r.RemoteAddr)
 	integ, ok := GetIntegration(host)
 	if !ok {
-		log.Printf("No integration configured for host %s", host)
+		logger.Warn("no integration configured", "host", host)
 		http.Error(w, "Not Found", http.StatusNotFound)
 		return
 	}
@@ -196,7 +214,7 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 		p := authplugins.GetIncoming(cfg.Type)
 		if p != nil {
 			if !p.Authenticate(r, cfg.parsed) {
-				log.Printf("Authentication failed for host %s from %s", host, r.RemoteAddr)
+				logger.Warn("authentication failed", "host", host, "remote", r.RemoteAddr)
 				http.Error(w, "Unauthorized", http.StatusUnauthorized)
 				return
 			}
@@ -210,12 +228,12 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !integ.inLimiter.Allow(rateKey) {
-		log.Printf("Caller %s exceeded rate limit on host %s", rateKey, host)
+		logger.Warn("caller exceeded rate limit", "caller", rateKey, "host", host)
 		http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
 		return
 	}
 	if !integ.outLimiter.Allow(host) {
-		log.Printf("Host %s exceeded rate limit", host)
+		logger.Warn("host exceeded rate limit", "host", host)
 		http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
 		return
 	}
@@ -250,7 +268,7 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 	if rec.status == 0 {
 		rec.status = http.StatusOK
 	}
-	log.Printf("Upstream response for host %s: %d", host, rec.status)
+	logger.Info("upstream response", "host", host, "status", rec.status)
 }
 
 type server interface {
@@ -268,6 +286,8 @@ func serve(s server, cert, key string) error {
 func main() {
 	flag.Usage = usage
 	flag.Parse()
+
+	logger = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: parseLevel(*logLevel)}))
 
 	config, err := loadConfig(*configFile)
 	if err != nil {
@@ -288,9 +308,6 @@ func main() {
 		SetAllowlist(al.Integration, al.Callers)
 	}
 
-	// Include timestamps in log output
-	log.SetFlags(log.LstdFlags)
-
 	if *debug {
 		http.HandleFunc("/integrations", integrationsHandler)
 	}
@@ -309,11 +326,11 @@ func main() {
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 	<-stop
 
-	log.Println("Shutting down...")
+	logger.Info("shutting down")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := srv.Shutdown(ctx); err != nil {
-		log.Printf("server shutdown: %v", err)
+		logger.Error("server shutdown", "error", err)
 	}
 
 	for _, i := range ListIntegrations() {
