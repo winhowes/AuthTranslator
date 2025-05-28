@@ -24,6 +24,7 @@ The project exists to make it trivial to translate one type of authentication in
 - [Logging](#logging)
 - [Health Checks and Metrics](#health-checks-and-metrics)
 - [Deploying with Terraform](#deploying-with-terraform)
+- [Contributing](#contributing)
 - [License](#license)
 
 ### Goals
