@@ -69,6 +69,7 @@ var logLevel = flag.String("log-level", "INFO", "log level: DEBUG, INFO, WARN, E
 var logFormat = flag.String("log-format", "text", "log output format: text or json")
 var redisAddr = flag.String("redis-addr", "", "redis address for rate limits (host:port)")
 var showVersion = flag.Bool("version", false, "print version and exit")
+var watch = flag.Bool("watch", false, "watch config and allowlist files for changes")
 var logger = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 
 func usage() {
@@ -301,6 +302,36 @@ func redisCmdInt(conn net.Conn, args ...string) (int, error) {
 	}
 }
 
+func watchFiles(interval time.Duration, files []string, out chan<- struct{}) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	mods := make(map[string]time.Time)
+	for _, f := range files {
+		if fi, err := os.Stat(f); err == nil {
+			mods[f] = fi.ModTime()
+		}
+	}
+
+	for range ticker.C {
+		changed := false
+		for _, f := range files {
+			if fi, err := os.Stat(f); err == nil {
+				if fi.ModTime().After(mods[f]) {
+					mods[f] = fi.ModTime()
+					changed = true
+				}
+			}
+		}
+		if changed {
+			select {
+			case out <- struct{}{}:
+			default:
+			}
+		}
+	}
+}
+
 // integrationsHandler manages creation and listing of integrations.
 func integrationsHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
@@ -499,12 +530,23 @@ func main() {
 
 	stop := make(chan os.Signal, 1)
 	reloadSig := make(chan os.Signal, 1)
+	watchSig := make(chan struct{}, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 	signal.Notify(reloadSig, syscall.SIGHUP)
+
+	if *watch {
+		go watchFiles(time.Second, []string{*configFile, *allowlistFile}, watchSig)
+	}
 
 	for {
 		select {
 		case <-reloadSig:
+			if err := reload(); err != nil {
+				logger.Error("reload failed", "error", err)
+			} else {
+				logger.Info("reloaded configuration")
+			}
+		case <-watchSig:
 			if err := reload(); err != nil {
 				logger.Error("reload failed", "error", err)
 			} else {
