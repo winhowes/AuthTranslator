@@ -107,3 +107,82 @@ func TestListCapsOutput(t *testing.T) {
 		t.Fatalf("missing capability info: %s", out)
 	}
 }
+
+func TestRemoveEntry(t *testing.T) {
+	tmpDir := t.TempDir()
+	path := filepath.Join(tmpDir, "allow.json")
+
+	initial := []plugins.AllowlistEntry{
+		{
+			Integration: "foo",
+			Callers: []plugins.CallerConfig{
+				{ID: "u1", Capabilities: []plugins.CapabilityConfig{{Name: "cap1"}, {Name: "cap2"}}},
+			},
+		},
+	}
+	data, _ := json.MarshalIndent(initial, "", "    ")
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	old := *file
+	*file = path
+	t.Cleanup(func() { *file = old })
+
+	removeEntry([]string{"-integration", "foo", "-caller", "u1", "-capability", "cap1"})
+
+	out, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("failed reading file: %v", err)
+	}
+	var entries []plugins.AllowlistEntry
+	if err := json.Unmarshal(out, &entries); err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+	want := []plugins.AllowlistEntry{
+		{
+			Integration: "foo",
+			Callers: []plugins.CallerConfig{
+				{ID: "u1", Capabilities: []plugins.CapabilityConfig{{Name: "cap2"}}},
+			},
+		},
+	}
+	if !reflect.DeepEqual(entries, want) {
+		t.Fatalf("entries mismatch:\n%v\nwant\n%v", entries, want)
+	}
+}
+
+func TestRemoveEntryDeletesCaller(t *testing.T) {
+	tmpDir := t.TempDir()
+	path := filepath.Join(tmpDir, "allow.json")
+
+	initial := []plugins.AllowlistEntry{
+		{
+			Integration: "foo",
+			Callers:     []plugins.CallerConfig{{ID: "u1", Capabilities: []plugins.CapabilityConfig{{Name: "cap1"}}}},
+		},
+	}
+	data, _ := json.MarshalIndent(initial, "", "    ")
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	old := *file
+	*file = path
+	t.Cleanup(func() { *file = old })
+
+	removeEntry([]string{"-integration", "foo", "-caller", "u1", "-capability", "cap1"})
+
+	out, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("failed reading file: %v", err)
+	}
+	var entries []plugins.AllowlistEntry
+	if err := json.Unmarshal(out, &entries); err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+	want := []plugins.AllowlistEntry{}
+	if !reflect.DeepEqual(entries, want) {
+		t.Fatalf("entries mismatch:\n%v\nwant\n%v", entries, want)
+	}
+}

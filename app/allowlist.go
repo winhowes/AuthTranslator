@@ -150,7 +150,7 @@ func validateRequest(r *http.Request, c RequestConstraint) bool {
 
 func matchForm(vals url.Values, rule map[string]interface{}) bool {
 	for k, v := range rule {
-		if vals.Get(k) == "" {
+		if !vals.Has(k) {
 			return false
 		}
 		if arr, ok := v.([]interface{}); ok {
