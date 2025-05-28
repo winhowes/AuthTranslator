@@ -23,3 +23,9 @@ variable "security_group_id" {
   type        = string
 }
 
+variable "redis_address" {
+  description = "Optional Redis host:port for distributed rate limiting"
+  type        = string
+  default     = ""
+}
+

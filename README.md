@@ -17,6 +17,7 @@ The project exists to make it trivial to translate one type of authentication in
 - **Pluggable Authentication**: Supports "basic", "token", `hmac_signature`, `jwt`, `mtls`, `url_path`, `github_signature` and `slack_signature` authentication types for both incoming and outgoing requests including Google OIDC with room for extension.
 - **Extensible Plugins**: Add new auth, secret and integration plugins to cover different systems.
 - **Rate Limiting**: Limits the number of requests per caller and per host within a rolling window (default `1m` but configurable per integration via `rate_limit_window`). A value of `0` disables limiting.
+- **Redis Support**: Provide `-redis-addr` to use Redis for rate limit counters instead of in-memory tracking. If Redis is unavailable the limiter falls back to memory and logs an error.
 - **Allowlist**: Integrations can restrict specific callers to particular paths, methods and required parameters.
 - **Configuration Driven**: Behavior is controlled via a JSON configuration file.
 - **Clean Shutdown**: On SIGINT or SIGTERM the server and rate limiters are gracefully stopped.
@@ -122,7 +123,7 @@ The project exists to make it trivial to translate one type of authentication in
 
 3. **Running**
 
-   The listen address can be configured with the `-addr` flag. By default the server listens on `:8080`. Incoming requests are matched against the `X-AT-Int` header, if present, or otherwise the host header to determine the route and associated authentication plugin. Use `-disable_x_at_int` to ignore the header entirely or `-x_at_int_host` to only respect the header when a specific host is requested. The configuration file is chosen with `-config` (default `config.json`). The allowlist file can be specified with `-allowlist`; it defaults to `allowlist.json`.
+   The listen address can be configured with the `-addr` flag. By default the server listens on `:8080`. Incoming requests are matched against the `X-AT-Int` header, if present, or otherwise the host header to determine the route and associated authentication plugin. Use `-disable_x_at_int` to ignore the header entirely or `-x_at_int_host` to only respect the header when a specific host is requested. The configuration file is chosen with `-config` (default `config.json`). The allowlist file can be specified with `-allowlist`; it defaults to `allowlist.json`. Set `-redis-addr` to persist rate limits in Redis; failures fall back to memory with an error log.
    Send `SIGHUP` to the process to reload these files without restarting.
 
 4. **Run Locally**
@@ -483,6 +484,7 @@ Example Terraform files are provided in the `terraform` directory for AWS, GCP a
 - `terraform/azure` contains a configuration for deploying to Azure Container Instances.
 
 Set the required variables for your environment and run `terraform apply` inside the desired folder to create the service.
+All modules accept an optional `redis_address` variable to pass the `-redis-addr` flag to the container if you have a Redis instance.
 
 ## License
 

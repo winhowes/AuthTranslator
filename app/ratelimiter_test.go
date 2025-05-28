@@ -64,3 +64,20 @@ func TestRateLimiterUnlimitedNegative(t *testing.T) {
 		}
 	}
 }
+
+func TestRateLimiterRedisFallback(t *testing.T) {
+	old := *redisAddr
+	*redisAddr = "127.0.0.1:0" // unreachable
+	rl := NewRateLimiter(1, time.Millisecond)
+	t.Cleanup(func() {
+		rl.Stop()
+		*redisAddr = old
+	})
+
+	if !rl.Allow("k") {
+		t.Fatal("first call should be allowed")
+	}
+	if rl.Allow("k") {
+		t.Fatal("second call should be rate limited using fallback")
+	}
+}

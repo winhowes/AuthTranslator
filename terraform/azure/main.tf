@@ -30,6 +30,8 @@ resource "azurerm_container_group" "this" {
     cpu    = "0.5"
     memory = "1.0"
 
+    command = var.redis_address != "" ? ["./authtranslator", "-redis-addr", var.redis_address] : ["./authtranslator"]
+
     ports {
       port     = 8080
       protocol = "TCP"
