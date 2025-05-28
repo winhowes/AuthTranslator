@@ -448,10 +448,11 @@ AuthTranslator writes log messages to standard output using Go's `log/slog` pack
 
 AuthTranslator exposes a readiness endpoint at `/healthz` which returns HTTP `200` when the server is running.
 
-Metrics are available at `/metrics` using the Prometheus text format. Two counters are exported:
+Metrics are available at `/metrics` using the Prometheus text format. The following metrics are exported:
 
 - `authtranslator_requests_total{integration="<name>"}` – total requests processed per integration.
 - `authtranslator_rate_limit_events_total{integration="<name>"}` – requests rejected due to rate limits.
+- `authtranslator_request_duration_seconds` – histogram of request processing duration per integration.
 
 To scrape metrics with Prometheus, add a job such as:
 
