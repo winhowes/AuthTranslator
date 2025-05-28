@@ -6,6 +6,26 @@ AuthTranslator is a simple Go-based reverse proxy that injects authentication to
 
 The project exists to make it trivial to translate one type of authentication into another. By running AuthTranslator as a centralized proxy, a small group of administrators can manage the secrets for each integration while developers simply reference those integrations. Ideally, this project allows short‑lived credentials provided by your organization to be exchanged for the long‑lived tokens required by third‑party services, and inbound requests bearing long‑lived credentials transformed back into short‑lived secrets. This keeps sensitive keys out of day‑to‑day workflows while still allowing seamless access.
 
+## Table of Contents
+
+- [Goals](#goals)
+- [Features](#features)
+- [Development Requirements](#development-requirements)
+- [Getting Started](#getting-started)
+- [Allowlist Rules](#allowlist-rules)
+- [Built-in Authentication Plugins](#built-in-authentication-plugins)
+- [Capabilities](#capabilities)
+- [Secret Plugin Environment Variables](#secret-plugin-environment-variables)
+- [Writing Plugins](#writing-plugins)
+- [Integration CLI](#integration-cli)
+- [Allowlist CLI](#allowlist-cli)
+- [Running Tests](#running-tests)
+- [Docker](#docker)
+- [Logging](#logging)
+- [Health Checks and Metrics](#health-checks-and-metrics)
+- [Deploying with Terraform](#deploying-with-terraform)
+- [License](#license)
+
 ### Goals
 
 - **Centralized secrets management** – only a few trusted maintainers need to add or rotate secrets for each integration. Developers reference the integrations without ever seeing the underlying values.
