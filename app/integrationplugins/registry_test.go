@@ -1,6 +1,9 @@
 package integrationplugins
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+)
 
 func TestExpandCapabilities(t *testing.T) {
 	// Save current registry state and restore after test
@@ -20,7 +23,10 @@ func TestExpandCapabilities(t *testing.T) {
 		Capabilities: []CapabilityConfig{{Name: "cap"}},
 	}}
 
-	expanded := ExpandCapabilities("test", callers)
+	expanded, err := ExpandCapabilities("test", callers)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	if len(expanded) != 1 {
 		t.Fatalf("expected one caller, got %d", len(expanded))
@@ -38,5 +44,29 @@ func TestExpandCapabilities(t *testing.T) {
 	}
 	if len(got.Capabilities) != 0 {
 		t.Errorf("expected capabilities to be cleared")
+	}
+}
+
+func TestExpandCapabilitiesError(t *testing.T) {
+	orig := capabilityRegistry
+	t.Cleanup(func() { capabilityRegistry = orig })
+
+	RegisterCapability("err", "bad", CapabilitySpec{
+		Generate: func(params map[string]interface{}) ([]CallRule, error) {
+			return nil, fmt.Errorf("boom")
+		},
+	})
+
+	callers := []CallerConfig{{
+		ID:           "x",
+		Capabilities: []CapabilityConfig{{Name: "bad"}},
+	}}
+
+	_, err := ExpandCapabilities("err", callers)
+	if err == nil {
+		t.Fatal("expected error for capability failure")
+	}
+	if len(callers[0].Capabilities) != 1 || len(callers[0].Rules) != 0 {
+		t.Fatal("input callers modified on error")
 	}
 }

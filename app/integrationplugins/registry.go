@@ -1,5 +1,7 @@
 package integrationplugins
 
+import "fmt"
+
 // CapabilityConfig defines a named capability and optional parameters.
 type CapabilityConfig struct {
 	Name   string                 `json:"name"`
@@ -35,22 +37,23 @@ func CapabilitiesFor(integration string) map[string]CapabilitySpec {
 }
 
 // expandCapabilities converts declared capabilities into explicit allow rules.
-func ExpandCapabilities(integration string, callers []CallerConfig) []CallerConfig {
-	for i := range callers {
-		for _, cap := range callers[i].Capabilities {
+func ExpandCapabilities(integration string, callers []CallerConfig) ([]CallerConfig, error) {
+	out := make([]CallerConfig, len(callers))
+	for i, c := range callers {
+		out[i] = CallerConfig{ID: c.ID, Rules: append([]CallRule(nil), c.Rules...)}
+		for _, cap := range c.Capabilities {
 			spec, ok := getCapability(integration, cap.Name)
 			if !ok {
-				continue
+				return nil, fmt.Errorf("unknown capability %q for integration %s", cap.Name, integration)
 			}
 			rules, err := spec.Generate(cap.Params)
 			if err != nil {
-				continue
+				return nil, fmt.Errorf("capability %s: %w", cap.Name, err)
 			}
-			callers[i].Rules = append(callers[i].Rules, rules...)
+			out[i].Rules = append(out[i].Rules, rules...)
 		}
-		callers[i].Capabilities = nil
 	}
-	return callers
+	return out, nil
 }
 
 // ListCapabilities exposes capability names for CLI usage.
