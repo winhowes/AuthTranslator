@@ -51,7 +51,8 @@ When running multiple replicas behind a Service or Load Balancer, prefer the **P
 
 ## 4  Structured logs
 
-The proxy logs in **JSON** using Go’s `slog`. Fields:
+The proxy logs in structured **text** by default. Pass
+`-log-format json` to emit **JSON** using Go’s `slog`. Fields:
 
 | Key           | Example                   | Meaning                                                     |
 | ------------- | ------------------------- | ----------------------------------------------------------- |

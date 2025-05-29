@@ -106,7 +106,7 @@ Also see [`cmd/allowlist`](cmd/allowlist) for CRUD operations on the allow‑lis
 | ----------------------- | ---------------------------------------------------------------------- |
 | `/_at_internal/healthz` | Liveness probe – returns **200 OK** when the proxy is running.         |
 | `/_at_internal/metrics` | Prometheus metrics (Go runtime + per‑integration rate‑limit counters). |
-| Structured logs         | JSON via `slog` with request details (method, integration, path, status; adds `caller_id` when known). |
+| Structured logs         | Text by default; pass `-log-format json` for JSON via `slog`. Includes method, integration, path, status; adds `caller_id` when known. |
 
 ---
 
