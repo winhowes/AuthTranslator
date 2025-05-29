@@ -169,6 +169,9 @@ The project exists to make it trivial to translate one type of authentication in
    - `-debug` – expose the `/integrations` endpoint for the CLI
    - `-version` – print the build version and exit
    - `-watch` – automatically reload when config or allowlist files change
+   - `-enable-metrics` – expose the `/metrics` endpoint (default `true`)
+   - `-metrics-user` – username required to access `/metrics`
+   - `-metrics-pass` – password required to access `/metrics`
 
 4. **Run Locally**
 
@@ -553,7 +556,7 @@ AuthTranslator writes log messages to standard output using Go's `log/slog` pack
 AuthTranslator exposes a readiness endpoint at `/healthz` which returns HTTP `200` when the server is running.
 The response includes an `X-Last-Reload` header indicating the last time configuration was reloaded.
 
-Metrics are available at `/metrics` using the Prometheus text format. The following metrics are exported:
+Metrics are available at `/metrics` using the Prometheus text format. Set `-enable-metrics=false` to disable the endpoint and provide `-metrics-user` and `-metrics-pass` to require HTTP Basic credentials. The following metrics are exported:
 
 - `authtranslator_requests_total{integration="<name>"}` – total requests processed per integration.
 - `authtranslator_rate_limit_events_total{integration="<name>"}` – requests rejected due to rate limits.
