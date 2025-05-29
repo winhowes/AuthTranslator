@@ -1,11 +1,14 @@
 # Configuration Reference
 
-AuthTranslator loads **two** YAML (or pure‑JSON) documents at runtime:
+AuthTranslator loads up to **two** YAML (or pure‑JSON) documents at runtime:
 
 | File             | Required? | Hot‑reload? | Purpose                                                                            |
 | ---------------- | --------- | ----------- | ---------------------------------------------------------------------------------- |
 | `config.yaml`    | ✅         | ✅           | Declares *integrations* – where to proxy traffic and how to authenticate outwards. |
-| `allowlist.yaml` | ✅         | ✅           | Grants each *caller ID* a set of capabilities **or** low‑level request filters.    |
+| `allowlist.yaml` | –          | ✅           | Grants each *caller ID* a set of capabilities **or** low‑level request filters.    |
+
+If no allowlist is provided, every request is permitted once inbound authentication succeeds.
+Running without an allowlist effectively gives all authenticated callers unrestricted access, so supplying `allowlist.yaml` is **strongly recommended** even if it just contains a single wildcard entry to start.
 
 The proxy currently infers its schema directly from Go structs. A top‑level `apiVersion` key is **optional** and ignored at runtime (reserved for future compatibility).
 

@@ -5,6 +5,7 @@ The **allow‑list** answers a single question:
 > *Given this caller ID and integration, is the request allowed?*
 
 It lives in `allowlist.yaml` and is hot‑reloaded just like `config.yaml`.
+While the proxy starts without this file, doing so lets any authenticated caller access every integration. In production we **strongly recommend** defining an allowlist, even if it initially grants a single wildcard caller.
 
 ```yaml
 apiVersion: v1alpha1  # optional, ignored today
