@@ -50,9 +50,9 @@ Set `in_rate_limit: 0` and `out_rate_limit: 0` (or omit the fields entirely). Ra
 
 * `env:` (environment variable)
 * `file:` (volume‑mounted file)
-* `gcp-secret:` (Google Secret Manager)
-* `aws-secret:` (AWS Secrets Manager)
-* `azure-keyvault:` (Azure Key Vault)
+* `gcp:` (Cloud KMS)
+* `aws:` (AWS Secrets Manager)
+* `azure:` (Azure Key Vault)
 * `vault:` (HashiCorp Vault)
 
 You can add more with \~50 LoC—see [Secret Back‑Ends](secret-backends.md).
