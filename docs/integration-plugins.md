@@ -1,4 +1,4 @@
-# Integration Plugins
+[# Integration Plugins
 
 While **auth plugins** focus on translating credentials, an **integration plugin** bundles everything required to speak to a specific upstream service—URL, auth hints, default rate‑limits, and convenience CLI helpers.
 Think of it as a *cookie‑cutter* that stamps out a ready‑to‑run block in your `config.yaml` so teams don’t reinvent the wheel for common SaaS APIs.
@@ -82,3 +82,4 @@ From here you can tweak fields—e.g. turn on `tls_skip_verify` for a dev sandbo
 * **Namespace tags** Add `tags: [chat, slack]` so dashboards can group traffic.
 * **Keep zero secrets** Integration plugins should only reference secret URIs, never raw tokens.
 
+](https://chatgpt.com/c/6837f80a-afdc-8006-b041-fabc16df451b)
