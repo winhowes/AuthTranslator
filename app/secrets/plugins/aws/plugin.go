@@ -12,6 +12,12 @@ import (
 	"github.com/winhowes/AuthTranslator/app/secrets"
 )
 
+// functions to allow stubbing during tests
+var (
+	newAESCipher = aes.NewCipher
+	newGCM       = cipher.NewGCM
+)
+
 // awsKMSPlugin decrypts secrets using a symmetric key provided via the
 // AWS_KMS_KEY environment variable. The ciphertext must be base64 encoded and
 // include a 12 byte nonce prefix followed by the encrypted data. This is not a
@@ -58,11 +64,11 @@ func (p *awsKMSPlugin) Load(ctx context.Context, id string) (string, error) {
 	nonce := ct[:12]
 	data := ct[12:]
 
-	block, err := aes.NewCipher(p.key)
+	block, err := newAESCipher(p.key)
 	if err != nil {
 		return "", err
 	}
-	gcm, err := cipher.NewGCM(block)
+	gcm, err := newGCM(block)
 	if err != nil {
 		return "", err
 	}

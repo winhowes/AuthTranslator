@@ -23,6 +23,9 @@ type azureKMSPlugin struct{}
 
 var HTTPClient = &http.Client{Timeout: 5 * time.Second}
 
+// helper to allow request stubbing in tests
+var newRequest = http.NewRequest
+
 // Prefix returns the identifier prefix used in configuration strings.
 func (azureKMSPlugin) Prefix() string { return "azure" }
 
@@ -42,7 +45,7 @@ func (azureKMSPlugin) Load(ctx context.Context, id string) (string, error) {
 		return "", err
 	}
 
-	req, err := http.NewRequest("GET", id+"?api-version=7.2", nil)
+	req, err := newRequest("GET", id+"?api-version=7.2", nil)
 	if err != nil {
 		return "", err
 	}
@@ -73,7 +76,7 @@ func getAzureToken(tenant, client, secret string) (string, error) {
 	form.Set("scope", "https://vault.azure.net/.default")
 
 	u := fmt.Sprintf("https://login.microsoftonline.com/%s/oauth2/v2.0/token", tenant)
-	req, err := http.NewRequest("POST", u, bytes.NewBufferString(form.Encode()))
+	req, err := newRequest("POST", u, bytes.NewBufferString(form.Encode()))
 	if err != nil {
 		return "", err
 	}

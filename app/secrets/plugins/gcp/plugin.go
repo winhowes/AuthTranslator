@@ -24,6 +24,12 @@ type gcpKMSPlugin struct{}
 
 var HTTPClient = &http.Client{Timeout: 5 * time.Second}
 
+// helpers overridable in tests
+var (
+	httpNewRequest = http.NewRequest
+	jsonMarshal    = json.Marshal
+)
+
 func (gcpKMSPlugin) Prefix() string { return "gcp" }
 
 func (gcpKMSPlugin) Load(ctx context.Context, id string) (string, error) {
@@ -34,7 +40,7 @@ func (gcpKMSPlugin) Load(ctx context.Context, id string) (string, error) {
 	keyName, ciphertext := parts[0], parts[1]
 
 	// Obtain an access token from the metadata server.
-	req, err := http.NewRequest("GET", "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token", nil)
+	req, err := httpNewRequest("GET", "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token", nil)
 	if err != nil {
 		return "", err
 	}
@@ -57,12 +63,12 @@ func (gcpKMSPlugin) Load(ctx context.Context, id string) (string, error) {
 
 	// Call the KMS API to decrypt the ciphertext.
 	decryptURL := fmt.Sprintf("https://cloudkms.googleapis.com/v1/%s:decrypt", keyName)
-	body, err := json.Marshal(map[string]string{"ciphertext": ciphertext})
+	body, err := jsonMarshal(map[string]string{"ciphertext": ciphertext})
 	if err != nil {
 		return "", err
 	}
 
-	postReq, err := http.NewRequest("POST", decryptURL, bytes.NewReader(body))
+	postReq, err := httpNewRequest("POST", decryptURL, bytes.NewReader(body))
 	if err != nil {
 		return "", err
 	}
