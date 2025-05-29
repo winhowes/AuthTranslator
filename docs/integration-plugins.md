@@ -24,13 +24,13 @@ Think of it as a *cookie‑cutter* that stamps out a ready‑to‑run block in y
 ## Creating an integration via the CLI
 
 ```bash
-# Generate a skeleton block for Slack into stdout
-go run ./cmd/integrations slack > my-config.yaml
-
-# Edit the generated YAML to adjust rate limits or timeouts
+# Append a Slack integration to config.yaml
+go run ./cmd/integrations slack \
+  -file config.yaml \
+  -token env:SLACK_TOKEN -signing-secret env:SLACK_SIGNING
 ```
 
-The CLI simply templates YAML using the plugin’s defaults—feel free to edit afterwards.
+The CLI modifies `config.yaml` in place.
 
 ---
 

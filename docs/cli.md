@@ -4,7 +4,7 @@ AuthTranslator ships with two small helper binaries under **`cmd/`**:
 
 | Binary         | Purpose                                       | Typical usage                                     |
 | -------------- | --------------------------------------------- | ------------------------------------------------- |
-| `integrations` | Scaffold or inspect entries in *config.yaml*. | `go run ./cmd/integrations slack > config.yaml`   |
+| `integrations` | Modify or inspect *config.yaml*. | `go run ./cmd/integrations slack -file config.yaml -token env:SLACK_TOKEN -signing-secret env:SLACK_SIGNING` |
 | `allowlist`    | Modify or inspect *allowlist.yaml*.           | `go run ./cmd/allowlist add -integration slack -caller bot -capability ping` |
 
 > **Heads‑up** Both helpers are thin wrappers around Go structs—check the `--help` output for the definitive flag list because the CLI evolves alongside the schema.
@@ -34,25 +34,26 @@ integrations <command> [flags]
 
 | Command    | Purpose                                                             |
 | ---------- | ------------------------------------------------------------------- |
-| `list`     | Print the names of integrations currently loaded by the server.     |
+| `list`     | Print the names of integrations defined in `config.yaml`.     |
 | `update`   | Replace an existing integration using one of the plugin builders.   |
-| `delete`   | Remove an integration by name.                                      |
-| `<plugin>` | Generate a new integration using that plugin’s flags and send it.   |
+| `delete`   | Remove an integration by name.   |
+| `<plugin>` | Generate a new integration using that plugin's flags and append it to the file.   |
 
 ```bash
 # Add a Slack integration from env vars
 go run ./cmd/integrations slack \
+  -file config.yaml \
   -token env:SLACK_TOKEN -signing-secret env:SLACK_SIGNING
 
 # Delete an integration
-go run ./cmd/integrations delete slack
+go run ./cmd/integrations delete slack -file config.yaml
 ```
 
 #### Flags
 
 | Flag       | Default                              | Meaning                    |
 | ---------- | ------------------------------------ | -------------------------- |
-| `--server` | `http://localhost:8080/integrations` | Management API endpoint.   |
+| `--file`   | `config.yaml` | Path to the configuration file. |
 
 ## 3  `allowlist` helper
 

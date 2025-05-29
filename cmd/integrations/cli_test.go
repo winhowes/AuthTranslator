@@ -1,51 +1,36 @@
 package main
 
 import (
-	"encoding/json"
-	"net/http"
-	"net/http/httptest"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 )
 
 func TestCLIListDeleteUpdate(t *testing.T) {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/integrations", func(w http.ResponseWriter, r *http.Request) {
-		switch r.Method {
-		case http.MethodGet:
-			json.NewEncoder(w).Encode([]struct {
-				Name string `json:"name"`
-			}{{"cli"}})
-		case http.MethodDelete:
-			w.WriteHeader(http.StatusNoContent)
-		case http.MethodPut:
-			w.WriteHeader(http.StatusOK)
-		case http.MethodPost:
-			w.WriteHeader(http.StatusCreated)
-		}
-	})
-	srv := httptest.NewServer(mux)
-	defer srv.Close()
+	dir := t.TempDir()
+	cfg := filepath.Join(dir, "config.yaml")
+
+	// add
+	out, err := exec.Command("go", "run", ".", "-file", cfg, "slack", "-token", "t", "-signing-secret", "s").CombinedOutput()
+	if err != nil {
+		t.Fatalf("add failed: %v\n%s", err, out)
+	}
 
 	// list
-	endpoint := srv.URL + "/integrations"
-	out, err := exec.Command("go", "run", ".", "-server", endpoint, "list").CombinedOutput()
-	if err != nil {
+	out, err = exec.Command("go", "run", ".", "-file", cfg, "list").CombinedOutput()
+	if err != nil || !strings.Contains(string(out), "slack") {
 		t.Fatalf("list failed: %v\n%s", err, out)
-	}
-	if !strings.Contains(string(out), "cli") {
-		t.Fatalf("list output unexpected: %s", out)
 	}
 
 	// update
-	out, err = exec.Command("go", "run", ".", "-server", endpoint, "update", "slack", "-name", "cli", "-token", "t", "-signing-secret", "s").CombinedOutput()
+	out, err = exec.Command("go", "run", ".", "-file", cfg, "update", "slack", "-token", "t2", "-signing-secret", "s2").CombinedOutput()
 	if err != nil {
 		t.Fatalf("update failed: %v\n%s", err, out)
 	}
 
 	// delete
-	out, err = exec.Command("go", "run", ".", "-server", endpoint, "delete", "cli").CombinedOutput()
+	out, err = exec.Command("go", "run", ".", "-file", cfg, "delete", "slack").CombinedOutput()
 	if err != nil {
 		t.Fatalf("delete failed: %v\n%s", err, out)
 	}
