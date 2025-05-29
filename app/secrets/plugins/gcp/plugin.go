@@ -2,6 +2,7 @@ package plugins
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -25,7 +26,7 @@ var HTTPClient = &http.Client{Timeout: 5 * time.Second}
 
 func (gcpKMSPlugin) Prefix() string { return "gcp" }
 
-func (gcpKMSPlugin) Load(id string) (string, error) {
+func (gcpKMSPlugin) Load(ctx context.Context, id string) (string, error) {
 	parts := strings.SplitN(id, ":", 2)
 	if len(parts) != 2 {
 		return "", fmt.Errorf("invalid gcp kms id: %s", id)

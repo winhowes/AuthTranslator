@@ -1,6 +1,7 @@
 package secrets_test
 
 import (
+	"context"
 	"crypto/aes"
 	"crypto/cipher"
 	"encoding/base64"
@@ -13,7 +14,7 @@ import (
 
 func TestLoadSecretEnv(t *testing.T) {
 	t.Setenv("MY_SECRET", "val")
-	s, err := secrets.LoadSecret("env:MY_SECRET")
+	s, err := secrets.LoadSecret(context.Background(), "env:MY_SECRET")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -23,13 +24,13 @@ func TestLoadSecretEnv(t *testing.T) {
 }
 
 func TestLoadSecretEnvMissing(t *testing.T) {
-	if _, err := secrets.LoadSecret("env:UNSET_VAR"); err == nil {
+	if _, err := secrets.LoadSecret(context.Background(), "env:UNSET_VAR"); err == nil {
 		t.Fatal("expected error when variable is missing")
 	}
 }
 
 func TestLoadSecretUnknown(t *testing.T) {
-	if _, err := secrets.LoadSecret("unknown:id"); err == nil {
+	if _, err := secrets.LoadSecret(context.Background(), "unknown:id"); err == nil {
 		t.Fatal("expected error for unknown secret source")
 	}
 }
@@ -39,7 +40,7 @@ func TestLoadRandomSecret(t *testing.T) {
 	t.Setenv("B", "second")
 
 	// Single reference
-	val, err := secrets.LoadRandomSecret([]string{"env:A"})
+	val, err := secrets.LoadRandomSecret(context.Background(), []string{"env:A"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -48,7 +49,7 @@ func TestLoadRandomSecret(t *testing.T) {
 	}
 
 	// Multiple references - result should be one of the provided values
-	val, err = secrets.LoadRandomSecret([]string{"env:A", "env:B"})
+	val, err = secrets.LoadRandomSecret(context.Background(), []string{"env:A", "env:B"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -67,7 +68,7 @@ func TestLoadRandomSecretConcurrent(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			val, err := secrets.LoadRandomSecret(refs)
+			val, err := secrets.LoadRandomSecret(context.Background(), refs)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 				return
@@ -105,7 +106,7 @@ func TestLoadSecretAWSKMS(t *testing.T) {
 	ct = append(nonce, ct...)
 	ref := "aws:" + base64.StdEncoding.EncodeToString(ct)
 
-	val, err := secrets.LoadSecret(ref)
+	val, err := secrets.LoadSecret(context.Background(), ref)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

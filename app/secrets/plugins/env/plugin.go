@@ -1,6 +1,7 @@
 package plugins
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -12,7 +13,7 @@ type envPlugin struct{}
 
 func (envPlugin) Prefix() string { return "env" }
 
-func (envPlugin) Load(id string) (string, error) {
+func (envPlugin) Load(ctx context.Context, id string) (string, error) {
 	val, ok := os.LookupEnv(id)
 	if !ok {
 		return "", fmt.Errorf("%s not set", id)

@@ -1,6 +1,7 @@
 package googleoidc
 
 import (
+        "context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -66,7 +67,7 @@ func (g *GoogleOIDC) ParseParams(m map[string]interface{}) (interface{}, error) 
 	return p, nil
 }
 
-func (g *GoogleOIDC) AddAuth(r *http.Request, params interface{}) {
+func (g *GoogleOIDC) AddAuth(ctx context.Context, r *http.Request, params interface{}) {
 	cfg, ok := params.(*googleOIDCParams)
 	if !ok {
 		return

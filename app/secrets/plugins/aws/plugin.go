@@ -1,6 +1,7 @@
 package plugins
 
 import (
+	"context"
 	"crypto/aes"
 	"crypto/cipher"
 	"encoding/base64"
@@ -41,7 +42,7 @@ func (p *awsKMSPlugin) init() {
 
 func (p *awsKMSPlugin) Prefix() string { return "aws" }
 
-func (p *awsKMSPlugin) Load(id string) (string, error) {
+func (p *awsKMSPlugin) Load(ctx context.Context, id string) (string, error) {
 	p.once.Do(p.init)
 	if p.err != nil {
 		return "", p.err

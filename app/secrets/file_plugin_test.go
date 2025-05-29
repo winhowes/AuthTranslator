@@ -1,6 +1,7 @@
 package secrets_test
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -15,7 +16,7 @@ func TestLoadSecretFile(t *testing.T) {
 	if err := os.WriteFile(path, []byte("top-secret"), 0600); err != nil {
 		t.Fatalf("write: %v", err)
 	}
-	val, err := secrets.LoadSecret("file:" + path)
+	val, err := secrets.LoadSecret(context.Background(), "file:"+path)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -30,7 +31,7 @@ func TestLoadSecretFileTrailingNewline(t *testing.T) {
 	if err := os.WriteFile(path, []byte("top-secret\n"), 0600); err != nil {
 		t.Fatalf("write: %v", err)
 	}
-	val, err := secrets.LoadSecret("file:" + path)
+	val, err := secrets.LoadSecret(context.Background(), "file:"+path)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -41,7 +42,7 @@ func TestLoadSecretFileTrailingNewline(t *testing.T) {
 
 func TestLoadSecretFileMissing(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "missing.txt")
-	if _, err := secrets.LoadSecret("file:" + path); err == nil {
+	if _, err := secrets.LoadSecret(context.Background(), "file:"+path); err == nil {
 		t.Fatal("expected error for missing file")
 	}
 }

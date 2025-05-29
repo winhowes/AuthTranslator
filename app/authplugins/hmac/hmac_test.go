@@ -1,6 +1,7 @@
 package hmacsig
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
@@ -20,7 +21,7 @@ func TestHMACOutgoingAddAuth(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	p.AddAuth(r, cfg)
+	p.AddAuth(context.Background(), r, cfg)
 	mac := hmac.New(sha256.New, []byte("key"))
 	mac.Write([]byte("hello"))
 	expected := hex.EncodeToString(mac.Sum(nil))
@@ -41,7 +42,7 @@ func TestHMACIncomingAuth(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !p.Authenticate(r, cfg) {
+	if !p.Authenticate(context.Background(), r, cfg) {
 		t.Fatal("expected authentication to succeed")
 	}
 }
@@ -58,7 +59,7 @@ func TestHMACIncomingAuthFail(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p.Authenticate(r, cfg) {
+	if p.Authenticate(context.Background(), r, cfg) {
 		t.Fatal("expected authentication to fail")
 	}
 }

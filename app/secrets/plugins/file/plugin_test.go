@@ -1,6 +1,7 @@
 package plugins
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -13,7 +14,7 @@ func TestFilePluginLoad(t *testing.T) {
 		t.Fatalf("write: %v", err)
 	}
 	p := filePlugin{}
-	got, err := p.Load(path)
+	got, err := p.Load(context.Background(), path)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -25,7 +26,7 @@ func TestFilePluginLoad(t *testing.T) {
 func TestFilePluginLoadMissing(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "missing.txt")
 	p := filePlugin{}
-	if _, err := p.Load(path); err == nil {
+	if _, err := p.Load(context.Background(), path); err == nil {
 		t.Fatal("expected error for missing file")
 	}
 }

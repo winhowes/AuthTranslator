@@ -1,6 +1,7 @@
 package mtls
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
@@ -25,7 +26,7 @@ func TestMTLSAuth(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !p.Authenticate(r, cfg) {
+	if !p.Authenticate(context.Background(), r, cfg) {
 		t.Fatal("expected authentication to succeed")
 	}
 	id, ok := p.Identify(r, cfg)
@@ -41,7 +42,7 @@ func TestMTLSAuthFail(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p.Authenticate(r, cfg) {
+	if p.Authenticate(context.Background(), r, cfg) {
 		t.Fatal("expected failure without TLS")
 	}
 }
@@ -68,7 +69,7 @@ func TestMTLSOutgoingParse(t *testing.T) {
 		t.Fatalf("unexpected config %+v", cfg)
 	}
 	r := &http.Request{Header: http.Header{}}
-	p.AddAuth(r, cfg)
+	p.AddAuth(context.Background(), r, cfg)
 	if len(r.Header) != 0 {
 		t.Fatalf("expected no headers set, got %v", r.Header)
 	}

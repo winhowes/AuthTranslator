@@ -1,6 +1,7 @@
 package plugins
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -48,7 +49,7 @@ func TestVaultLoad(t *testing.T) {
 	t.Setenv("VAULT_TOKEN", "tok")
 
 	p := vaultPlugin{}
-	got, err := p.Load("secret/data/foo")
+	got, err := p.Load(context.Background(), "secret/data/foo")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -69,14 +70,14 @@ func TestVaultLoadError(t *testing.T) {
 	t.Setenv("VAULT_TOKEN", "tok")
 
 	p := vaultPlugin{}
-	if _, err := p.Load("secret/data/foo"); err == nil {
+	if _, err := p.Load(context.Background(), "secret/data/foo"); err == nil {
 		t.Fatal("expected error")
 	}
 }
 
 func TestVaultLoadMissingConfig(t *testing.T) {
 	p := vaultPlugin{}
-	if _, err := p.Load("secret/data/foo"); err == nil {
+	if _, err := p.Load(context.Background(), "secret/data/foo"); err == nil {
 		t.Fatal("expected error when config missing")
 	}
 }

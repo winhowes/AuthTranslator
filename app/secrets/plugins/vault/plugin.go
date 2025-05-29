@@ -1,6 +1,7 @@
 package plugins
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -24,7 +25,7 @@ var HTTPClient = &http.Client{Timeout: 5 * time.Second}
 
 func (vaultPlugin) Prefix() string { return "vault" }
 
-func (vaultPlugin) Load(id string) (string, error) {
+func (vaultPlugin) Load(ctx context.Context, id string) (string, error) {
 	addr := os.Getenv("VAULT_ADDR")
 	token := os.Getenv("VAULT_TOKEN")
 	if addr == "" || token == "" {

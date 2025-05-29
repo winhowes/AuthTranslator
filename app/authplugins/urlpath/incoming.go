@@ -1,6 +1,7 @@
 package urlpath
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -31,13 +32,13 @@ func (u *URLPathAuth) ParseParams(m map[string]interface{}) (interface{}, error)
 	return p, nil
 }
 
-func (u *URLPathAuth) Authenticate(r *http.Request, p interface{}) bool {
+func (u *URLPathAuth) Authenticate(ctx context.Context, r *http.Request, p interface{}) bool {
 	cfg, ok := p.(*inParams)
 	if !ok {
 		return false
 	}
 	for _, ref := range cfg.Secrets {
-		sec, err := secrets.LoadSecret(ref)
+		sec, err := secrets.LoadSecret(ctx, ref)
 		if err != nil {
 			continue
 		}

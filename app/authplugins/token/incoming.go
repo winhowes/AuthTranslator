@@ -1,6 +1,7 @@
 package token
 
 import (
+	"context"
 	"crypto/subtle"
 	"fmt"
 	"net/http"
@@ -36,14 +37,14 @@ func (t *TokenAuth) ParseParams(m map[string]interface{}) (interface{}, error) {
 	return p, nil
 }
 
-func (t *TokenAuth) Authenticate(r *http.Request, p interface{}) bool {
+func (t *TokenAuth) Authenticate(ctx context.Context, r *http.Request, p interface{}) bool {
 	cfg, ok := p.(*inParams)
 	if !ok {
 		return false
 	}
 	tokenValue := strings.TrimPrefix(r.Header.Get(cfg.Header), cfg.Prefix)
 	for _, ref := range cfg.Secrets {
-		token, err := secrets.LoadSecret(ref)
+		token, err := secrets.LoadSecret(ctx, ref)
 		if err != nil {
 			continue
 		}

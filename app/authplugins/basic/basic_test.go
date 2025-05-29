@@ -1,6 +1,7 @@
 package basic
 
 import (
+	"context"
 	"encoding/base64"
 	"net/http"
 	"testing"
@@ -16,7 +17,7 @@ func TestBasicOutgoingAddAuth(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	p.AddAuth(r, cfg)
+	p.AddAuth(context.Background(), r, cfg)
 	expected := "Basic " + base64.StdEncoding.EncodeToString([]byte("user:pass"))
 	if got := r.Header.Get("Authorization"); got != expected {
 		t.Fatalf("expected %q, got %s", expected, got)
@@ -32,7 +33,7 @@ func TestBasicIncomingAuth(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !p.Authenticate(r, cfg) {
+	if !p.Authenticate(context.Background(), r, cfg) {
 		t.Fatal("expected authentication to succeed")
 	}
 
@@ -50,7 +51,7 @@ func TestBasicIncomingAuthFail(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p.Authenticate(r, cfg) {
+	if p.Authenticate(context.Background(), r, cfg) {
 		t.Fatal("expected authentication to fail")
 	}
 }
@@ -64,7 +65,7 @@ func TestBasicIdentify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !p.Authenticate(r, cfg) {
+	if !p.Authenticate(context.Background(), r, cfg) {
 		t.Fatal("expected authentication to succeed")
 	}
 	id, ok := p.Identify(r, cfg)

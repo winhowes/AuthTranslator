@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"os"
 	"testing"
@@ -112,11 +113,11 @@ func TestReloadClearsSecretCache(t *testing.T) {
 	}
 
 	t.Setenv("CACHE_RELOAD_SECRET", "first")
-	if _, err := secrets.LoadSecret("env:CACHE_RELOAD_SECRET"); err != nil {
+	if _, err := secrets.LoadSecret(context.Background(), "env:CACHE_RELOAD_SECRET"); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("CACHE_RELOAD_SECRET", "second")
-	if val, err := secrets.LoadSecret("env:CACHE_RELOAD_SECRET"); err != nil {
+	if val, err := secrets.LoadSecret(context.Background(), "env:CACHE_RELOAD_SECRET"); err != nil {
 		t.Fatal(err)
 	} else if val != "first" {
 		t.Fatalf("expected cached 'first', got %s", val)
@@ -126,7 +127,7 @@ func TestReloadClearsSecretCache(t *testing.T) {
 		t.Fatalf("reload failed: %v", err)
 	}
 
-	val, err := secrets.LoadSecret("env:CACHE_RELOAD_SECRET")
+	val, err := secrets.LoadSecret(context.Background(), "env:CACHE_RELOAD_SECRET")
 	if err != nil {
 		t.Fatalf("unexpected error after reload: %v", err)
 	}

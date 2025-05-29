@@ -1,6 +1,7 @@
 package plugins
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -61,7 +62,7 @@ func TestAzureKMSLoad(t *testing.T) {
 	t.Setenv("AZURE_CLIENT_SECRET", "sec")
 
 	p := azureKMSPlugin{}
-	got, err := p.Load("https://vault.example.com/secrets/foo")
+	got, err := p.Load(context.Background(), "https://vault.example.com/secrets/foo")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -83,7 +84,7 @@ func TestAzureKMSLoadError(t *testing.T) {
 	t.Setenv("AZURE_CLIENT_SECRET", "sec")
 
 	p := azureKMSPlugin{}
-	if _, err := p.Load("https://vault.example.com/secrets/foo"); err == nil {
+	if _, err := p.Load(context.Background(), "https://vault.example.com/secrets/foo"); err == nil {
 		t.Fatal("expected error")
 	}
 }

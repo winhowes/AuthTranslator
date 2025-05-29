@@ -1,6 +1,7 @@
 package jwt
 
 import (
+	"context"
 	"crypto"
 	"crypto/hmac"
 	"crypto/rsa"
@@ -117,7 +118,7 @@ func matchAudience(claim interface{}, want string) bool {
 	return false
 }
 
-func (j *JWTAuth) Authenticate(r *http.Request, p interface{}) bool {
+func (j *JWTAuth) Authenticate(ctx context.Context, r *http.Request, p interface{}) bool {
 	cfg, ok := p.(*inParams)
 	if !ok {
 		return false
@@ -134,7 +135,7 @@ func (j *JWTAuth) Authenticate(r *http.Request, p interface{}) bool {
 	alg, _ := header["alg"].(string)
 	verified := false
 	for _, ref := range cfg.Secrets {
-		key, err := secrets.LoadSecret(ref)
+		key, err := secrets.LoadSecret(ctx, ref)
 		if err != nil {
 			continue
 		}

@@ -1,6 +1,7 @@
 package basic
 
 import (
+	"context"
 	"crypto/subtle"
 	"encoding/base64"
 	"fmt"
@@ -41,7 +42,7 @@ func (b *BasicAuth) ParseParams(m map[string]interface{}) (interface{}, error) {
 	return p, nil
 }
 
-func (b *BasicAuth) Authenticate(r *http.Request, p interface{}) bool {
+func (b *BasicAuth) Authenticate(ctx context.Context, r *http.Request, p interface{}) bool {
 	cfg, ok := p.(*inParams)
 	if !ok {
 		return false
@@ -57,7 +58,7 @@ func (b *BasicAuth) Authenticate(r *http.Request, p interface{}) bool {
 	}
 	creds := dec
 	for _, ref := range cfg.Secrets {
-		sec, err := secrets.LoadSecret(ref)
+		sec, err := secrets.LoadSecret(ctx, ref)
 		if err != nil {
 			continue
 		}

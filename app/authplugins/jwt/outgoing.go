@@ -1,6 +1,7 @@
 package jwt
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
@@ -38,12 +39,12 @@ func (j *JWTAuthOut) ParseParams(m map[string]interface{}) (interface{}, error) 
 	return p, nil
 }
 
-func (j *JWTAuthOut) AddAuth(r *http.Request, p interface{}) {
+func (j *JWTAuthOut) AddAuth(ctx context.Context, r *http.Request, p interface{}) {
 	cfg, ok := p.(*outParams)
 	if !ok || len(cfg.Secrets) == 0 {
 		return
 	}
-	tok, err := secrets.LoadRandomSecret(cfg.Secrets)
+	tok, err := secrets.LoadRandomSecret(ctx, cfg.Secrets)
 	if err != nil {
 		return
 	}

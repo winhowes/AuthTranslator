@@ -1,23 +1,26 @@
 package authplugins
 
-import "testing"
-import "net/http"
+import (
+	"context"
+	"net/http"
+	"testing"
+)
 
 // minimal incoming plugin
 type testIncoming struct{ name string }
 
-func (p testIncoming) Name() string                                          { return p.name }
-func (testIncoming) ParseParams(map[string]interface{}) (interface{}, error) { return nil, nil }
-func (testIncoming) Authenticate(*http.Request, interface{}) bool            { return true }
-func (testIncoming) RequiredParams() []string                                { return nil }
-func (testIncoming) OptionalParams() []string                                { return nil }
+func (p testIncoming) Name() string                                                { return p.name }
+func (testIncoming) ParseParams(map[string]interface{}) (interface{}, error)       { return nil, nil }
+func (testIncoming) Authenticate(context.Context, *http.Request, interface{}) bool { return true }
+func (testIncoming) RequiredParams() []string                                      { return nil }
+func (testIncoming) OptionalParams() []string                                      { return nil }
 
 // minimal outgoing plugin
 type testOutgoing struct{ name string }
 
 func (p testOutgoing) Name() string                                          { return p.name }
 func (testOutgoing) ParseParams(map[string]interface{}) (interface{}, error) { return nil, nil }
-func (testOutgoing) AddAuth(*http.Request, interface{})                      {}
+func (testOutgoing) AddAuth(context.Context, *http.Request, interface{})     {}
 func (testOutgoing) RequiredParams() []string                                { return nil }
 func (testOutgoing) OptionalParams() []string                                { return nil }
 

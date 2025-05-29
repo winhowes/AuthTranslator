@@ -414,7 +414,7 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 	for _, cfg := range integ.IncomingAuth {
 		p := authplugins.GetIncoming(cfg.Type)
 		if p != nil {
-			if !p.Authenticate(r, cfg.parsed) {
+			if !p.Authenticate(r.Context(), r, cfg.parsed) {
 				logger.Warn("authentication failed", "host", host, "remote", r.RemoteAddr)
 				http.Error(w, "Unauthorized", http.StatusUnauthorized)
 				return
@@ -457,7 +457,7 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 	for _, cfg := range integ.OutgoingAuth {
 		p := authplugins.GetOutgoing(cfg.Type)
 		if p != nil {
-			p.AddAuth(r, cfg.parsed)
+			p.AddAuth(r.Context(), r, cfg.parsed)
 		}
 	}
 

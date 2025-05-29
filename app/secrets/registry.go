@@ -1,6 +1,7 @@
 package secrets
 
 import (
+	"context"
 	"crypto/rand"
 	"fmt"
 	"math/big"
@@ -11,7 +12,7 @@ import (
 // Plugin fetches a secret value for a given identifier.
 type Plugin interface {
 	Prefix() string
-	Load(id string) (string, error)
+	Load(ctx context.Context, id string) (string, error)
 }
 
 var registry = make(map[string]Plugin)
@@ -44,7 +45,7 @@ func ValidateSecret(ref string) error {
 }
 
 // LoadSecret resolves a secret reference using the registered plugins.
-func LoadSecret(ref string) (string, error) {
+func LoadSecret(ctx context.Context, ref string) (string, error) {
 	secretCache.RLock()
 	if val, ok := secretCache.m[ref]; ok {
 		secretCache.RUnlock()
@@ -61,7 +62,7 @@ func LoadSecret(ref string) (string, error) {
 	if !ok {
 		return "", fmt.Errorf("unknown secret source: %s", prefix)
 	}
-	val, err := p.Load(id)
+	val, err := p.Load(ctx, id)
 	if err != nil {
 		return "", err
 	}
@@ -75,7 +76,7 @@ func LoadSecret(ref string) (string, error) {
 // resolves it via LoadSecret. When multiple references are given a unique seed
 // is used for the random generator to ensure a different selection on each
 // invocation.
-func LoadRandomSecret(refs []string) (string, error) {
+func LoadRandomSecret(ctx context.Context, refs []string) (string, error) {
 	if len(refs) == 0 {
 		return "", fmt.Errorf("no secrets provided")
 	}
@@ -92,5 +93,5 @@ func LoadRandomSecret(refs []string) (string, error) {
 	}
 
 	ref := refs[idx]
-	return LoadSecret(ref)
+	return LoadSecret(ctx, ref)
 }

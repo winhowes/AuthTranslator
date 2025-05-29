@@ -1,6 +1,7 @@
 package githubsignature
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
@@ -43,7 +44,7 @@ func (g *GitHubSignatureAuth) ParseParams(m map[string]interface{}) (interface{}
 	return p, nil
 }
 
-func (g *GitHubSignatureAuth) Authenticate(r *http.Request, p interface{}) bool {
+func (g *GitHubSignatureAuth) Authenticate(ctx context.Context, r *http.Request, p interface{}) bool {
 	cfg, ok := p.(*githubSigParams)
 	if !ok {
 		return false
@@ -57,7 +58,7 @@ func (g *GitHubSignatureAuth) Authenticate(r *http.Request, p interface{}) bool 
 		return false
 	}
 	for _, ref := range cfg.Secrets {
-		secret, err := secrets.LoadSecret(ref)
+		secret, err := secrets.LoadSecret(ctx, ref)
 		if err != nil {
 			continue
 		}
