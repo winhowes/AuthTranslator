@@ -132,7 +132,7 @@ func matchSegments(pattern, path []string) bool {
 // validateRequest checks headers and body according to the request constraint.
 func validateRequest(r *http.Request, c RequestConstraint) bool {
 	for name, wantVals := range c.Headers {
-		gotVals, ok := r.Header[name]
+		gotVals, ok := r.Header[http.CanonicalHeaderKey(name)]
 		if !ok {
 			return false
 		}

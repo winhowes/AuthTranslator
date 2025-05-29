@@ -50,6 +50,12 @@ func TestValidateRequestHeaders(t *testing.T) {
 	if validateRequest(r2, RequestConstraint{Headers: map[string][]string{"X-Test": {"val"}}}) {
 		t.Fatal("expected failure without header")
 	}
+
+	r3 := httptest.NewRequest(http.MethodGet, "http://x", nil)
+	r3.Header.Set("X-Test", "v")
+	if !validateRequest(r3, RequestConstraint{Headers: map[string][]string{"x-test": {"v"}}}) {
+		t.Fatal("expected case-insensitive header match")
+	}
 }
 
 func TestValidateRequestJSONBody(t *testing.T) {
