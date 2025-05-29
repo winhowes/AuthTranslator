@@ -1,10 +1,15 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"flag"
 	"fmt"
+	"io"
 	"net"
+	"os"
+	"os/exec"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -141,5 +146,119 @@ func TestRateLimiterStopClosesConnections(t *testing.T) {
 
 	if _, err := c2.Write([]byte("x")); err == nil {
 		t.Fatal("expected closed connection")
+	}
+}
+
+// readRedisRequest consumes one Redis request from br.
+func readRedisRequest(br *bufio.Reader) error {
+	line, err := br.ReadString('\n')
+	if err != nil {
+		return err
+	}
+	if len(line) < 2 || line[0] != '*' {
+		return nil
+	}
+	n, err := strconv.Atoi(strings.TrimSpace(line[1:]))
+	if err != nil {
+		return err
+	}
+	for i := 0; i < n*2; i++ {
+		if _, err := br.ReadString('\n'); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func TestAllowRedisUnsupportedScheme(t *testing.T) {
+	old := *redisAddr
+	*redisAddr = "foo://localhost"
+	rl := NewRateLimiter(1, time.Second)
+	t.Cleanup(func() {
+		*redisAddr = old
+		rl.Stop()
+	})
+	if _, err := rl.allowRedis("k"); err == nil {
+		t.Fatal("expected error for unsupported scheme")
+	}
+}
+
+func TestAllowRedisTLSCAError(t *testing.T) {
+	oldAddr, oldCA := *redisAddr, *redisCA
+	*redisAddr = "rediss://localhost:1"
+	*redisCA = "does_not_exist.pem"
+	rl := NewRateLimiter(1, time.Second)
+	t.Cleanup(func() {
+		*redisAddr = oldAddr
+		*redisCA = oldCA
+		rl.Stop()
+	})
+	if _, err := rl.allowRedis("k"); err == nil {
+		t.Fatal("expected error reading CA file")
+	}
+}
+
+func TestAllowRedisErrorResponse(t *testing.T) {
+	old := *redisAddr
+	*redisAddr = "dummy"
+	rl := NewRateLimiter(1, time.Second)
+	t.Cleanup(func() {
+		*redisAddr = old
+		rl.Stop()
+	})
+	srv, cli := net.Pipe()
+	rl.conns <- cli
+	go func() {
+		br := bufio.NewReader(srv)
+		readRedisRequest(br)
+		srv.Write([]byte("-ERR fail\r\n"))
+		srv.Close()
+	}()
+	if ok, err := rl.allowRedis("k"); err == nil || ok {
+		t.Fatalf("expected error response, got ok=%v err=%v", ok, err)
+	}
+}
+
+// Helper process used for testing main().
+func TestMainHelper(t *testing.T) {
+	if os.Getenv("GO_WANT_MAIN_HELPER") != "1" {
+		return
+	}
+	for i, a := range os.Args {
+		if a == "--" {
+			os.Args = append([]string{os.Args[0]}, os.Args[i+1:]...)
+			break
+		}
+	}
+	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+	main()
+	os.Exit(0)
+}
+
+func TestMainVersionFlag(t *testing.T) {
+	oldArgs := os.Args
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+	os.Args = []string{"cmd", "-version"}
+	main()
+	w.Close()
+	os.Stdout = oldStdout
+	os.Args = oldArgs
+	out, _ := io.ReadAll(r)
+	if strings.TrimSpace(string(out)) != version {
+		t.Fatalf("expected %q got %q", version, strings.TrimSpace(string(out)))
+	}
+}
+
+func TestMainReloadFailure(t *testing.T) {
+	cmd := exec.Command(os.Args[0], "-test.run=TestMainHelper", "--", "-config", "no_such_file")
+	cmd.Env = append(os.Environ(), "GO_WANT_MAIN_HELPER=1")
+	err := cmd.Run()
+	if err == nil {
+		t.Fatal("expected process to exit with error")
+	}
+	if ee, ok := err.(*exec.ExitError); !ok || ee.ExitCode() == 0 {
+		t.Fatalf("unexpected exit status: %v", err)
 	}
 }
