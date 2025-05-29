@@ -49,3 +49,71 @@ func TestRedisCmdIntError(t *testing.T) {
 		t.Fatal("expected error")
 	}
 }
+
+func TestRedisCmdIntUnexpected(t *testing.T) {
+	srv, cli := net.Pipe()
+	defer srv.Close()
+	defer cli.Close()
+
+	go func() {
+		br := bufio.NewReader(srv)
+		br.ReadBytes('\n')
+		br.ReadBytes('\n')
+		srv.Write([]byte("?what\r\n"))
+	}()
+
+	if _, err := redisCmdInt(cli, "PING"); err == nil {
+		t.Fatal("expected error for unexpected prefix")
+	}
+}
+
+func TestRedisCmdOK(t *testing.T) {
+	srv, cli := net.Pipe()
+	defer srv.Close()
+	defer cli.Close()
+
+	go func() {
+		br := bufio.NewReader(srv)
+		br.ReadBytes('\n')
+		br.ReadBytes('\n')
+		srv.Write([]byte("+OK\r\n"))
+	}()
+
+	if err := redisCmd(cli, "PING"); err != nil {
+		t.Fatalf("redisCmd error: %v", err)
+	}
+}
+
+func TestRedisCmdError(t *testing.T) {
+	srv, cli := net.Pipe()
+	defer srv.Close()
+	defer cli.Close()
+
+	go func() {
+		br := bufio.NewReader(srv)
+		br.ReadBytes('\n')
+		br.ReadBytes('\n')
+		srv.Write([]byte("-ERR nope\r\n"))
+	}()
+
+	if err := redisCmd(cli, "PING"); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestRedisCmdUnexpected(t *testing.T) {
+	srv, cli := net.Pipe()
+	defer srv.Close()
+	defer cli.Close()
+
+	go func() {
+		br := bufio.NewReader(srv)
+		br.ReadBytes('\n')
+		br.ReadBytes('\n')
+		srv.Write([]byte("?bad\r\n"))
+	}()
+
+	if err := redisCmd(cli, "PING"); err == nil {
+		t.Fatal("expected error for unexpected prefix")
+	}
+}
