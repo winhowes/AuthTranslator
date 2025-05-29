@@ -97,6 +97,13 @@ The project exists to make it trivial to translate one type of authentication in
 
    Use `0` (or a negative number) for `in_rate_limit` or `out_rate_limit` to disable rate limiting for that direction.
    The optional `rate_limit_window` sets the rolling window duration using Go's duration syntax; it defaults to `1m`.
+   Optional transport settings adjust the proxy's HTTP client:
+
+   - `idle_conn_timeout` – close idle connections after this duration.
+   - `tls_handshake_timeout` – maximum time for TLS handshakes.
+   - `response_header_timeout` – how long to wait for upstream headers.
+   - `tls_insecure_skip_verify` – skip TLS certificate verification.
+   - `disable_keep_alives` – disable HTTP keep-alive connections.
 
    The allowlist configuration lives in a separate `allowlist.json` file:
 
