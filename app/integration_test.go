@@ -8,6 +8,7 @@ import (
 	"math/big"
 	"net/http"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -336,5 +337,109 @@ func TestIntegrationPluginTransport(t *testing.T) {
 	}
 	if !reflect.DeepEqual(tr.TLSClientConfig.Certificates, baseTr.TLSClientConfig.Certificates) {
 		t.Fatalf("certificates not preserved")
+	}
+}
+
+func TestAddIntegrationUnknownIncomingAuth(t *testing.T) {
+	i := &Integration{
+		Name:         "unknowninc",
+		Destination:  "http://example.com",
+		IncomingAuth: []AuthPluginConfig{{Type: "nope", Params: map[string]interface{}{}}},
+	}
+	if err := AddIntegration(i); err == nil || !strings.Contains(err.Error(), "unknown incoming auth type") {
+		t.Fatalf("expected unknown incoming auth type error, got %v", err)
+	}
+}
+
+func TestAddIntegrationUnknownOutgoingAuth(t *testing.T) {
+	i := &Integration{
+		Name:         "unknownout",
+		Destination:  "http://example.com",
+		OutgoingAuth: []AuthPluginConfig{{Type: "none", Params: map[string]interface{}{}}},
+	}
+	if err := AddIntegration(i); err == nil || !strings.Contains(err.Error(), "unknown outgoing auth type") {
+		t.Fatalf("expected unknown outgoing auth type error, got %v", err)
+	}
+}
+
+func TestAddIntegrationInvalidSecretRef(t *testing.T) {
+	i := &Integration{
+		Name:        "badsecret",
+		Destination: "http://example.com",
+		IncomingAuth: []AuthPluginConfig{{Type: "token", Params: map[string]interface{}{
+			"secrets": []string{"bogus:VAL"},
+			"header":  "X-Auth",
+		}}},
+	}
+	if err := AddIntegration(i); err == nil || !strings.Contains(err.Error(), "unknown secret source") {
+		t.Fatalf("expected secret validation error, got %v", err)
+	}
+}
+
+func TestListIntegrationsIncludesAdded(t *testing.T) {
+	i1 := &Integration{Name: "listone", Destination: "http://one.com"}
+	if err := AddIntegration(i1); err != nil {
+		t.Fatalf("add1: %v", err)
+	}
+	t.Cleanup(func() {
+		i1.inLimiter.Stop()
+		i1.outLimiter.Stop()
+		DeleteIntegration("listone")
+	})
+
+	i2 := &Integration{Name: "listtwo", Destination: "http://two.com"}
+	if err := AddIntegration(i2); err != nil {
+		t.Fatalf("add2: %v", err)
+	}
+	t.Cleanup(func() {
+		i2.inLimiter.Stop()
+		i2.outLimiter.Stop()
+		DeleteIntegration("listtwo")
+	})
+
+	names := map[string]bool{}
+	for _, v := range ListIntegrations() {
+		names[v.Name] = true
+	}
+	if !names["listone"] || !names["listtwo"] {
+		t.Fatalf("ListIntegrations missing entries: %v", names)
+	}
+}
+
+func TestGetIntegrationNotFound(t *testing.T) {
+	if _, ok := GetIntegration("missing"); ok {
+		t.Fatal("expected lookup failure")
+	}
+}
+
+func TestAddIntegrationDefaultRateLimitWindow(t *testing.T) {
+	i := &Integration{
+		Name:         "defwin",
+		Destination:  "http://example.com",
+		InRateLimit:  1,
+		OutRateLimit: 1,
+	}
+	if err := AddIntegration(i); err != nil {
+		t.Fatalf("add: %v", err)
+	}
+	t.Cleanup(func() {
+		i.inLimiter.Stop()
+		i.outLimiter.Stop()
+		DeleteIntegration("defwin")
+	})
+
+	if i.inLimiter.window != time.Minute || i.outLimiter.window != time.Minute {
+		t.Fatalf("expected default window 1m, got %v and %v", i.inLimiter.window, i.outLimiter.window)
+	}
+}
+
+func TestAddIntegrationBadRateLimitWindowParse(t *testing.T) {
+	i := &Integration{
+		Name:            "badwin",
+		Destination:     "http://example.com",
+		RateLimitWindow: "notaduration",
+	}
+	if err := AddIntegration(i); err == nil || !strings.Contains(err.Error(), "invalid rate_limit_window") {
+		t.Fatalf("expected rate limit window parse error, got %v", err)
 	}
 }
