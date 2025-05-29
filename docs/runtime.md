@@ -36,7 +36,7 @@ AuthTranslator exposes several command‑line options:
 | `-disable_x_at_int` | ignore the `X-AT-Int` header |
 | `-x_at_int_host` | only respect `X-AT-Int` when this host is requested |
 | `-tls-cert` and `-tls-key` | TLS certificate and key to serve HTTPS |
-| `-redis-addr` | Redis URL for rate limit counters. Use `rediss://` for TLS and include credentials (`user:pass@`) before the host to authenticate. |
+| `-redis-addr` | Redis address for rate limit counters. Accepts `host:port` or a `redis://`/`rediss://` URL with optional `user:pass@` credentials. |
 | `-redis-ca` | CA certificate for verifying Redis TLS |
 | `-redis-timeout` | timeout for dialing Redis (default `5s`) |
 | `-max_body_size` | maximum bytes buffered from request bodies; use `0` to disable |
