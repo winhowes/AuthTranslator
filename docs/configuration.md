@@ -130,11 +130,11 @@ apiVersion: v1alpha1
 | Field        | Type                 | Notes                                                  |
 | ------------ | -------------------- | ------------------------------------------------------ |
 | `path`       | string               | Anchored to the upstream path. Supports `*` and `**` wildcards. |
-| `method`     | string or `[string]` | `GET`, `POST`, …                                       |
-| `query`      | `[string]`           | Each element `key=value`. All must match.              |
-| `headers`    | map\[string][]string | Header names and required values. Empty list checks only presence. |
-| `body.json`  | map\[string]interface{} | Object matched recursively; must be a subset of the request. |
-| `body.form`  | map\[string]interface{} | Same subset matching for `application/x-www-form-urlencoded`. |
+| `methods`    | map[string]RequestConstraint | Map of HTTP method names to request constraints. |
+| `methods.<name>.query`   | map[string][]string | Each element is a list of allowed values per query key. All must match. |
+| `methods.<name>.headers` | map[string][]string | Header names and required values. Empty list checks only presence. |
+| `methods.<name>.body.json` | map[string]interface{} | Object matched recursively; must be a subset of the request. |
+| `methods.<name>.body.form` | map[string]interface{} | Same subset matching for `application/x-www-form-urlencoded`. |
 
 > **Performance note** Low‑level matching adds negligible latency (<50 µs at 10 rules). Tune rule ordering so the most frequent match comes first.
 
