@@ -7,7 +7,7 @@ import (
 )
 
 func TestHealthz(t *testing.T) {
-	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+	req := httptest.NewRequest(http.MethodGet, "/_at_internal/healthz", nil)
 	rr := httptest.NewRecorder()
 	healthzHandler(rr, req)
 	if rr.Code != http.StatusOK {

@@ -593,9 +593,9 @@ func main() {
 		http.HandleFunc("/integrations", integrationsHandler)
 	}
 
-	http.HandleFunc("/healthz", healthzHandler)
+	http.HandleFunc("/_at_internal/healthz", healthzHandler)
 	if *enableMetrics {
-		http.HandleFunc("/metrics", metricsHandler)
+		http.HandleFunc("/_at_internal/metrics", metricsHandler)
 	}
 
 	http.HandleFunc("/", proxyHandler)
