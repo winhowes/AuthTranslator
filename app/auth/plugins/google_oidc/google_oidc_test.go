@@ -139,6 +139,56 @@ func TestGoogleOIDCAddAuthCache(t *testing.T) {
 	}
 }
 
+func TestGoogleOIDCAddAuthExpiredCache(t *testing.T) {
+	tokenCache.Lock()
+	tokenCache.m = map[string]cachedToken{"aud": {token: "old", exp: time.Now().Add(-time.Minute)}}
+	tokenCache.Unlock()
+	defer func() {
+		tokenCache.Lock()
+		tokenCache.m = make(map[string]cachedToken)
+		tokenCache.Unlock()
+	}()
+
+	called := false
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		fmt.Fprint(w, "newtok")
+	}))
+	defer ts.Close()
+
+	oldHost := MetadataHost
+	MetadataHost = ts.URL
+	defer func() { MetadataHost = oldHost }()
+	oldClient := HTTPClient
+	HTTPClient = ts.Client()
+	defer func() { HTTPClient = oldClient }()
+
+	p := GoogleOIDC{}
+	cfg, err := p.ParseParams(map[string]interface{}{"audience": "aud"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := &http.Request{Header: http.Header{}}
+	p.AddAuth(context.Background(), r, cfg)
+	if !called {
+		t.Fatal("expected HTTP call for expired cache")
+	}
+	if got := r.Header.Get("Authorization"); got != "Bearer newtok" {
+		t.Fatalf("unexpected header %s", got)
+	}
+}
+
+func TestGoogleOIDCParseParamsUnknownField(t *testing.T) {
+	p := GoogleOIDC{}
+	if _, err := p.ParseParams(map[string]interface{}{"audience": "a", "bad": true}); err == nil {
+		t.Fatal("expected error")
+	}
+	a := GoogleOIDCAuth{}
+	if _, err := a.ParseParams(map[string]interface{}{"audience": "a", "extra": 1}); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
 func makeToken(aud, sub string, exp int64, key *rsa.PrivateKey, kid string) string {
 	headerBytes, _ := json.Marshal(map[string]string{"alg": "RS256", "kid": kid})
 	header := base64.RawURLEncoding.EncodeToString(headerBytes)

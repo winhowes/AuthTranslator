@@ -233,3 +233,42 @@ func TestBasicParseParamsUnknownField(t *testing.T) {
 		t.Fatal("expected error for unknown field")
 	}
 }
+
+func TestBasicOutgoingAddAuthMultipleSecrets(t *testing.T) {
+	r := &http.Request{Header: http.Header{}}
+	p := BasicAuthOut{}
+	t.Setenv("C1", "u1:p1")
+	t.Setenv("C2", "u2:p2")
+	cfg, err := p.ParseParams(map[string]interface{}{"secrets": []string{"env:C1", "env:C2"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.AddAuth(context.Background(), r, cfg)
+	got := r.Header.Get("Authorization")
+	exp1 := "Basic " + base64.StdEncoding.EncodeToString([]byte("u1:p1"))
+	exp2 := "Basic " + base64.StdEncoding.EncodeToString([]byte("u2:p2"))
+	if got != exp1 && got != exp2 {
+		t.Fatalf("unexpected header %s", got)
+	}
+}
+
+func TestBasicIncomingPrefixMismatch(t *testing.T) {
+	cred := base64.StdEncoding.EncodeToString([]byte("u:p"))
+	r := &http.Request{Header: http.Header{"Authz": []string{"Basic " + cred}}}
+	p := BasicAuth{}
+	t.Setenv("C", "u:p")
+	cfg, _ := p.ParseParams(map[string]interface{}{"secrets": []string{"env:C"}})
+	if p.Authenticate(context.Background(), r, cfg) {
+		t.Fatal("expected authentication to fail")
+	}
+	if id, ok := p.Identify(r, cfg); ok || id != "" {
+		t.Fatalf("unexpected id %s", id)
+	}
+}
+
+func TestBasicOutParseParamsMissingSecrets(t *testing.T) {
+	o := BasicAuthOut{}
+	if _, err := o.ParseParams(map[string]interface{}{}); err == nil {
+		t.Fatal("expected error for missing secrets")
+	}
+}
