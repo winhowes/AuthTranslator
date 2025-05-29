@@ -157,9 +157,9 @@
    - `-debug` – expose the `/integrations` endpoint for the CLI
    - `-version` – print the build version and exit
    - `-watch` – automatically reload when config or allowlist files change
-   - `-enable-metrics` – expose the `/metrics` endpoint (default `true`)
-   - `-metrics-user` – username required to access `/metrics`
-   - `-metrics-pass` – password required to access `/metrics`
+  - `-enable-metrics` – expose the `/_at_internal/metrics` endpoint (default `true`)
+  - `-metrics-user` – username required to access `/_at_internal/metrics`
+  - `-metrics-pass` – password required to access `/_at_internal/metrics`
 
 4. **Run Locally**
 
