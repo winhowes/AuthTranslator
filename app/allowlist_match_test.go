@@ -97,6 +97,14 @@ func TestValidateRequestBodyMismatch(t *testing.T) {
 	}
 }
 
+func TestValidateRequestUnknownContentType(t *testing.T) {
+	r := newRequest(http.MethodPost, "http://x", "text/plain", []byte("ignored"))
+	cons := RequestConstraint{Body: map[string]interface{}{"foo": "bar"}}
+	if !validateRequest(r, cons) {
+		t.Fatal("expected body check skipped on unknown content type")
+	}
+}
+
 func TestSplitPathEmpty(t *testing.T) {
 	got := splitPath("")
 	if len(got) != 0 {

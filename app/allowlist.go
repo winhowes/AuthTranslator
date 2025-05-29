@@ -176,8 +176,8 @@ func validateRequest(r *http.Request, c RequestConstraint) bool {
 		}
 		return matchForm(vals, c.Body)
 	}
-	// unsupported content type
-	return false
+	// unsupported content type -> skip body filtering
+	return true
 }
 
 func matchForm(vals url.Values, rule map[string]interface{}) bool {

@@ -107,9 +107,8 @@ apiVersion: v1alpha1
               query:
                 channel: ["^C[0-9A-Z]{8}$"]   # workspace channel IDs
               body:
-                json:
-                  text: "^.+"              # any non‑empty string
-                form: {}
+                text: "^.+"              # any non‑empty string
+                # format detection uses Content-Type; other types skip body matching
               headers:
                 X-Custom-Trace: [abc123]
 ```
@@ -138,8 +137,7 @@ apiVersion: v1alpha1
 | `methods`     | map[string]RequestConstraint | Keys are HTTP verbs. Map a verb to `{}` to allow it without extra checks. |
 | `methods.<name>.query`   | map[string][]string | Each element is a list of allowed values per query key. All must match. |
 | `methods.<name>.headers` | map[string][]string | Header names and required values. Empty list checks only presence. |
-| `methods.<name>.body.json` | map[string]interface{} | Object matched recursively; must be a subset of the request. |
-| `methods.<name>.body.form` | map[string]interface{} | Same subset matching for `application/x-www-form-urlencoded`. |
+| `methods.<name>.body` | map[string]interface{} | Recursive subset of the request body (JSON or form). Arrays matched unordered. The proxy inspects `Content-Type`; unknown types skip body checks. |
 
 > **Performance note** Low‑level matching adds negligible latency (<50 µs at 10 rules). Tune rule ordering so the most frequent match comes first.
 

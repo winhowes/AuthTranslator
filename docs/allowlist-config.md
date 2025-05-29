@@ -73,10 +73,9 @@ rules:
           channel: [C12345678]
         headers:                           # header=value list; empty list checks only presence
           X-Custom-Trace: [abc123]
-        body:                              # optional JSON *or* form filters
-          json:
-            text: "Hello world"            # matched recursively
-          form: {}
+        body:                              # optional JSON or form filters
+          text: "Hello world"              # matched recursively
+          # body format is detected via Content-Type; other types skip matching
 ```
 
 Each key under `methods:` represents an HTTP method. Mapping a method to `{}`
@@ -92,18 +91,16 @@ which requests are permitted.
 | Method       | Case‑insensitive string compare. Each method key contains its own constraints. |
 | Query params | In `methods.<HTTP_METHOD>.query`, each key maps to allowed value list. Extra params allowed.
 | Headers      | In `methods.<HTTP_METHOD>.headers`, each key has required values; an empty list only checks for presence.
-| Body JSON    | `methods.<HTTP_METHOD>.body.json` must be a recursive subset of the request. Arrays matched unordered.
-| Body form    | `methods.<HTTP_METHOD>.body.form` applies the same subset logic for `application/x-www-form-urlencoded`.
+| Body         | `methods.<HTTP_METHOD>.body` must be a recursive subset of the request body (JSON or form). Arrays matched unordered. Detection relies on the `Content-Type` header; if it's neither JSON nor form, body checks are skipped.
 
 A rule like:
 
 ```yaml
   body:
-    json:
-      obj:
-        inner:
-          more_inner: x
-        arr: [2, 1]
+    obj:
+      inner:
+        more_inner: x
+      arr: [2, 1]
 ```
 
 matches a request body
