@@ -8,6 +8,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"errors"
 	"math/big"
 	"net"
 	"net/http"
@@ -333,5 +334,54 @@ func TestMTLSIdentifyPeerOnly(t *testing.T) {
 	id, ok := p.Identify(r, cfg)
 	if !ok || id != "cn" {
 		t.Fatalf("expected id 'cn', got %s", id)
+	}
+}
+
+// failPlugin is used to simulate secret provider failures.
+type failPlugin struct{}
+
+func (failPlugin) Prefix() string { return "fail" }
+func (failPlugin) Load(context.Context, string) (string, error) {
+	return "", errors.New("fail")
+}
+
+func TestMTLSParamMethods(t *testing.T) {
+	in := MTLSAuth{}
+	out := MTLSAuthOut{}
+	if rp := in.RequiredParams(); len(rp) != 0 {
+		t.Fatalf("unexpected required params: %v", rp)
+	}
+	if op := in.OptionalParams(); len(op) != 1 || op[0] != "subjects" {
+		t.Fatalf("unexpected optional params: %v", op)
+	}
+	if rp := out.RequiredParams(); len(rp) != 2 || rp[0] != "cert" || rp[1] != "key" {
+		t.Fatalf("unexpected required params: %v", rp)
+	}
+	if op := out.OptionalParams(); op != nil {
+		t.Fatalf("unexpected optional params: %v", op)
+	}
+}
+
+func TestMTLSOutgoingParseSecretErrors(t *testing.T) {
+	secrets.Register(failPlugin{})
+	key, _ := rsa.GenerateKey(rand.Reader, 1024)
+	tmpl := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "c"},
+		NotBefore:    time.Now().Add(-time.Hour),
+		NotAfter:     time.Now().Add(time.Hour),
+	}
+	der, _ := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
+	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})
+	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)})
+	t.Setenv("CERT", string(certPEM))
+	t.Setenv("KEY", string(keyPEM))
+
+	p := MTLSAuthOut{}
+	if _, err := p.ParseParams(map[string]interface{}{"cert": "fail:c", "key": "env:KEY"}); err == nil {
+		t.Fatal("expected error for failing cert secret")
+	}
+	if _, err := p.ParseParams(map[string]interface{}{"cert": "env:CERT", "key": "fail:k"}); err == nil {
+		t.Fatal("expected error for failing key secret")
 	}
 }
