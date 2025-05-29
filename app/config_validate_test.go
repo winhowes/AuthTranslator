@@ -34,3 +34,24 @@ func TestValidateConfigBadResponseTimeout(t *testing.T) {
 		t.Fatalf("expected error for invalid response header timeout")
 	}
 }
+
+func TestValidateConfigBadName(t *testing.T) {
+	c := Config{Integrations: []Integration{{Name: "bad name", Destination: "http://ex"}}}
+	if err := validateConfig(&c); err == nil {
+		t.Fatalf("expected error for invalid name")
+	}
+}
+
+func TestValidateConfigDuplicateName(t *testing.T) {
+	c := Config{Integrations: []Integration{{Name: "dup", Destination: "http://ex"}, {Name: "DUP", Destination: "http://ex"}}}
+	if err := validateConfig(&c); err == nil {
+		t.Fatalf("expected error for duplicate name")
+	}
+}
+
+func TestValidateConfigBadDestination(t *testing.T) {
+	c := Config{Integrations: []Integration{{Name: "a", Destination: "example.com"}}}
+	if err := validateConfig(&c); err == nil {
+		t.Fatalf("expected error for invalid destination")
+	}
+}

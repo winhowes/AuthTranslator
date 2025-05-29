@@ -2,18 +2,37 @@ package main
 
 import (
 	"fmt"
+	"net/url"
+	"regexp"
+	"strings"
 	"time"
 )
 
+var configNameRegexp = regexp.MustCompile(`^[a-zA-Z0-9-]+$`)
+
 // validateConfig ensures the Config contains sane values before use.
 func validateConfig(c *Config) error {
+	names := make(map[string]struct{})
 	for idx := range c.Integrations {
 		i := &c.Integrations[idx]
 		if i.Name == "" {
 			return fmt.Errorf("integration at index %d missing name", idx)
 		}
+		lower := strings.ToLower(i.Name)
+		if !configNameRegexp.MatchString(lower) {
+			return fmt.Errorf("integration %s has invalid name", i.Name)
+		}
+		if _, dup := names[lower]; dup {
+			return fmt.Errorf("duplicate integration name %s", i.Name)
+		}
+		names[lower] = struct{}{}
+
 		if i.Destination == "" {
 			return fmt.Errorf("integration %s missing destination", i.Name)
+		}
+		u, err := url.Parse(i.Destination)
+		if err != nil || u.Scheme == "" || u.Host == "" {
+			return fmt.Errorf("integration %s has invalid destination", i.Name)
 		}
 		if i.RateLimitWindow != "" {
 			d, err := time.ParseDuration(i.RateLimitWindow)
