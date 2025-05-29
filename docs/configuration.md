@@ -98,15 +98,16 @@ apiVersion: v1alpha1
       # granular example
       rules:
         - path:   /api/chat.postMessage
-          method: POST
-          query:
-            - channel=^C[0-9A-Z]{8}$   # workspace channel IDs
-          body:
-            json:
-              text: "^.+"              # any non‑empty string
-            form: {}
-          headers:
-            X-Custom-Trace: [abc123]
+          methods:                             # per-method constraints
+            POST:
+              query:
+                channel: ["^C[0-9A-Z]{8}$"]   # workspace channel IDs
+              body:
+                json:
+                  text: "^.+"              # any non‑empty string
+                form: {}
+              headers:
+                X-Custom-Trace: [abc123]
 ```
 
 ### Top‑level keys
@@ -130,11 +131,11 @@ apiVersion: v1alpha1
 | Field        | Type                 | Notes                                                  |
 | ------------ | -------------------- | ------------------------------------------------------ |
 | `path`       | string               | Anchored to the upstream path. Supports `*` and `**` wildcards. |
-| `method`     | string or `[string]` | `GET`, `POST`, …                                       |
-| `query`      | `[string]`           | Each element `key=value`. All must match.              |
-| `headers`    | map\[string][]string | Header names and required values. Empty list checks only presence. |
-| `body.json`  | map\[string]interface{} | Object matched recursively; must be a subset of the request. |
-| `body.form`  | map\[string]interface{} | Same subset matching for `application/x-www-form-urlencoded`. |
+| `methods`    | map[string]RequestConstraint | Map of HTTP method names to constraint objects. |
+| `methods.<name>.query` | map[string][]string | Query params to match; each key’s listed values must be present. |
+| `methods.<name>.headers` | map[string][]string | Header names and required values; empty list checks only presence. |
+| `methods.<name>.body.json` | map[string]interface{} | Object matched recursively; must be a subset of the request. |
+| `methods.<name>.body.form` | map[string]interface{} | Same subset matching for `application/x-www-form-urlencoded`. |
 
 > **Performance note** Low‑level matching adds negligible latency (<50 µs at 10 rules). Tune rule ordering so the most frequent match comes first.
 
