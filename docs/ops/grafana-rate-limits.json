@@ -1,0 +1,19 @@
+{
+  "title": "AuthTranslator Rate Limits",
+  "panels": [
+    {
+      "type": "graph",
+      "title": "Rate Limit Exceeded",
+      "targets": [
+        {
+          "expr": "sum(rate(authtranslator_rate_limit_exceeded_total[5m])) by (integration)",
+          "legendFormat": "{{integration}}"
+        }
+      ]
+    }
+  ],
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  }
+}
