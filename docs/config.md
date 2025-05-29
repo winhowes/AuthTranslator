@@ -14,9 +14,10 @@ integrations:
             - vault:/old/token
             - vault:/new/token
     outgoing_auth:
-      type: bearer_static
+      type: token
       params:
         header: Authorization
+        prefix: "Bearer "
         secrets:
           - env:APP_TOKEN_1
           - env:APP_TOKEN_2
