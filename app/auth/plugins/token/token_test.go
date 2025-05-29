@@ -236,3 +236,39 @@ func TestTokenAuthenticateSecretError(t *testing.T) {
 		t.Fatal("expected authentication to fail due to secret load error")
 	}
 }
+
+func TestTokenParseParamsUnknownField(t *testing.T) {
+	in := TokenAuth{}
+	if _, err := in.ParseParams(map[string]interface{}{
+		"secrets": []string{"env:X"},
+		"header":  "H",
+		"extra":   true,
+	}); err == nil {
+		t.Fatal("expected error for unknown field")
+	}
+	out := TokenAuthOut{}
+	if _, err := out.ParseParams(map[string]interface{}{
+		"secrets": []string{"env:X"},
+		"header":  "H",
+		"extra":   true,
+	}); err == nil {
+		t.Fatal("expected error for unknown field")
+	}
+}
+
+func TestTokenParseParamsTypeMismatch(t *testing.T) {
+	in := TokenAuth{}
+	if _, err := in.ParseParams(map[string]interface{}{
+		"secrets": "bad",
+		"header":  "H",
+	}); err == nil {
+		t.Fatal("expected type mismatch error")
+	}
+	out := TokenAuthOut{}
+	if _, err := out.ParseParams(map[string]interface{}{
+		"secrets": "bad",
+		"header":  "H",
+	}); err == nil {
+		t.Fatal("expected type mismatch error")
+	}
+}
