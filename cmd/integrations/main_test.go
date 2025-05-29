@@ -421,3 +421,27 @@ func TestUpdateIntegrationWriteError(t *testing.T) {
 		t.Fatalf("expected error output")
 	}
 }
+
+func TestMainNoArgs(t *testing.T) {
+	cmd := exec.Command(os.Args[0], "-test.run=TestMainHelper", "--")
+	cmd.Env = append(os.Environ(), "GO_WANT_INTEGRATIONS_HELPER=1")
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("expected error")
+	}
+	if !strings.Contains(string(out), "Usage: integrations") {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestMainAddBuilderError(t *testing.T) {
+	cmd := exec.Command(os.Args[0], "-test.run=TestMainHelper", "--", "slack", "-token", "t")
+	cmd.Env = append(os.Environ(), "GO_WANT_INTEGRATIONS_HELPER=1")
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("expected error")
+	}
+	if !strings.Contains(string(out), "-token and -signing-secret are required") {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
