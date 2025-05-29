@@ -63,8 +63,9 @@ func addEntry(args []string) {
 		fmt.Println("-integration, -caller and -capability required")
 		return
 	}
-	params := map[string]interface{}{}
+	var params map[string]interface{}
 	if *paramList != "" {
+		params = make(map[string]interface{})
 		for _, kv := range strings.Split(*paramList, ",") {
 			parts := strings.SplitN(kv, "=", 2)
 			if len(parts) == 2 {
@@ -113,6 +114,7 @@ func addEntry(args []string) {
 	callerCfg.Capabilities = append(callerCfg.Capabilities, plugins.CapabilityConfig{Name: *capName, Params: params})
 
 	out, _ := yaml.Marshal(entries)
+	out = bytes.ReplaceAll(out, []byte("params: {}"), []byte("params: null"))
 
 	if err := os.WriteFile(*file, out, 0644); err != nil {
 		fmt.Fprintln(os.Stderr, err)

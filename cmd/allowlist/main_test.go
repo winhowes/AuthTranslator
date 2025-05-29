@@ -64,7 +64,7 @@ func TestAddEntryNewFile(t *testing.T) {
 		{
 			Integration: "foo",
 			Callers: []plugins.CallerConfig{
-				{ID: "u1", Capabilities: []plugins.CapabilityConfig{{Name: "cap", Params: map[string]interface{}{}}}},
+				{ID: "u1", Capabilities: []plugins.CapabilityConfig{{Name: "cap", Params: nil}}},
 			},
 		},
 	}
@@ -210,7 +210,7 @@ func TestAddEntryNewCaller(t *testing.T) {
 		{
 			Integration: "foo",
 			Callers: []plugins.CallerConfig{
-				{ID: "u1", Capabilities: []plugins.CapabilityConfig{{Name: "cap1", Params: map[string]interface{}{}}}},
+				{ID: "u1", Capabilities: []plugins.CapabilityConfig{{Name: "cap1", Params: nil}}},
 			},
 		},
 	}
@@ -237,8 +237,8 @@ func TestAddEntryNewCaller(t *testing.T) {
 		{
 			Integration: "foo",
 			Callers: []plugins.CallerConfig{
-				{ID: "u1", Capabilities: []plugins.CapabilityConfig{{Name: "cap1", Params: map[string]interface{}{}}}},
-				{ID: "u2", Capabilities: []plugins.CapabilityConfig{{Name: "cap2", Params: map[string]interface{}{}}}},
+				{ID: "u1", Capabilities: []plugins.CapabilityConfig{{Name: "cap1", Params: nil}}},
+				{ID: "u2", Capabilities: []plugins.CapabilityConfig{{Name: "cap2", Params: nil}}},
 			},
 		},
 	}
