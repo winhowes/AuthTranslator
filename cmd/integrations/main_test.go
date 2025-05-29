@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
+	"flag"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -139,5 +141,94 @@ func TestListIntegrations(t *testing.T) {
 
 	if !strings.Contains(out, "i1") || !strings.Contains(out, "i2") {
 		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestUsageOutput(t *testing.T) {
+	oldFS := flag.CommandLine
+	oldServer := server
+	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+	buf := &bytes.Buffer{}
+	flag.CommandLine.SetOutput(buf)
+	server = flag.CommandLine.String("server", *oldServer, "integration endpoint")
+	t.Cleanup(func() {
+		flag.CommandLine = oldFS
+		server = oldServer
+	})
+
+	usage()
+	out := buf.String()
+	if !strings.Contains(out, "Usage: integrations") {
+		t.Fatalf("usage output unexpected: %s", out)
+	}
+}
+
+func TestMainListCommand(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			t.Fatalf("expected GET, got %s", r.Method)
+		}
+		json.NewEncoder(w).Encode([]struct {
+			Name string `json:"name"`
+		}{{"m1"}})
+	}))
+	defer srv.Close()
+
+	oldFS := flag.CommandLine
+	oldServer := server
+	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+	server = flag.CommandLine.String("server", srv.URL, "integration endpoint")
+	t.Cleanup(func() {
+		flag.CommandLine = oldFS
+		server = oldServer
+	})
+
+	origArgs := os.Args
+	os.Args = []string{"integrations", "-server", srv.URL, "list"}
+	defer func() { os.Args = origArgs }()
+
+	out := captureOutput(main)
+	if !strings.Contains(out, "m1") {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestMainUpdateDeleteCommands(t *testing.T) {
+	var methods []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		methods = append(methods, r.Method)
+		if r.Method == http.MethodDelete {
+			w.WriteHeader(http.StatusNoContent)
+		} else {
+			w.WriteHeader(http.StatusOK)
+		}
+	}))
+	defer srv.Close()
+
+	oldFS := flag.CommandLine
+	oldServer := server
+	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+	server = flag.CommandLine.String("server", srv.URL, "integration endpoint")
+	t.Cleanup(func() {
+		flag.CommandLine = oldFS
+		server = oldServer
+	})
+
+	origArgs := os.Args
+	os.Args = []string{"integrations", "-server", srv.URL, "update", "slack", "-token", "t", "-signing-secret", "s"}
+	out := captureOutput(main)
+	if !strings.Contains(out, "integration updated") {
+		t.Fatalf("update output unexpected: %s", out)
+	}
+
+	os.Args = []string{"integrations", "-server", srv.URL, "delete", "slack"}
+	out = captureOutput(main)
+	if !strings.Contains(out, "integration deleted") {
+		t.Fatalf("delete output unexpected: %s", out)
+	}
+	defer func() { os.Args = origArgs }()
+
+	if len(methods) != 2 || methods[0] != http.MethodPut || methods[1] != http.MethodDelete {
+		t.Fatalf("requests not issued as expected: %v", methods)
 	}
 }

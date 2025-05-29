@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"flag"
 	yaml "gopkg.in/yaml.v3"
 	"io"
 	"os"
@@ -347,5 +349,45 @@ func TestRemoveEntryFormatsParamsNull(t *testing.T) {
 	dataStr := string(out)
 	if !strings.Contains(dataStr, "params: null") {
 		t.Fatalf("expected params to be null, got: %s", dataStr)
+	}
+}
+
+func TestUsageOutput(t *testing.T) {
+	oldFS := flag.CommandLine
+	oldFile := file
+	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+	buf := &bytes.Buffer{}
+	flag.CommandLine.SetOutput(buf)
+	file = flag.CommandLine.String("file", "allowlist.yaml", "allowlist file")
+	t.Cleanup(func() {
+		flag.CommandLine = oldFS
+		file = oldFile
+	})
+
+	usage()
+	out := buf.String()
+	if !strings.Contains(out, "Usage: allowlist") {
+		t.Fatalf("usage output unexpected: %s", out)
+	}
+}
+
+func TestMainListCommand(t *testing.T) {
+	oldFS := flag.CommandLine
+	oldFile := file
+	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+	flag.CommandLine.SetOutput(os.Stdout)
+	file = flag.CommandLine.String("file", "allowlist.yaml", "allowlist file")
+	t.Cleanup(func() {
+		flag.CommandLine = oldFS
+		file = oldFile
+	})
+
+	origArgs := os.Args
+	os.Args = []string{"allowlist", "list"}
+	defer func() { os.Args = origArgs }()
+
+	out := captureOutput(main)
+	if !strings.Contains(out, "slack:") {
+		t.Fatalf("unexpected output: %s", out)
 	}
 }
