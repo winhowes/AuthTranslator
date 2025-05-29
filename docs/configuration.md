@@ -51,7 +51,7 @@ See [Secret Back-Ends](secret-backends.md) for all supported URI schemes.
 | Field           | Type           | Default      | Description                                                                  |
 | --------------- | -------------- | ------------ | ---------------------------------------------------------------------------- |
 | `destination`   | URL            | **required** | Base URL; path from client is appended as‑is.                                |
-| `outgoing_auth` | `[]PluginSpec` | `[]`         | Injects long‑lived credential **before** forwarding.                         |
+| `outgoing_auth` | `[]PluginSpec` | `[]`         | Injects credential **before** forwarding.                         |
 | `incoming_auth` | `[]PluginSpec` | `[]`         | Zero or more validators that run **in order**; the first that succeeds wins. |
 | `in_rate_limit` | int            | `0`          | Max inbound requests per caller within the window. |
 | `out_rate_limit` | int           | `0`          | Max outbound requests per caller within the window. |
