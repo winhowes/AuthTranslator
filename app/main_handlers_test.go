@@ -18,7 +18,7 @@ func resetIntegrations() {
 }
 
 func TestLoadAllowlistsValid(t *testing.T) {
-	tmp, err := os.CreateTemp("", "allowlist*.json")
+	tmp, err := os.CreateTemp("", "allowlist*.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}

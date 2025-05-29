@@ -110,7 +110,7 @@ func collectSecretRefs(cfg interface{}) []string {
 }
 
 // AuthPluginConfig ties an auth plugin type to its parameters. The Params field
-// holds the raw configuration from the JSON config while parsed is used at
+// holds the raw configuration from the YAML config while parsed is used at
 // runtime after being validated by the plugin's ParseParams function.
 type AuthPluginConfig struct {
 	Type   string                 `json:"type"`

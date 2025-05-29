@@ -8,7 +8,7 @@ import (
 )
 
 func TestWatchFiles(t *testing.T) {
-	tmp, err := os.CreateTemp("", "watch*.json")
+	tmp, err := os.CreateTemp("", "watch*.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,7 +37,7 @@ func TestWatchFiles(t *testing.T) {
 }
 
 func TestWatchFilesRename(t *testing.T) {
-	tmp, err := os.CreateTemp("", "watch*.json")
+	tmp, err := os.CreateTemp("", "watch*.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}
