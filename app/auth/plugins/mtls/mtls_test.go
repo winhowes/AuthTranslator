@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/winhowes/AuthTranslator/app/secrets"
 	_ "github.com/winhowes/AuthTranslator/app/secrets/plugins"
 )
 
@@ -280,5 +281,33 @@ func TestMTLSOutgoingTransportInvalid(t *testing.T) {
 	p := MTLSAuthOut{}
 	if tr := p.Transport(nil); tr != nil {
 		t.Fatal("expected nil transport for invalid config")
+	}
+}
+
+func TestMTLSOutgoingParseInvalidPair(t *testing.T) {
+	secrets.ClearCache()
+	p := MTLSAuthOut{}
+	t.Setenv("CERT", "invalid")
+	t.Setenv("KEY", "invalid")
+	if _, err := p.ParseParams(map[string]interface{}{"cert": "env:CERT", "key": "env:KEY"}); err == nil {
+		t.Fatal("expected error for invalid tls pair")
+	}
+}
+
+func TestMTLSOutgoingParseUnknownSecret(t *testing.T) {
+	secrets.ClearCache()
+	p := MTLSAuthOut{}
+	if _, err := p.ParseParams(map[string]interface{}{"cert": "unknown:CERT", "key": "unknown:KEY"}); err == nil {
+		t.Fatal("expected error for unknown secret source")
+	}
+}
+
+func TestMTLSOutgoingAddAuthBadCert(t *testing.T) {
+	cfg := &outParams{transport: &http.Transport{TLSClientConfig: &tls.Config{Certificates: []tls.Certificate{{Certificate: [][]byte{[]byte("bad")}}}}}}
+	r := &http.Request{Header: http.Header{}}
+	p := MTLSAuthOut{}
+	p.AddAuth(context.Background(), r, cfg)
+	if got := r.Header.Get("X-TLS-Client-CN"); got != "" {
+		t.Fatalf("expected empty header, got %s", got)
 	}
 }
