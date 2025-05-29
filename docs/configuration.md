@@ -142,12 +142,12 @@ callers:
 
 | Field        | Type                 | Notes                                                  |
 | ------------ | -------------------- | ------------------------------------------------------ |
-| `path`       | regex                | Anchored to the upstream path.                         |
+| `path`       | string               | Anchored to the upstream path. Supports `*` and `**` wildcards. |
 | `method`     | string or `[string]` | `GET`, `POST`, …                                       |
-| `query`      | `[string]`           | Each element `key=regex`. All must match.              |
+| `query`      | `[string]`           | Each element `key=value`. All must match.              |
 | `headers`    | `[string]`           | Header names that **must be present** (value ignored). |
-| `body.json`  | map\[string]regex    | JSON pointer‑like top‑level keys.                      |
-| `body.form`  | map\[string]regex    | For `application/x-www-form-urlencoded`.               |
+| `body.json`  | map\[string]interface{} | JSON pointer‑like top‑level keys; values must match exactly. |
+| `body.form`  | map\[string]interface{} | For `application/x-www-form-urlencoded`; values must match exactly. |
 | `rate_limit` | `RateLimit`          | Optional per‑caller‑per‑rule override.                 |
 
 > **Performance note** Low‑level matching adds negligible latency (<50 µs at 10 rules). Tune rule ordering so the most frequent match comes first.
