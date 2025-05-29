@@ -29,7 +29,8 @@ func TestCLIListDeleteUpdate(t *testing.T) {
 	defer srv.Close()
 
 	// list
-	out, err := exec.Command("go", "run", "./cmd/integrations", "-server", srv.URL, "list").CombinedOutput()
+	endpoint := srv.URL + "/integrations"
+	out, err := exec.Command("go", "run", ".", "-server", endpoint, "list").CombinedOutput()
 	if err != nil {
 		t.Fatalf("list failed: %v\n%s", err, out)
 	}
@@ -38,13 +39,13 @@ func TestCLIListDeleteUpdate(t *testing.T) {
 	}
 
 	// update
-	out, err = exec.Command("go", "run", "./cmd/integrations", "-server", srv.URL, "update", "slack", "-name", "cli", "-token", "t", "-signing-secret", "s").CombinedOutput()
+	out, err = exec.Command("go", "run", ".", "-server", endpoint, "update", "slack", "-name", "cli", "-token", "t", "-signing-secret", "s").CombinedOutput()
 	if err != nil {
 		t.Fatalf("update failed: %v\n%s", err, out)
 	}
 
 	// delete
-	out, err = exec.Command("go", "run", "./cmd/integrations", "-server", srv.URL, "delete", "cli").CombinedOutput()
+	out, err = exec.Command("go", "run", ".", "-server", endpoint, "delete", "cli").CombinedOutput()
 	if err != nil {
 		t.Fatalf("delete failed: %v\n%s", err, out)
 	}
