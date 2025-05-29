@@ -5,9 +5,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	_ "github.com/winhowes/AuthTranslator/app/authplugins/basic"
-	_ "github.com/winhowes/AuthTranslator/app/authplugins/google_oidc"
-	_ "github.com/winhowes/AuthTranslator/app/authplugins/token"
+	_ "github.com/winhowes/AuthTranslator/app/auth/plugins/basic"
+	_ "github.com/winhowes/AuthTranslator/app/auth/plugins/google_oidc"
+	_ "github.com/winhowes/AuthTranslator/app/auth/plugins/token"
 	_ "github.com/winhowes/AuthTranslator/app/secrets/plugins"
 )
 

@@ -3,8 +3,8 @@ package main
 import (
 	"testing"
 
-	integrationplugins "github.com/winhowes/AuthTranslator/app/integrationplugins"
-	_ "github.com/winhowes/AuthTranslator/app/integrationplugins/plugins"
+	integrationplugins "github.com/winhowes/AuthTranslator/app/integrations"
+	_ "github.com/winhowes/AuthTranslator/app/integrations/plugins"
 )
 
 func TestValidateAllowlistEntriesDuplicateIntegration(t *testing.T) {
