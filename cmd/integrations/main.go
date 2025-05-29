@@ -1,18 +1,16 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
 	"flag"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
+
+	yaml "gopkg.in/yaml.v3"
 
 	"github.com/winhowes/AuthTranslator/cmd/integrations/plugins"
 )
 
-var server = flag.String("server", "http://localhost:8080/integrations", "integration endpoint")
+var file = flag.String("file", "config.yaml", "config file")
 
 func usage() {
 	fmt.Fprintf(flag.CommandLine.Output(), `Usage: integrations [options] <list|update|delete|plugin> [plugin options]\n\n`)
@@ -58,7 +56,7 @@ func main() {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
-		sendIntegrationWithMethod(http.MethodPut, integ)
+		updateIntegration(integ)
 		return
 	}
 
@@ -72,88 +70,107 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	sendIntegrationWithMethod(http.MethodPost, integ)
+	addIntegration(integ)
 }
 
-func sendIntegrationWithMethod(method string, i plugins.Integration) {
-	data, err := json.Marshal(i)
+func addIntegration(i plugins.Integration) {
+	list, err := readConfig()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	req, err := http.NewRequest(method, *server, bytes.NewBuffer(data))
+	for _, existing := range list {
+		if existing.Name == i.Name {
+			fmt.Fprintf(os.Stderr, "integration %s already exists\n", i.Name)
+			os.Exit(1)
+		}
+	}
+	list = append(list, i)
+	if err := writeConfig(list); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	fmt.Println("integration added")
+}
+
+func updateIntegration(i plugins.Integration) {
+	list, err := readConfig()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
+	found := false
+	for idx := range list {
+		if list[idx].Name == i.Name {
+			list[idx] = i
+			found = true
+			break
+		}
+	}
+	if !found {
+		list = append(list, i)
+	}
+	if err := writeConfig(list); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	defer resp.Body.Close()
-	success := http.StatusCreated
-	if method == http.MethodPut {
-		success = http.StatusOK
-	}
-	if resp.StatusCode != success {
-		body, _ := io.ReadAll(resp.Body)
-		fmt.Fprintf(os.Stderr, "server error: %s\n%s\n", resp.Status, string(body))
-		os.Exit(1)
-	}
-	if method == http.MethodPost {
-		fmt.Println("integration added")
-	} else {
-		fmt.Println("integration updated")
-	}
+	fmt.Println("integration updated")
 }
 
 func deleteIntegration(name string) {
-	payload := struct {
-		Name string `json:"name"`
-	}{Name: name}
-	data, _ := json.Marshal(payload)
-	req, err := http.NewRequest(http.MethodDelete, *server, bytes.NewBuffer(data))
+	list, err := readConfig()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+	for idx := range list {
+		if list[idx].Name == name {
+			list = append(list[:idx], list[idx+1:]...)
+			break
+		}
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusNoContent {
-		body, _ := io.ReadAll(resp.Body)
-		fmt.Fprintf(os.Stderr, "server error: %s\n%s\n", resp.Status, string(body))
+	if err := writeConfig(list); err != nil {
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 	fmt.Println("integration deleted")
 }
 
 func listIntegrations() {
-	resp, err := http.Get(*server)
+	list, err := readConfig()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		fmt.Fprintf(os.Stderr, "server error: %s\n%s\n", resp.Status, string(body))
-		os.Exit(1)
-	}
-	var list []struct {
-		Name string `json:"name"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 	for _, i := range list {
 		fmt.Println(i.Name)
 	}
+}
+
+func readConfig() ([]plugins.Integration, error) {
+	data, err := os.ReadFile(*file)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	var cfg struct {
+		Integrations []plugins.Integration `yaml:"integrations"`
+	}
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
+		return nil, err
+	}
+	return cfg.Integrations, nil
+}
+
+func writeConfig(integrations []plugins.Integration) error {
+	cfg := struct {
+		Integrations []plugins.Integration `yaml:"integrations"`
+	}{integrations}
+	out, err := yaml.Marshal(&cfg)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(*file, out, 0644)
 }
