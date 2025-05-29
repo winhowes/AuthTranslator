@@ -67,3 +67,32 @@ func TestValidateConfigBadIdleConns(t *testing.T) {
 		t.Fatalf("expected error for invalid max idle conns per host")
 	}
 }
+
+func TestValidateConfigBadRateLimitWindow(t *testing.T) {
+	c := Config{Integrations: []Integration{{Name: "a", Destination: "http://ex", RateLimitWindow: "bad"}}}
+	if err := validateConfig(&c); err == nil {
+		t.Fatalf("expected error for invalid rate limit window")
+	}
+
+	c = Config{Integrations: []Integration{{Name: "b", Destination: "http://ex", RateLimitWindow: "0"}}}
+	if err := validateConfig(&c); err == nil {
+		t.Fatalf("expected error for nonpositive rate limit window")
+	}
+}
+
+func TestValidateConfigNegativeTimeouts(t *testing.T) {
+	c := Config{Integrations: []Integration{{Name: "c", Destination: "http://ex", IdleConnTimeout: "-1s"}}}
+	if err := validateConfig(&c); err == nil {
+		t.Fatalf("expected error for negative idle_conn_timeout")
+	}
+
+	c = Config{Integrations: []Integration{{Name: "d", Destination: "http://ex", TLSHandshakeTimeout: "-1s"}}}
+	if err := validateConfig(&c); err == nil {
+		t.Fatalf("expected error for negative tls_handshake_timeout")
+	}
+
+	c = Config{Integrations: []Integration{{Name: "e", Destination: "http://ex", ResponseHeaderTimeout: "-1s"}}}
+	if err := validateConfig(&c); err == nil {
+		t.Fatalf("expected error for negative response_header_timeout")
+	}
+}
