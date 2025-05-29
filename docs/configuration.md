@@ -184,6 +184,3 @@ CI fails fast on typos so you never ship an invalid proxy.
 * [Secret Back-Ends](secret-backends.md)
 * [Rate-Limiting](rate-limiting.md)
 
----
-
-*Last updated*: {{date}}
