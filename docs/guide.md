@@ -1,0 +1,612 @@
+### Goals
+
+- **Centralized secrets management** – only a few trusted maintainers need to add or rotate secrets for each integration. Developers reference the integrations without ever seeing the underlying values.
+- **Short‑lived credentials** – internal callers should use ephemeral tokens. The proxy swaps them for the long‑lived keys external services require and can also downgrade inbound requests to short‑lived tokens so long‑lived secrets never circulate internally.
+
+## Features
+
+- **Reverse Proxy**: Forwards incoming HTTP requests to a target backend based on the requested host or `X-AT-Int` header. The header can be disabled or restricted to a specific host using command-line flags.
+- **Pluggable Authentication**: Supports "basic", "token", `hmac_signature`, `jwt`, `mtls`, `url_path`, `github_signature` and `slack_signature` authentication types for both incoming and outgoing requests including Google OIDC with room for extension.
+- **Extensible Plugins**: Add new auth, secret and integration plugins to cover different systems.
+- **Rate Limiting**: Limits the number of requests per caller and per host within a rolling window (default `1m` but configurable per integration via `rate_limit_window`). A value of `0` disables limiting.
+- **Redis Support**: Provide `-redis-addr` as a Redis URL (e.g. `redis://user:pass@host:6379` or `rediss://user:pass@host:6379`) to use Redis for rate limit counters instead of in-memory tracking. Use the `rediss` scheme to enable TLS. Include the credentials in the URL to authenticate with Redis. Certificate verification is skipped unless a CA file is supplied with `-redis-ca`. If Redis is unavailable the limiter falls back to memory and logs an error.
+- **Request Body Limit**: The maximum buffered request body can be adjusted with `-max_body_size` (default 10MB). Set the flag to `0` to disable the limit entirely.
+- **Allowlist**: Integrations can restrict specific callers to particular paths, methods and required parameters.
+- **Configuration Driven**: Behavior is controlled via a YAML configuration file.
+- **Validated Startup**: The configuration is checked at startup and errors are reported before serving traffic.
+- **Clean Shutdown**: On SIGINT or SIGTERM the server and rate limiters are gracefully stopped.
+- **Hot Reload**: Send `SIGHUP` to reload the configuration and allowlist without restarting.
+- **File Watching**: Use `-watch` to automatically reload when configuration or allowlist files change.
+
+
+## Getting Started
+
+1. **Download or Build**
+
+   Grab a pre-built binary from the latest release:
+
+   ```bash
+   curl -L https://github.com/winhowes/AuthTranslator/releases/latest/download/authtranslator_$(uname -s)_$(uname -m).tar.gz | tar -xz
+   ./authtranslator -config app/config.yaml
+   ```
+
+   Or run from source:
+
+   ```bash
+   go run ./app -config app/config.yaml
+   ```
+
+   Run `go run ./app --help` to see all available flags. Provide
+   `-tls-cert` and `-tls-key` together to serve HTTPS using the
+   specified certificate and key. Supplying only one of these options
+   results in an error.
+
+   Or build an executable:
+
+   ```bash
+   go build -o authtranslator ./app
+   ./authtranslator -config app/config.yaml
+   ```
+
+2. **Configuration File**
+   
+   Edit `app/config.yaml` to define auth plugins and route targets:
+   
+   ```yaml
+   integrations:
+     - name: example
+       destination: http://backend.example.com
+       in_rate_limit: 100
+       out_rate_limit: 1000
+       rate_limit_window: 1m
+       max_idle_conns: 100
+       max_idle_conns_per_host: 20
+       incoming_auth:
+         - type: token
+           params:
+             secrets:
+               - env:IN_TOKEN
+             header: X-Auth
+       outgoing_auth:
+         - type: token
+           params:
+             secrets:
+               - env:OUT_TOKEN
+             header: X-Auth
+   ```
+
+   Use `0` (or a negative number) for `in_rate_limit` or `out_rate_limit` to disable rate limiting for that direction.
+   The optional `rate_limit_window` sets the rolling window duration using Go's duration syntax; it defaults to `1m`.
+   Optional transport settings adjust the proxy's HTTP client:
+
+   - `idle_conn_timeout` – close idle connections after this duration.
+   - `tls_handshake_timeout` – maximum time for TLS handshakes.
+   - `response_header_timeout` – how long to wait for upstream headers.
+   - `tls_insecure_skip_verify` – skip TLS certificate verification.
+   - `disable_keep_alives` – disable HTTP keep-alive connections.
+   - `max_idle_conns` – total idle connections to keep pooled.
+   - `max_idle_conns_per_host` – idle connections per upstream host.
+
+   A JSON schema describing this file is available at
+   [`schemas/config.schema.json`](schemas/config.schema.json).
+
+  The allowlist configuration lives in a separate `allowlist.yaml` file:
+
+  ```yaml
+  - integration: example
+    callers:
+      - id: user-token
+        rules:
+          - path: /allowed
+            methods:
+              GET: {}
+  ```
+
+   A JSON schema describing this file is available at
+   [`schemas/allowlist.schema.json`](schemas/allowlist.schema.json).
+
+   Caller IDs are derived by the incoming auth plugins. Plugins that
+   implement the `Identifier` interface return a string used to match the
+   `id` field in the allowlist. `jwt` and `google_oidc` return the token's
+   `sub` claim while `mtls` uses the client certificate's common name and
+   `basic` returns the username portion of the credentials. Plugins like the
+   `token` plugin do not supply an ID. Allowlist entries are grouped first
+   by integration name and then by caller ID. When no ID is available the
+   wildcard `"*"` entry is used so all callers share those rules.
+
+   On startup the server converts this list into a nested map keyed first
+   by integration and then by caller ID so lookups are fast during request
+   processing.
+
+  Capabilities can be listed instead of explicit rules. Each capability expands
+  to one or more rules when loaded, making it easy to audit access by name and
+  easier for folks to add new entries to the allowlist:
+
+  ```yaml
+  - integration: slack
+    callers:
+      - id: ci-bot-token
+        capabilities:
+          - name: post_public_as
+            params:
+              username: ci-bot
+  ```
+
+3. **Running**
+
+   The listen address can be configured with the `-addr` flag. By default the server listens on `:8080`. Incoming requests are matched against the `X-AT-Int` header, if present, or otherwise the host header to determine the route and associated authentication plugin. Use `-disable_x_at_int` to ignore the header entirely or `-x_at_int_host` to only respect the header when a specific host is requested. The configuration file is chosen with `-config` (default `config.yaml`). The allowlist file can be specified with `-allowlist`; it defaults to `allowlist.yaml`. Set `-redis-addr` to persist rate limits in Redis; failures fall back to memory with an error log. Use `-redis-timeout` to control how long dialing Redis can take.
+   Send `SIGHUP` or run with `-watch` to reload these files automatically without
+   restarting. The watcher re-adds itself when the files are renamed so edits
+   that replace the file still trigger a reload. If the allowlist fails to load
+   during a reload, the previously loaded entries remain in effect.
+
+   **Service flags**
+
+   - `-addr` – listen address (default `:8080`)
+   - `-config` – path to the configuration file (`config.yaml` by default)
+   - `-allowlist` – path to the allowlist file (`allowlist.yaml` by default)
+   - `-disable_x_at_int` – ignore the `X-AT-Int` header
+   - `-x_at_int_host` – only respect `X-AT-Int` when this host is requested
+   - `-tls-cert` and `-tls-key` – TLS certificate and key to serve HTTPS
+   - `-redis-addr` – Redis URL for rate limit counters. Use `rediss://` for TLS and include credentials (`user:pass@`) before the host to authenticate.
+   - `-redis-ca` – CA certificate for verifying Redis TLS
+   - `-redis-timeout` – timeout for dialing Redis (default `5s`)
+  - `-max_body_size` – maximum bytes buffered from request bodies; use `0` to disable
+   - `-log-level` – log verbosity (`DEBUG`, `INFO`, `WARN`, `ERROR`)
+   - `-log-format` – log output format (`text` or `json`)
+   - `-debug` – expose the `/integrations` endpoint for the CLI
+   - `-version` – print the build version and exit
+   - `-watch` – automatically reload when config or allowlist files change
+   - `-enable-metrics` – expose the `/metrics` endpoint (default `true`)
+   - `-metrics-user` – username required to access `/metrics`
+   - `-metrics-pass` – password required to access `/metrics`
+
+4. **Run Locally**
+
+   Start a simple backend and point an integration at it to test the proxy:
+
+   ```bash
+   # dummy backend
+   python3 -m http.server 9000
+   ```
+
+   Edit `app/config.yaml` so the integration forwards to the local backend:
+
+   ```yaml
+   integrations:
+     - name: example
+       destination: http://localhost:9000
+       in_rate_limit: 100
+       out_rate_limit: 1000
+       rate_limit_window: 1m
+       incoming_auth:
+         - type: token
+           params:
+             secrets:
+               - env:IN_TOKEN
+             header: X-Auth
+       outgoing_auth:
+         - type: token
+           params:
+             secrets:
+               - env:OUT_TOKEN
+             header: X-Auth
+   ```
+
+   Provide the environment variables referenced by the auth configuration and start the proxy:
+
+   ```bash
+   export IN_TOKEN=secret-in
+   export OUT_TOKEN=secret-out
+   go run ./app -config app/config.yaml -allowlist app/allowlist.yaml -watch
+   ```
+
+   In another terminal, call the proxy using the integration name as the Host header:
+
+   ```bash
+   curl -H "Host: example" -H "X-Auth: $IN_TOKEN" http://localhost:8080/
+   ```
+### Allowlist Rules
+
+Each caller entry lists path patterns and method constraints. `*` matches a
+single path segment while `**` matches any remaining segments. Header names are
+listed under `headers` and required body fields under `body`.
+
+Example rule requiring an `X-Token` header and a JSON field:
+
+```yaml
+path: /api/**
+methods:
+  POST:
+    headers:
+      - X-Token
+    body:
+      action: create
+```
+
+For `application/x-www-form-urlencoded` requests the `body` keys refer to form
+fields and may list required values:
+
+```yaml
+path: /submit
+methods:
+  POST:
+    body:
+      tag: ["a", "b"]
+```
+
+Query parameters may also be constrained. Each parameter listed under
+`query` must appear in the request. If the value list is empty the parameter
+only needs to exist. Otherwise every value must be present, though additional
+values are allowed:
+
+```yaml
+path: /search
+methods:
+  GET:
+    query:
+      q: ["foo", "bar"]
+      lang: []
+```
+
+The above rule requires that `q` include both `foo` and `bar` among its
+values and that a `lang` parameter is present with any value.
+
+#### Body Matching
+
+Body rules are checked against only the fields listed in the rule. Additional
+fields in the request are ignored. Values are compared using these rules:
+
+* **Primitive values** must match exactly.
+* **Objects** are matched recursively. Every key present in the rule must also
+  exist in the request with a value that satisfies the sub‑rule. Extra keys in the request are allowed.
+* **Arrays** require that every element in the rule appear somewhere in the
+  request array. Order does not matter and extra elements are allowed.
+
+These rules apply to nested structures as well. For example, the rule
+
+```json
+{"items": [{"id": 1}]}
+```
+
+matches a body where `items` contains an object with `{"id":1}` anywhere in the
+array.
+
+### Built-in Authentication Plugins
+
+   - **integrations**: Defines proxy routes, rate limits and authentication methods. Secret references use the `env:`, `file:` or KMS-prefixed formats described below.
+   - **google_oidc**: Outgoing auth plugin that retrieves an ID token from the GCP metadata server and sets it in the `Authorization` header for backend requests. The incoming variant validates Google ID tokens against a configured audience.
+   - **jwt**: Validates generic JWTs using provided keys and can attach tokens on outgoing requests.
+   - **mtls**: Requires a verified client certificate and optional subject match, and accepts outbound certificate configuration.
+   - **token**: Header token comparison for simple shared secrets.
+   - **basic**: Performs HTTP Basic authentication using credentials loaded from configured secrets. The username becomes the caller ID for allowlist checks.
+   - **hmac_signature**: Computes or verifies request HMAC digests with a configurable algorithm.
+   - **github_signature**: Validates GitHub webhook signatures against shared secrets.
+   - **slack_signature**: Validates Slack request signatures with timestamp tolerance.
+   - **url_path**: Appends a secret to the request path for outgoing calls and verifies it on incoming requests.
+
+### Capabilities
+
+Integration plugins can bundle common allowlist rules into **capabilities**. Assigning a capability to a caller expands to one or more rules automatically. Two of the goals are to make it simpler for folks to add entries to the allowlist and to make it easier to audit access. A few examples:
+
+- `slack.post_public_as` – permit posting a message as a specific username.
+- `slack.post_channels_as` – restrict posting to a defined set of channels.
+- `github.comment` – allow creating issue comments in a given repository (requires the `repo` parameter).
+- `github.create_issue` – permit opening issues in a given repository.
+- `github.update_issue` – allow editing or closing issues in a given repository.
+- `ghe.comment`, `ghe.create_issue`, `ghe.update_issue` – GitHub Enterprise equivalents requiring the `repo` parameter.
+- `gitlab.comment`, `gitlab.create_issue`, `gitlab.update_issue` – similar capabilities for GitLab projects (use the `project` parameter).
+- `asana.create_task`, `linear.create_task`, `jira.create_task`, `confluence.create_page` – permit creating tasks, issues or pages.
+- `asana.update_status`, `linear.update_status`, `jira.update_status`, `confluence.update_page` – allow editing tasks, issues or pages.
+- `asana.add_comment`, `linear.add_comment`, `jira.add_comment`, `confluence.add_comment` – permit adding comments.
+- `zendesk.open_ticket`, `servicenow.open_ticket` – allow creating support tickets.
+- `zendesk.update_ticket`, `servicenow.update_ticket` – permit updating ticket details.
+- `zendesk.query_status`, `servicenow.query_status` – allow reading ticket status.
+- `sendgrid.send_email`, `sendgrid.manage_contacts`, `sendgrid.update_template` – basic SendGrid operations.
+- `twilio.send_sms`, `twilio.make_call`, `twilio.query_message` – Twilio messaging and voice APIs.
+- `okta.create_user`, `okta.update_user`, `okta.deactivate_user` – manage Okta user accounts.
+- `stripe.create_charge`, `stripe.refund_charge`, `stripe.create_customer` – Stripe payment flows.
+- `trufflehog.start_scan`, `trufflehog.get_results`, `trufflehog.list_scans` – scan management operations.
+- `openai.chat_completion`, `openai.list_models`, `openai.create_embedding` – basic OpenAI API calls.
+
+### Secret Plugin Environment Variables
+
+| Prefix | Environment Variables | Description | Example |
+| ------ | -------------------- | ----------- | ------- |
+| `env`  | Names referenced in the configuration (e.g. `env:IN_TOKEN`) | Secrets are read directly from those environment variables. | `env:IN_TOKEN` resolves to `$IN_TOKEN` |
+| `file` | _none_ | Reads file contents from disk for `file:` secrets. | `file:/etc/token` reads `/etc/token` |
+| `aws`  | `AWS_KMS_KEY` | Base64 encoded 32 byte key used for decrypting `aws:` secrets. | `aws:prod/token` decrypts the stored value |
+| `azure`| `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET` | Credentials for fetching `azure:` secrets from Key Vault. | `azure:/kv/token` fetches `token` from Key Vault |
+| `gcp`  | _none_ | Uses the GCP metadata service for authentication when resolving `gcp:` secrets. | `gcp:/projects/p/secrets/token` from Secret Manager |
+| `vault`| `VAULT_ADDR`, `VAULT_TOKEN` | Fetches secrets from HashiCorp Vault via the HTTP API. | `vault:secret/data/api` reads from Vault |
+
+Example usage:
+
+```bash
+export IN_TOKEN=secret-in            # env:IN_TOKEN
+echo "out" > /tmp/out.token         # file:/tmp/out.token
+export AWS_KMS_KEY=$(cat kms.b64)    # decrypts aws:prod/token
+export AZURE_TENANT_ID=xxxxx
+export AZURE_CLIENT_ID=yyyyy
+export AZURE_CLIENT_SECRET=zzzzz
+# gcp plugin relies on metadata service
+export VAULT_ADDR=https://vault.example.com
+export VAULT_TOKEN=s.myroot
+```
+
+```json
+{
+  "integrations": [
+    {
+      "name": "example",
+      "incoming_auth": [{"type": "token", "params": {"secrets": ["vault:secret/data/api"]}}],
+      "outgoing_auth": [{"type": "token", "params": {"secrets": ["env:IN_TOKEN", "file:/tmp/out.token"]}}]
+    }
+  ]
+}
+```
+
+### Writing Plugins
+
+New functionality can be added without touching the core server. Three plugin
+categories are supported:
+
+- **Auth plugins** – implement incoming or outgoing authentication logic.
+- **Secret plugins** – resolve secret references from external providers.
+- **Integration plugins** – define reusable integration configurations and
+  capability helpers for the CLI.
+
+Auth plugins live in `app/auth/plugins`. Implement the
+`IncomingAuthPlugin` or `OutgoingAuthPlugin` interface and register your type in
+an `init()` function using `authplugins.RegisterIncoming` or
+`authplugins.RegisterOutgoing`. The registered name is referenced in the
+configuration. See
+[app/auth/plugins/example/README.md](app/auth/plugins/example/README.md) for a
+minimal template, which shows how to exclude example code from normal builds
+with a `//go:build` tag. Secret plugins implement the `secrets.Plugin`
+interface in subdirectories of `app/secrets/plugins` and register themselves
+with `secrets.Register`. The prefix they register becomes the identifier for
+secret references such as `env:` or `vault:`. See
+[app/secrets/plugins/example/README.md](app/secrets/plugins/example/README.md)
+for a minimal secret plugin example. Integration plugins reside in
+`cmd/integrations/plugins`. Each plugin provides a `plugins.Builder` that parses
+CLI arguments and returns an `Integration`. Register the builder in an
+`init()` function using `plugins.Register` so the CLI automatically discovers
+new plugins. See
+[cmd/integrations/plugins/example/README.md](cmd/integrations/plugins/example/README.md)
+for a minimal integration plugin.
+
+## Integration CLI
+
+Run `go run ./cmd/integrations --help` for a full list of commands and options.
+
+Start the server with `-debug` so the `/integrations` endpoint is available:
+
+```bash
+go run ./app -debug
+```
+
+Then run the CLI to manage integrations. The `-server` flag controls where
+requests are sent (default `http://localhost:8080/integrations`). `POST` adds a
+new integration, `PUT` updates an existing one and `DELETE` removes it.
+
+List existing integrations:
+```bash
+go run ./cmd/integrations list
+```
+
+A helper CLI is available under `cmd/integrations` to create Slack, GitHub, GitHub Enterprise, GitLab, Jira, Confluence, Linear, Asana, Zendesk, ServiceNow, SendGrid, TruffleHog, Twilio, OpenAI or Stripe integrations with minimal flags.
+
+Add Slack:
+```bash
+go run ./cmd/integrations -server http://localhost:8080/integrations \
+  slack -token env:SLACK_TOKEN -signing-secret env:SLACK_SIGNING
+```
+
+Add GitHub:
+```bash
+go run ./cmd/integrations -server http://localhost:8080/integrations \
+  github -token env:GITHUB_TOKEN -webhook-secret env:GITHUB_SECRET
+```
+Add GitHub Enterprise:
+```bash
+go run ./cmd/integrations -server http://localhost:8080/integrations \
+  ghe -domain ghe.example.com -token env:GHE_TOKEN -webhook-secret env:GHE_SECRET
+```
+Add GitLab:
+```bash
+go run ./cmd/integrations -server http://localhost:8080/integrations \
+  gitlab -token env:GITLAB_TOKEN
+```
+Add Jira (domain optional):
+```bash
+go run ./cmd/integrations jira -token env:JIRA_TOKEN -domain jira.example.com
+```
+Add Confluence (domain optional):
+```bash
+go run ./cmd/integrations confluence -token env:CONFLUENCE_TOKEN -domain confluence.example.com
+```
+Add Linear:
+```bash
+go run ./cmd/integrations linear -token env:LINEAR_TOKEN
+```
+Add Monday:
+```bash
+go run ./cmd/integrations monday -token env:MONDAY_TOKEN
+```
+Add Asana:
+```bash
+go run ./cmd/integrations asana -token env:ASANA_TOKEN
+```
+Add Zendesk:
+```bash
+go run ./cmd/integrations zendesk -token env:ZENDESK_TOKEN
+```
+Add ServiceNow:
+```bash
+go run ./cmd/integrations servicenow -token env:SERVICENOW_TOKEN
+```
+Add SendGrid:
+```bash
+go run ./cmd/integrations sendgrid -token env:SENDGRID_TOKEN
+```
+Add TruffleHog:
+```bash
+go run ./cmd/integrations trufflehog -token env:TRUFFLEHOG_TOKEN
+```
+Add Twilio:
+```bash
+go run ./cmd/integrations twilio -token env:TWILIO_TOKEN
+```
+Add Okta:
+```bash
+go run ./cmd/integrations okta -domain okta.example.com -token env:OKTA_TOKEN
+```
+Add Workday:
+```bash
+go run ./cmd/integrations workday -domain workday.example.com -token env:WORKDAY_TOKEN
+```
+Add OpenAI:
+```bash
+go run ./cmd/integrations openai -token env:OPENAI_TOKEN
+```
+Add Stripe:
+```bash
+go run ./cmd/integrations stripe -token env:STRIPE_TOKEN
+```
+
+Update an existing integration (same flags as add):
+```bash
+go run ./cmd/integrations update slack -token env:NEW_TOKEN -signing-secret env:NEW_SIGNING
+```
+
+Delete an integration by name:
+```bash
+go run ./cmd/integrations delete slack
+```
+
+## Allowlist CLI
+
+Run `go run ./cmd/allowlist --help` to view commands and flags.
+
+The `allowlist` command helps maintain the `allowlist.yaml` file. Run `allowlist list` to view every capability defined by the integration plugins:
+
+```bash
+go run ./cmd/allowlist list
+```
+
+To grant a caller a capability use `allowlist add`:
+
+```bash
+go run ./cmd/allowlist add -integration slack \
+    -caller user-token -capability post_public_as \
+    -params username=ci-bot
+```
+
+To revoke a capability use `allowlist remove`:
+
+```bash
+go run ./cmd/allowlist remove -integration slack \
+    -caller user-token -capability post_public_as
+```
+
+The CLI updates the file in place (default `allowlist.yaml`, overridable with `-file`).
+
+## Running Tests
+
+Use the Makefile to format, vet and lint the code before running tests:
+
+```bash
+make precommit
+make test
+```
+
+`make precommit` runs `gofmt -w`, `go vet ./...` and `golangci-lint run` if available.
+
+The CI workflow caches the Go modules directory using `actions/cache` to speed
+up dependency installation.
+
+## Docker
+
+Build the container image:
+
+```bash
+docker build -t authtranslator .
+```
+
+Prebuilt images are also published to GitHub Container Registry:
+
+```bash
+docker pull ghcr.io/winhowes/authtranslator:latest
+```
+
+Run the image exposing port 8080:
+
+```bash
+docker run -p 8080:8080 authtranslator
+```
+
+## Logging
+
+AuthTranslator writes log messages to standard output using Go's `log/slog` package. Use the `-log-level` flag to control verbosity. Valid levels are `DEBUG`, `INFO`, `WARN` and `ERROR` with `INFO` as the default. Specify `-log-format json` to emit structured JSON instead of plain text. Each request generates an entry showing the HTTP method, host, path and remote address. Authentication failures, rate limiting events and upstream status codes are also logged.
+
+## Health Checks and Metrics
+
+AuthTranslator exposes a readiness endpoint at `/_at_internal/healthz` which returns HTTP `200` when the server is running.
+The response includes an `X-Last-Reload` header indicating the last time configuration was reloaded.
+
+Metrics are available at `/_at_internal/metrics` using the Prometheus text format. Set `-enable-metrics=false` to disable the endpoint and provide `-metrics-user` and `-metrics-pass` to require HTTP Basic credentials. The following metrics are exported:
+
+- `authtranslator_requests_total{integration="<name>"}` – total requests processed per integration.
+- `authtranslator_rate_limit_events_total{integration="<name>"}` – requests rejected due to rate limits.
+- `authtranslator_request_duration_seconds` – histogram of request processing duration per integration.
+
+To scrape metrics with Prometheus, add a job such as:
+
+```yaml
+scrape_configs:
+  - job_name: 'authtranslator'
+    static_configs:
+      - targets: ['localhost:8080']
+```
+
+## Deploying with Terraform
+
+Example Terraform files are provided in the `terraform` directory for AWS, GCP and Azure.
+
+- [`terraform/quickstart`](terraform/quickstart/README.md) provides a minimal example using the Docker provider to run a local container.
+
+- [`terraform/aws`](terraform/aws/README.md) contains the AWS configuration for ECS Fargate.
+- [`terraform/gcp`](terraform/gcp/README.md) contains a configuration for deploying to Google Cloud Run.
+- [`terraform/azure`](terraform/azure/README.md) contains a configuration for deploying to Azure Container Instances.
+
+Set the required variables for your environment and run `terraform apply` inside the desired folder to create the service.
+All modules accept optional `redis_address`, `redis_timeout` and `redis_ca` variables to pass the `-redis-addr`, `-redis-timeout` and `-redis-ca` flags to the container if you have a Redis instance. Each README lists the required variables along with example commands for initialization and deployment.
+
+## Development
+
+### Requirements
+
+- [Go](https://golang.org/doc/install) 1.24 or newer.
+- [`golangci-lint`](https://github.com/golangci/golangci-lint) (optional) for running lint checks.
+
+### Makefile Targets
+
+A Makefile is provided to simplify formatting, vetting, testing and building the Docker image.
+
+```bash
+make fmt    # run gofmt on all Go files
+make vet    # run go vet ./...
+make lint   # run golangci-lint if installed
+make test   # run go test ./...
+make docker # build the container image
+make precommit # run fmt, vet and lint
+```
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines. Formatting, vetting and tests are required as described there.
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
