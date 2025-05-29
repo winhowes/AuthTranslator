@@ -58,6 +58,12 @@ func validateConfig(c *Config) error {
 				return fmt.Errorf("integration %s has invalid response_header_timeout", i.Name)
 			}
 		}
+		if i.MaxIdleConns < 0 {
+			return fmt.Errorf("integration %s has invalid max_idle_conns", i.Name)
+		}
+		if i.MaxIdleConnsPerHost < 0 {
+			return fmt.Errorf("integration %s has invalid max_idle_conns_per_host", i.Name)
+		}
 	}
 	return nil
 }

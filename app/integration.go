@@ -139,6 +139,8 @@ type Integration struct {
 	ResponseHeaderTimeout string `json:"response_header_timeout,omitempty"`
 	TLSInsecureSkipVerify bool   `json:"tls_insecure_skip_verify,omitempty"`
 	DisableKeepAlives     bool   `json:"disable_keep_alives,omitempty"`
+	MaxIdleConns          int    `json:"max_idle_conns,omitempty"`
+	MaxIdleConnsPerHost   int    `json:"max_idle_conns_per_host,omitempty"`
 
 	inLimiter  *RateLimiter
 	outLimiter *RateLimiter
@@ -265,6 +267,12 @@ func prepareIntegration(i *Integration) error {
 	}
 	if i.DisableKeepAlives {
 		tr.DisableKeepAlives = true
+	}
+	if i.MaxIdleConns > 0 {
+		tr.MaxIdleConns = i.MaxIdleConns
+	}
+	if i.MaxIdleConnsPerHost > 0 {
+		tr.MaxIdleConnsPerHost = i.MaxIdleConnsPerHost
 	}
 
 	i.proxy.Transport = tr

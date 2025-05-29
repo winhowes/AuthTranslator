@@ -84,6 +84,8 @@ The project exists to make it trivial to translate one type of authentication in
       "in_rate_limit": 100,
       "out_rate_limit": 1000,
       "rate_limit_window": "1m",
+      "max_idle_conns": 100,
+      "max_idle_conns_per_host": 20,
       "incoming_auth": [
            {"type": "token", "params": {"secrets": ["env:IN_TOKEN"], "header": "X-Auth"}}
          ],
@@ -104,6 +106,8 @@ The project exists to make it trivial to translate one type of authentication in
    - `response_header_timeout` – how long to wait for upstream headers.
    - `tls_insecure_skip_verify` – skip TLS certificate verification.
    - `disable_keep_alives` – disable HTTP keep-alive connections.
+   - `max_idle_conns` – total idle connections to keep pooled.
+   - `max_idle_conns_per_host` – idle connections per upstream host.
 
    The allowlist configuration lives in a separate `allowlist.json` file:
 

@@ -6,6 +6,8 @@
         "in_rate_limit": 100,
         "out_rate_limit": 1000,
         "rate_limit_window": "1m",
+        "max_idle_conns": 100,
+        "max_idle_conns_per_host": 20,
         "incoming_auth": [
                 {"type": "token", "params": {"secrets": ["env:IN_TOKEN"], "header": "X-Auth"}}
             ],

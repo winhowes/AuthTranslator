@@ -224,6 +224,8 @@ func TestIntegrationTransportSettings(t *testing.T) {
 		TLSHandshakeTimeout:   "1s",
 		ResponseHeaderTimeout: "3s",
 		TLSInsecureSkipVerify: true,
+		MaxIdleConns:          5,
+		MaxIdleConnsPerHost:   3,
 	}
 	if err := AddIntegration(i); err != nil {
 		t.Fatalf("add: %v", err)
@@ -239,6 +241,9 @@ func TestIntegrationTransportSettings(t *testing.T) {
 	}
 	if tr.IdleConnTimeout != 2*time.Second || tr.TLSHandshakeTimeout != 1*time.Second || tr.ResponseHeaderTimeout != 3*time.Second {
 		t.Fatalf("transport timeouts not applied")
+	}
+	if tr.MaxIdleConns != 5 || tr.MaxIdleConnsPerHost != 3 {
+		t.Fatalf("idle connection limits not applied")
 	}
 	if tr.TLSClientConfig == nil || !tr.TLSClientConfig.InsecureSkipVerify {
 		t.Fatalf("TLS settings not applied")
