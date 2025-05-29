@@ -3,6 +3,7 @@ package plugins
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -129,5 +130,54 @@ func TestVaultLoadBadAddr(t *testing.T) {
 	p := vaultPlugin{}
 	if _, err := p.Load(context.Background(), "secret/data/foo"); err == nil {
 		t.Fatal("expected url parse error")
+	}
+}
+
+func TestVaultLoadNetworkError(t *testing.T) {
+	old := HTTPClient
+	HTTPClient = &http.Client{Transport: errorRoundTripper{}}
+	defer func() { HTTPClient = old }()
+
+	t.Setenv("VAULT_ADDR", "http://vault")
+	t.Setenv("VAULT_TOKEN", "tok")
+
+	p := vaultPlugin{}
+	if _, err := p.Load(context.Background(), "secret/data/foo"); err == nil {
+		t.Fatal("expected network error")
+	}
+}
+
+func TestVaultLoadRequestError(t *testing.T) {
+	oldReq := newRequest
+	newRequest = func(string, string, io.Reader) (*http.Request, error) { return nil, fmt.Errorf("bad") }
+	defer func() { newRequest = oldReq }()
+
+	t.Setenv("VAULT_ADDR", "http://vault")
+	t.Setenv("VAULT_TOKEN", "tok")
+
+	p := vaultPlugin{}
+	if _, err := p.Load(context.Background(), "secret/data/foo"); err == nil {
+		t.Fatal("expected request error")
+	}
+}
+
+func TestVaultLoadValueField(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, `{"data":{"value":"secret"}}`)
+	}))
+	defer ts.Close()
+	restore := setVaultTestClient(ts)
+	defer restore()
+
+	t.Setenv("VAULT_ADDR", "http://vault")
+	t.Setenv("VAULT_TOKEN", "tok")
+
+	p := vaultPlugin{}
+	got, err := p.Load(context.Background(), "secret/data/foo")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "secret" {
+		t.Fatalf("expected secret, got %s", got)
 	}
 }
