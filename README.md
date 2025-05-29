@@ -247,6 +247,23 @@ methods:
       tag: ["a", "b"]
 ```
 
+Query parameters may also be constrained. Each parameter listed under
+`query` must appear in the request. If the value list is empty the parameter
+only needs to exist. Otherwise every value must be present, though additional
+values are allowed:
+
+```yaml
+path: /search
+methods:
+  GET:
+    query:
+      q: ["foo", "bar"]
+      lang: []
+```
+
+The above rule requires that `q` include both `foo` and `bar` among its
+values and that a `lang` parameter is present with any value.
+
 #### Body Matching
 
 Body rules are checked against only the fields listed in the rule. Additional

@@ -136,6 +136,11 @@ func validateRequest(r *http.Request, c RequestConstraint) bool {
 			return false
 		}
 	}
+	if len(c.Query) > 0 {
+		if !matchQuery(r.URL.Query(), c.Query) {
+			return false
+		}
+	}
 	if len(c.Body) == 0 {
 		return true
 	}
@@ -184,6 +189,28 @@ func matchForm(vals url.Values, rule map[string]interface{}) bool {
 				if !found {
 					return false
 				}
+			}
+		}
+	}
+	return true
+}
+
+func matchQuery(vals url.Values, rule map[string][]string) bool {
+	for k, wantVals := range rule {
+		present, ok := vals[k]
+		if !ok {
+			return false
+		}
+		for _, want := range wantVals {
+			found := false
+			for _, got := range present {
+				if got == want {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return false
 			}
 		}
 	}

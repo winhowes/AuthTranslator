@@ -85,6 +85,18 @@ func TestValidateRequestTable(t *testing.T) {
 			cons:   RequestConstraint{Body: map[string]interface{}{"a": []interface{}{"1", "3"}, "b": "2"}},
 			wantOK: true,
 		},
+		{
+			name:   "query match",
+			r:      httptest.NewRequest(http.MethodGet, "http://x?a=1&b=2", nil),
+			cons:   RequestConstraint{Query: map[string][]string{"a": {"1"}, "b": {"2"}}},
+			wantOK: true,
+		},
+		{
+			name:   "query missing",
+			r:      httptest.NewRequest(http.MethodGet, "http://x?a=1", nil),
+			cons:   RequestConstraint{Query: map[string][]string{"a": {"1"}, "b": {"2"}}},
+			wantOK: false,
+		},
 	}
 
 	for _, tt := range tests {
