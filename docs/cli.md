@@ -5,7 +5,7 @@ AuthTranslator ships with two small helper binaries under **`cmd/`**:
 | Binary         | Purpose                                       | Typical usage                                       |
 | -------------- | --------------------------------------------- | --------------------------------------------------- |
 | `integrations` | Scaffold or inspect entries in *config.yaml*. | `go run ./cmd/integrations slack > config.yaml`     |
-| `allowlist`    | Validate or query *allowlist.yaml*.           | `go run ./cmd/allowlist list --file allowlist.yaml` |
+| `allowlist`    | Modify or inspect *allowlist.yaml*.           | `go run ./cmd/allowlist add -integration slack -caller bot -capability ping` |
 
 > **Heads‑up** Both helpers are thin wrappers around Go structs—check the `--help` output for the definitive flag list because the CLI evolves alongside the schema.
 
@@ -32,79 +32,46 @@ integrations <command> [flags]
 
 ### Common commands
 
-| Command      | What it does                                                            |
-| ------------ | ----------------------------------------------------------------------- |
-| `list`       | Prints integration names found in a given `config.yaml`.                |
-| `<template>` | Generates a YAML block for the named template (e.g. `slack`, `github`). |
+| Command  | What it does |
+| -------- | ---------------------------------------------- |
+| `list`   | Prints available capability names for each integration. |
+| `add`    | Adds an entry to `allowlist.yaml`. |
+| `remove` | Deletes an entry from `allowlist.yaml`. |
 
 ```bash
-# List existing integrations in ./config.yaml
-integrations list --file config.yaml
+# Show available capabilities
+go run ./cmd/allowlist list
 
-# Create a Slack block with custom rate‑limit
-integrations slack \
-  --rate-window 1m --rate-requests 800 > slack.yaml
-```
+# Grant a caller permission
+go run ./cmd/allowlist add -integration slack \
+    -caller bot-123 -capability post_public_as
 
-#### Notable flags
-
-| Flag              | Default       | Meaning                                  |
-| ----------------- | ------------- | ---------------------------------------- |
-| `--file`          | `config.yaml` | Path to read (for `list`).               |
-| `--rate-window`   | `60s`         | Window length when generating templates. |
-| `--rate-requests` | `1000`        | Max requests in that window.             |
-| `--timeout`       | `10s`         | Upstream transport timeout.              |
-| `--output`        | `stdout`      | Where to write the generated YAML.       |
-
-All flags mirror fields in the schema—no hidden magic.
-
----
-
-## 3  `allowlist` helper
-
-```text
-allowlist <command> [flags]
-```
-
-### Common commands
-
-| Command    | What it does                                                     |
-| ---------- | ---------------------------------------------------------------- |
-| `list`     | Prints caller IDs in an `allowlist.yaml`.                        |
-| `validate` | Lints the file against the Go struct schema.                     |
-| `get`      | Dumps rules for a single caller/integration pair (useful in CI). |
-
-```bash
-# Show all callers
-go run ./cmd/allowlist list --file allowlist.yaml
-
-# Validate syntax
-go run ./cmd/allowlist validate --file allowlist.yaml
-
-# Inspect what bot‑123 can do with Slack
-go run ./cmd/allowlist get --file allowlist.yaml \
-   --caller bot-123 --integration slack
+# Revoke that permission
+go run ./cmd/allowlist remove -integration slack \
+    -caller bot-123 -capability post_public_as
 ```
 
 #### Flags
 
-| Flag            | Default          | Meaning                     |
-| --------------- | ---------------- | --------------------------- |
-| `--file`        | `allowlist.yaml` | Path to YAML file.          |
-| `--caller`      | –                | Caller ID for `get`.        |
-| `--integration` | –                | Integration name for `get`. |
+| Flag            | Default          | Meaning                                    |
+| --------------- | ---------------- | ------------------------------------------ |
+| `--file`        | `allowlist.yaml` | Path to YAML file for `add`/`remove`.      |
+| `--caller`      | –                | Caller ID for `add`/`remove`.              |
+| `--integration` | –                | Integration name for `add`/`remove`.       |
+| `--capability`  | –                | Capability name for `add`/`remove`.        |
+| `--params`      | ""               | Extra key=value pairs for `add` (optional). |
 
 ---
 
 ## 4  Using helpers in CI
 
-A minimal **GitHub Actions** snippet that validates both files on every PR:
+A minimal **GitHub Actions** snippet that checks both files on every PR:
 
 ```yaml
 - name: Validate AuthTranslator config
   run: |
     go run ./cmd/integrations list --file config.yaml
-    go run ./cmd/allowlist validate --file allowlist.yaml
+    go run ./cmd/allowlist list
 ```
 
 Fail‑fast means broken YAML never reaches production.
