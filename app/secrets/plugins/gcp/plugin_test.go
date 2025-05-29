@@ -86,3 +86,70 @@ func TestGCPKMSLoadError(t *testing.T) {
 		t.Fatal("expected error")
 	}
 }
+
+func TestGCPKMSInvalidID(t *testing.T) {
+	p := gcpKMSPlugin{}
+	if _, err := p.Load(context.Background(), "invalid"); err == nil {
+		t.Fatal("expected error for invalid id")
+	}
+}
+
+func TestGCPKMSTokenDecodeError(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/token") {
+			w.Write([]byte("notjson"))
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer ts.Close()
+	restore := setGCPTestClient(ts)
+	defer restore()
+
+	p := gcpKMSPlugin{}
+	if _, err := p.Load(context.Background(), "projects/p/k:cipher"); err == nil {
+		t.Fatal("expected decode error")
+	}
+}
+
+func TestGCPKMSDecryptDecodeError(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/token"):
+			json.NewEncoder(w).Encode(map[string]string{"access_token": "tok"})
+		case strings.HasSuffix(r.URL.Path, ":decrypt"):
+			w.Write([]byte("badjson"))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer ts.Close()
+	restore := setGCPTestClient(ts)
+	defer restore()
+
+	p := gcpKMSPlugin{}
+	if _, err := p.Load(context.Background(), "projects/p/locations/l/keyRings/r/cryptoKeys/k:cipher"); err == nil {
+		t.Fatal("expected decode error")
+	}
+}
+
+func TestGCPKMSInvalidPlaintext(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/token"):
+			json.NewEncoder(w).Encode(map[string]string{"access_token": "tok"})
+		case strings.HasSuffix(r.URL.Path, ":decrypt"):
+			json.NewEncoder(w).Encode(map[string]string{"plaintext": "!bad"})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer ts.Close()
+	restore := setGCPTestClient(ts)
+	defer restore()
+
+	p := gcpKMSPlugin{}
+	if _, err := p.Load(context.Background(), "projects/p/locations/l/keyRings/r/cryptoKeys/k:cipher"); err == nil {
+		t.Fatal("expected base64 error")
+	}
+}

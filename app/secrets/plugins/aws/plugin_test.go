@@ -63,3 +63,50 @@ func TestAWSKMSPluginInvalidCiphertext(t *testing.T) {
 		t.Fatal("expected error for invalid ciphertext")
 	}
 }
+
+func TestAWSKMSPluginInvalidKey(t *testing.T) {
+	t.Setenv("AWS_KMS_KEY", "!!badbase64!!")
+	p := &awsKMSPlugin{}
+	if _, err := p.Load(context.Background(), "cipher"); err == nil {
+		t.Fatal("expected error for invalid key")
+	}
+}
+
+func TestAWSKMSPluginBadKeyLength(t *testing.T) {
+	key := make([]byte, 16)
+	t.Setenv("AWS_KMS_KEY", base64.StdEncoding.EncodeToString(key))
+	p := &awsKMSPlugin{}
+	if _, err := p.Load(context.Background(), "cipher"); err == nil {
+		t.Fatal("expected error for short key")
+	}
+}
+
+func TestAWSKMSPluginShortCiphertext(t *testing.T) {
+	key := make([]byte, 32)
+	for i := range key {
+		key[i] = byte(i)
+	}
+	t.Setenv("AWS_KMS_KEY", base64.StdEncoding.EncodeToString(key))
+	ct := base64.StdEncoding.EncodeToString([]byte("short"))
+	p := &awsKMSPlugin{}
+	if _, err := p.Load(context.Background(), ct); err == nil {
+		t.Fatal("expected error for short ciphertext")
+	}
+}
+
+func TestAWSKMSPluginDecryptFailure(t *testing.T) {
+	key1 := make([]byte, 32)
+	for i := range key1 {
+		key1[i] = byte(i)
+	}
+	key2 := make([]byte, 32)
+	for i := range key2 {
+		key2[i] = byte(i + 1)
+	}
+	t.Setenv("AWS_KMS_KEY", base64.StdEncoding.EncodeToString(key1))
+	ct := encryptAWS(t, key2, "secret")
+	p := &awsKMSPlugin{}
+	if _, err := p.Load(context.Background(), ct); err == nil {
+		t.Fatal("expected decrypt error")
+	}
+}
