@@ -89,7 +89,7 @@ The proxy treats the entire value as opaque until the chosen back‑end returns 
 3. Register in `init()`:
 
    ```go
-   secret.Register("<scheme>", Fetch)
+   secrets.Register("<scheme>", Fetch)
    ```
 4. Unit‑test with a fake server or env vars.
 
@@ -102,11 +102,11 @@ import (
     "context"
     "net/url"
 
-    "github.com/winhowes/authtranslator/secret"
+    "github.com/winhowes/AuthTranslator/app/secrets"
 )
 
 func init() {
-    secret.Register("foo", fetch)
+    secrets.Register("foo", fetch)
 }
 
 func fetch(ctx context.Context, uri *url.URL) ([]byte, error) {
