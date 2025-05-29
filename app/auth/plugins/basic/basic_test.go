@@ -3,9 +3,11 @@ package basic
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"net/http"
 	"testing"
 
+	"github.com/winhowes/AuthTranslator/app/secrets"
 	_ "github.com/winhowes/AuthTranslator/app/secrets/plugins"
 )
 
@@ -137,5 +139,97 @@ func TestBasicIdentifyFailures(t *testing.T) {
 	}
 	if id, ok := p.Identify(r, cfg); ok || id != "" {
 		t.Fatalf("expected empty id, got %s", id)
+	}
+}
+
+// failPlugin simulates a failing secrets provider for error paths.
+type failPlugin struct{}
+
+func (failPlugin) Prefix() string { return "fail" }
+func (failPlugin) Load(context.Context, string) (string, error) {
+	return "", errors.New("fail")
+}
+
+func TestBasicCustomHeaderAndPrefix(t *testing.T) {
+	r := &http.Request{Header: http.Header{}}
+	out := BasicAuthOut{}
+	t.Setenv("C", "u:p")
+	ocfg, err := out.ParseParams(map[string]interface{}{
+		"secrets": []string{"env:C"},
+		"header":  "X-Auth",
+		"prefix":  "Pre ",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	out.AddAuth(context.Background(), r, ocfg)
+	enc := base64.StdEncoding.EncodeToString([]byte("u:p"))
+	expected := "Pre " + enc
+	if got := r.Header.Get("X-Auth"); got != expected {
+		t.Fatalf("expected %s, got %s", expected, got)
+	}
+
+	in := BasicAuth{}
+	icfg, err := in.ParseParams(map[string]interface{}{
+		"secrets": []string{"env:C"},
+		"header":  "X-Auth",
+		"prefix":  "Pre ",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !in.Authenticate(context.Background(), r, icfg) {
+		t.Fatal("expected authentication to succeed")
+	}
+	if id, ok := in.Identify(r, icfg); !ok || id != "u" {
+		t.Fatalf("unexpected id %s", id)
+	}
+}
+
+func TestBasicAddAuthInvalidParams(t *testing.T) {
+	r := &http.Request{Header: http.Header{}}
+	out := BasicAuthOut{}
+	out.AddAuth(context.Background(), r, nil)
+	if h := r.Header.Get("Authorization"); h != "" {
+		t.Fatalf("expected empty header, got %s", h)
+	}
+	out.AddAuth(context.Background(), r, struct{}{})
+	if h := r.Header.Get("Authorization"); h != "" {
+		t.Fatalf("expected empty header, got %s", h)
+	}
+}
+
+func TestBasicAuthenticateIdentifyInvalidParams(t *testing.T) {
+	r := &http.Request{Header: http.Header{}}
+	in := BasicAuth{}
+	if in.Authenticate(context.Background(), r, nil) {
+		t.Fatal("expected false for nil params")
+	}
+	if id, ok := in.Identify(r, nil); ok || id != "" {
+		t.Fatalf("unexpected id %s", id)
+	}
+	if in.Authenticate(context.Background(), r, struct{}{}) {
+		t.Fatal("expected false for wrong type")
+	}
+	if id, ok := in.Identify(r, struct{}{}); ok || id != "" {
+		t.Fatalf("unexpected id %s", id)
+	}
+}
+
+func TestBasicAddAuthSecretError(t *testing.T) {
+	secrets.Register(failPlugin{})
+	r := &http.Request{Header: http.Header{}}
+	out := BasicAuthOut{}
+	cfg := &outParams{Secrets: []string{"fail:o"}, Header: "Authorization"}
+	out.AddAuth(context.Background(), r, cfg)
+	if h := r.Header.Get("Authorization"); h != "" {
+		t.Fatalf("expected empty header, got %s", h)
+	}
+}
+
+func TestBasicParseParamsUnknownField(t *testing.T) {
+	p := BasicAuth{}
+	if _, err := p.ParseParams(map[string]interface{}{"secrets": []string{"env:S"}, "unknown": true}); err == nil {
+		t.Fatal("expected error for unknown field")
 	}
 }
