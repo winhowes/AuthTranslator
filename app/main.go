@@ -348,7 +348,7 @@ func redisCmdInt(conn net.Conn, args ...string) (int, error) {
 	}
 }
 
-func watchFiles(files []string, out chan<- struct{}) {
+func watchFiles(ctx context.Context, files []string, out chan<- struct{}) {
 	w, err := fsnotify.NewWatcher()
 	if err != nil {
 		logger.Error("failed to create watcher", "error", err)
@@ -364,6 +364,8 @@ func watchFiles(files []string, out chan<- struct{}) {
 
 	for {
 		select {
+		case <-ctx.Done():
+			return
 		case ev, ok := <-w.Events:
 			if !ok {
 				return
@@ -589,8 +591,11 @@ func main() {
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 	signal.Notify(reloadSig, syscall.SIGHUP)
 
+	var cancelWatch context.CancelFunc
 	if *watch {
-		go watchFiles([]string{*configFile, *allowlistFile}, watchSig)
+		var watchCtx context.Context
+		watchCtx, cancelWatch = context.WithCancel(context.Background())
+		go watchFiles(watchCtx, []string{*configFile, *allowlistFile}, watchSig)
 	}
 
 	for {
@@ -613,6 +618,10 @@ func main() {
 	}
 
 shutdown:
+
+	if cancelWatch != nil {
+		cancelWatch()
+	}
 
 	logger.Info("shutting down")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

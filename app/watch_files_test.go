@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"os"
 	"testing"
 	"time"
@@ -16,7 +17,9 @@ func TestWatchFiles(t *testing.T) {
 	defer os.Remove(name)
 
 	ch := make(chan struct{}, 1)
-	go watchFiles([]string{name}, ch)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go watchFiles(ctx, []string{name}, ch)
 
 	// give watcher time to start
 	time.Sleep(20 * time.Millisecond)
