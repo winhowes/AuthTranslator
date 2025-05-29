@@ -68,10 +68,13 @@ func TestRateLimiterUnlimitedNegative(t *testing.T) {
 func TestRateLimiterRedisFallback(t *testing.T) {
 	old := *redisAddr
 	*redisAddr = "127.0.0.1:0" // unreachable
+	oldTimeout := *redisTimeout
+	*redisTimeout = time.Millisecond
 	rl := NewRateLimiter(1, time.Millisecond)
 	t.Cleanup(func() {
 		rl.Stop()
 		*redisAddr = old
+		*redisTimeout = oldTimeout
 	})
 
 	if !rl.Allow("k") {

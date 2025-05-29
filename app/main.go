@@ -70,6 +70,7 @@ var tlsKey = flag.String("tls-key", "", "path to TLS key")
 var logLevel = flag.String("log-level", "INFO", "log level: DEBUG, INFO, WARN, ERROR")
 var logFormat = flag.String("log-format", "text", "log output format: text or json")
 var redisAddr = flag.String("redis-addr", "", "redis address for rate limits (host:port)")
+var redisTimeout = flag.Duration("redis-timeout", 5*time.Second, "dial timeout for redis")
 var maxBodySizeFlag = flag.Int64("max_body_size", authplugins.MaxBodySize, "maximum bytes buffered from request bodies (0 to disable)")
 var showVersion = flag.Bool("version", false, "print version and exit")
 var watch = flag.Bool("watch", false, "watch config and allowlist files for changes")
@@ -283,7 +284,7 @@ func (rl *RateLimiter) allowRedis(key string) (bool, error) {
 	}
 	var err error
 	if conn == nil {
-		conn, err = net.Dial("tcp", *redisAddr)
+		conn, err = net.DialTimeout("tcp", *redisAddr, *redisTimeout)
 		if err != nil {
 			return false, err
 		}
