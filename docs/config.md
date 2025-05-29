@@ -22,9 +22,9 @@ integrations:
           - env:APP_TOKEN_2
     transport:
       timeout: 10s
-    rate_limit:
-      window: 1m
-      requests: 800
+    in_rate_limit:  100
+    out_rate_limit: 800
+    rate_limit_window: 1m
 ```
 
 The integration name (`slack` above) is referenced by the allowlist. Incoming plugins run in order until one succeeds, optionally producing the caller ID (depending on the auth plugins). Outgoing plugins modify each request before forwarding it to the `destination` URL.

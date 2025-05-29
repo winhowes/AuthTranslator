@@ -20,35 +20,17 @@ This approximates a smooth sliding window while touching Redis once per request.
 ```yaml
 integrations:
   slack:
-    rate_limit:
-      backend:   redis       # memory | redis (default memory)
-      window:    60s         # any Go duration string
-      requests:  800         # max within that window
+    in_rate_limit:  100
+    out_rate_limit: 800
+    rate_limit_window: 1m
 ```
 
-| Field      | Type     | Default  | Notes                                           |
-| ---------- | -------- | -------- | ----------------------------------------------- |
-| `backend`  | string   | `memory` | `redis` recommended for multi‑instance deploys. |
-| `window`   | duration | `0`      | `0` disables limiting.                          |
-| `requests` | int      | `0`      | Required when `window` > 0.                     |
+| Field               | Type     | Default | Notes |
+| ------------------- | -------- | ------- | ------------------------------------------- |
+| `in_rate_limit`     | int      | `0`     | Max inbound requests per caller within the window. |
+| `out_rate_limit`    | int      | `0`     | Max outbound requests per caller within the window. |
+| `rate_limit_window` | duration | `1m`    | Rolling window length for rate limiting. |
 
-> **CLI helper** `go run ./cmd/integrations slack -rate-window 1m -rate-requests 800` will scaffold those fields for you.
-
-### Per‑rule overrides in `allowlist.yaml`
-
-```yaml
-callers:
-  bot‑123:
-    slack:
-      rules:
-        - path: /api/chat.postMessage
-          method: POST
-          rate_limit:
-            window:   10s
-            requests: 20
-```
-
-Useful for giving webhooks a burstier bucket than normal REST calls.
 
 ---
 

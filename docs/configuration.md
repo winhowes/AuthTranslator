@@ -30,9 +30,9 @@ integrations:
     transport:
       timeout: 10s
       tls_skip_verify: false
-    rate_limit:
-      window: 1m
-      requests: 800
+    in_rate_limit:  100
+    out_rate_limit: 800
+    rate_limit_window: 1m
     tags: [chat, team‑comm]
 ```
 
@@ -50,7 +50,9 @@ integrations:
 | `destination`   | URL            | **required** | Base URL; path from client is appended as‑is.                                |
 | `outgoing_auth` | `PluginSpec`   | –            | Injects long‑lived credential **before** forwarding.                         |
 | `incoming_auth` | `[]PluginSpec` | `[]`         | Zero or more validators that run **in order**; the first that succeeds wins. |
-| `rate_limit`    | `RateLimit`    | `{}`         | Sliding‑window limiter keyed per caller ID.                                  |
+| `in_rate_limit` | int           | `0`         | Max inbound requests per caller within the window. |
+| `out_rate_limit` | int          | `0`         | Max outbound requests per caller within the window. |
+| `rate_limit_window` | duration   | `1m`        | Rolling window length for rate limiting. |
 | `transport`     | `Transport`    | `{}`         | Fine‑tune timeouts, TLS, proxy settings.                                     |
 | `tags`          | `[]string`     | `[]`         | Arbitrary labels for dashboards / CLI queries.                               |
 
@@ -67,19 +69,7 @@ integrations:
 | -------- | --------------- | ------------------------------------ |
 | `type`   | string          | Name registered by a plugin package. |
 | `params` | map\[string]any | Free‑form; validated by the plugin.  |
-
-#### `RateLimit`
-
-| Field      | Type     | Default        | Meaning                                                       |
-| ---------- | -------- | -------------- | ------------------------------------------------------------- |
-| `window`   | duration | `0` (disabled) | Sliding window length, e.g. `1m`.                             |
-| `requests` | int      | `0`            | Max number within the window.                                 |
-| `backend`  | string   | `memory`       | `memory` or `redis`. If `redis`, env `REDIS_URL` must be set. |
-
-See [rate‑limiting guide](rate-limiting.md) for tuning advice.
-
 #### `Transport`
-
 | Field             | Type     | Default | Description                                          |
 | ----------------- | -------- | ------- | ---------------------------------------------------- |
 | `timeout`         | duration | `30s`   | End‑to‑end timeout for upstream call.                |
@@ -117,9 +107,6 @@ callers:
             form: {}
           headers:
             - X-Custom-Trace
-          rate_limit:
-            window: 1m
-            requests: 100
 ```
 
 ### Top‑level keys
@@ -148,7 +135,6 @@ callers:
 | `headers`    | `[string]`           | Header names that **must be present** (value ignored). |
 | `body.json`  | map\[string]interface{} | JSON pointer‑like top‑level keys; values must match exactly. |
 | `body.form`  | map\[string]interface{} | For `application/x-www-form-urlencoded`; values must match exactly. |
-| `rate_limit` | `RateLimit`          | Optional per‑caller‑per‑rule override.                 |
 
 > **Performance note** Low‑level matching adds negligible latency (<50 µs at 10 rules). Tune rule ordering so the most frequent match comes first.
 

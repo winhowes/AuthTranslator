@@ -53,10 +53,10 @@ callers:
 > **Discovering capabilities** Run the CLI helper:
 >
 > ```bash
-> go run ./cmd/integrations list-capabilities --integration slack
+> go run ./cmd/allowlist list
 > ```
 >
-> (Use `--help` for the exact flag name.)
+> (Use `--help` for plugin-specific flags.)
 >
 > For guidelines on adding new capabilities, see [integration-plugins.md](integration-plugins.md).
 
@@ -74,9 +74,6 @@ rules:
       json:
         text: "Hello world"               # exact match on top-level key
       form: {}
-    rate_limit:                           # optional override
-      window: 10s
-      requests: 20
 ```
 
 > **Subset principle** *Every* field you specify must match the request; unspecified fields are ignored. This means your rule must be a **subset** of the incoming request.
@@ -94,16 +91,7 @@ A request passes if **any** rule (or capability‑expanded rule) matches.
 
 ---
 
-## 3  Per‑rule vs integration‑wide rate‑limits
-
-* Integration block in `config.yaml` sets a **default** bucket.
-* A rule’s `rate_limit:` overrides *for that caller + rule only*.
-
-This lets you allow a bursty webhook while keeping other calls throttled.
-
----
-
-## 4  Tips & conventions
+## 3  Tips & conventions
 
 * **One capability ≈ one business use‑case** (e.g. `slack.chat.write.public`).
 * Prefer **uppercase** HTTP methods (`GET`, `POST`) for consistency.

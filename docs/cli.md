@@ -2,9 +2,9 @@
 
 AuthTranslator ships with two small helper binaries under **`cmd/`**:
 
-| Binary         | Purpose                                       | Typical usage                                       |
-| -------------- | --------------------------------------------- | --------------------------------------------------- |
-| `integrations` | Scaffold or inspect entries in *config.yaml*. | `go run ./cmd/integrations slack > config.yaml`     |
+| Binary         | Purpose                                       | Typical usage                                     |
+| -------------- | --------------------------------------------- | ------------------------------------------------- |
+| `integrations` | Scaffold or inspect entries in *config.yaml*. | `go run ./cmd/integrations slack > config.yaml`   |
 | `allowlist`    | Modify or inspect *allowlist.yaml*.           | `go run ./cmd/allowlist add -integration slack -caller bot -capability ping` |
 
 > **Heads‑up** Both helpers are thin wrappers around Go structs—check the `--help` output for the definitive flag list because the CLI evolves alongside the schema.
@@ -32,11 +32,41 @@ integrations <command> [flags]
 
 ### Common commands
 
-| Command  | What it does |
-| -------- | ---------------------------------------------- |
-| `list`   | Prints available capability names for each integration. |
-| `add`    | Adds an entry to `allowlist.yaml`. |
-| `remove` | Deletes an entry from `allowlist.yaml`. |
+| Command    | Purpose                                                             |
+| ---------- | ------------------------------------------------------------------- |
+| `list`     | Print the names of integrations currently loaded by the server.     |
+| `update`   | Replace an existing integration using one of the plugin builders.   |
+| `delete`   | Remove an integration by name.                                      |
+| `<plugin>` | Generate a new integration using that plugin’s flags and send it.   |
+
+```bash
+# Add a Slack integration from env vars
+go run ./cmd/integrations slack \
+  -token env:SLACK_TOKEN -signing-secret env:SLACK_SIGNING
+
+# Delete an integration
+go run ./cmd/integrations delete slack
+```
+
+#### Flags
+
+| Flag       | Default                              | Meaning                    |
+| ---------- | ------------------------------------ | -------------------------- |
+| `--server` | `http://localhost:8080/integrations` | Management API endpoint.   |
+
+## 3  `allowlist` helper
+
+```text
+allowlist <command> [flags]
+```
+
+### Common commands
+
+| Command  | Purpose                                              |
+| -------- | ---------------------------------------------------- |
+| `list`   | Show capabilities provided by integration plugins.   |
+| `add`    | Append a capability entry to `allowlist.yaml`.       |
+| `remove` | Delete an entry from `allowlist.yaml`.               |
 
 ```bash
 # Show available capabilities
@@ -44,21 +74,21 @@ go run ./cmd/allowlist list
 
 # Grant a caller permission
 go run ./cmd/allowlist add -integration slack \
-    -caller bot-123 -capability post_public_as
+  -caller bot-123 -capability post_public_as
 
 # Revoke that permission
 go run ./cmd/allowlist remove -integration slack \
-    -caller bot-123 -capability post_public_as
+  -caller bot-123 -capability post_public_as
 ```
 
 #### Flags
 
-| Flag            | Default          | Meaning                                    |
-| --------------- | ---------------- | ------------------------------------------ |
-| `--file`        | `allowlist.yaml` | Path to YAML file for `add`/`remove`.      |
-| `--caller`      | –                | Caller ID for `add`/`remove`.              |
-| `--integration` | –                | Integration name for `add`/`remove`.       |
-| `--capability`  | –                | Capability name for `add`/`remove`.        |
+| Flag            | Default          | Meaning                             |
+| --------------- | ---------------- | ----------------------------------- |
+| `--file`        | `allowlist.yaml` | Path to YAML file for `add`/`remove`. |
+| `--caller`      | –                | Caller ID for `add`/`remove`.       |
+| `--integration` | –                | Integration name for `add`/`remove`. |
+| `--capability`  | –                | Capability name for `add`/`remove`. |
 | `--params`      | ""               | Extra key=value pairs for `add` (optional). |
 
 ---
@@ -70,7 +100,7 @@ A minimal **GitHub Actions** snippet that checks both files on every PR:
 ```yaml
 - name: Validate AuthTranslator config
   run: |
-    go run ./cmd/integrations list --file config.yaml
+    go run ./cmd/integrations list
     go run ./cmd/allowlist list
 ```
 
