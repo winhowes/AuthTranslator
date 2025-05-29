@@ -129,3 +129,19 @@ helm push authtranslator-*.tgz oci://ghcr.io/winhowes/charts
 # Later, install via OCI reference
 helm install authtranslator oci://ghcr.io/winhowes/charts/authtranslator --version 1.2.3
 ```
+
+---
+
+## 6  Deploying with Terraform
+
+Example Terraform configurations live in the `terraform/` directory:
+
+- `terraform/quickstart` – minimal Docker provider example.
+- `terraform/aws` – deploys to AWS ECS Fargate.
+- `terraform/gcp` – deploys to Google Cloud Run.
+- `terraform/azure` – deploys to Azure Container Instances.
+
+Set the variables for your environment and run `terraform apply` inside the
+chosen folder to create the service. The modules accept optional
+`redis_address`, `redis_timeout` and `redis_ca` variables which map to the
+container flags.
