@@ -78,6 +78,8 @@ rules:
           # body format is detected via Content-Type; other types skip matching
 ```
 
+Allowed values are matched **exactly**; the proxy does not interpret regular expressions.
+
 Each key under `methods:` represents an HTTP method. Mapping a method to `{}`
 means the request is allowed for that verb as soon as the path matches. Add
 `query`, `headers`, or `body` constraints inside a method block to further limit
@@ -89,8 +91,8 @@ which requests are permitted.
 | ------------ | --------------------------------------------------------------------------------------------------- |
 | Path         | Must match the pattern **entirely**. `*` matches one segment; `**` matches the rest.                 |
 | Method       | Case‑insensitive string compare. Each method key contains its own constraints. |
-| Query params | In `methods.<HTTP_METHOD>.query`, each key maps to allowed value list. Extra params allowed.
-| Headers      | In `methods.<HTTP_METHOD>.headers`, each key has required values; an empty list only checks for presence.
+| Query params | In `methods.<HTTP_METHOD>.query`, each key maps to allowed value list. Extra params allowed. Values match exactly.
+| Headers      | In `methods.<HTTP_METHOD>.headers`, each key has required values; an empty list only checks for presence. Values match exactly.
 | Body         | `methods.<HTTP_METHOD>.body` must be a recursive subset of the request body (JSON or form). Arrays matched unordered. Detection relies on the `Content-Type` header; if it's neither JSON nor form, body checks are skipped.
 
 A rule like:
