@@ -155,7 +155,9 @@ func reload() error {
 	}
 
 	entries, err := loadAllowlists(*allowlistFile)
+	allowlists.RLock()
 	old := allowlists.m
+	allowlists.RUnlock()
 	if err != nil {
 		if os.IsNotExist(err) {
 			logger.Warn("allowlist file missing; keeping existing entries", "file", *allowlistFile)
