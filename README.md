@@ -535,20 +535,14 @@ The CLI updates the file in place (default `allowlist.yaml`, overridable with `-
 
 ## Running Tests
 
-Use the Makefile or the Go toolchain to vet and test the code:
+Use the Makefile to format, vet and lint the code before running tests:
 
 ```bash
-make vet
+make precommit
 make test
 ```
 
-These run `go vet ./...` and `go test ./...` respectively.
-
-If you have [`golangci-lint`](https://github.com/golangci/golangci-lint) installed you can also run:
-
-```bash
-golangci-lint run
-```
+`make precommit` runs `gofmt -w`, `go vet ./...` and `golangci-lint run` if available.
 
 The CI workflow caches the Go modules directory using `actions/cache` to speed
 up dependency installation.
@@ -624,8 +618,10 @@ A Makefile is provided to simplify formatting, vetting, testing and building the
 ```bash
 make fmt    # run gofmt on all Go files
 make vet    # run go vet ./...
+make lint   # run golangci-lint if installed
 make test   # run go test ./...
 make docker # build the container image
+make precommit # run fmt, vet and lint
 ```
 
 ## Contributing

@@ -4,26 +4,16 @@ Thank you for your interest in contributing! This project uses the standard Go t
 
 ## Development workflow
 
-1. Format your code before committing:
+1. Run the precommit checks to format, vet and lint your code:
    ```bash
-gofmt -w <files>
-```
-   Run `gofmt -w` on any files you changed so the style stays consistent.
-
-2. Run vet and tests:
-   ```bash
-go vet ./...
-go test ./...
+make precommit
 ```
 
-3. Optional linting
-
-   If you have [`golangci-lint`](https://github.com/golangci/golangci-lint) installed you can run:
+2. Run the tests:
    ```bash
-golangci-lint run
+make test
 ```
-   Linting is not required but helps catch issues early.
 
-4. Commit your changes and open a pull request on GitHub targeting the `main` branch.
+3. Commit your changes and open a pull request on GitHub targeting the `main` branch.
 
 We appreciate bug fixes, new features and improvements to the documentation. Thanks for contributing!
