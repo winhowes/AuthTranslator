@@ -153,3 +153,24 @@ func TestGCPKMSInvalidPlaintext(t *testing.T) {
 		t.Fatal("expected base64 error")
 	}
 }
+
+func TestGCPKMSDecryptFail(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/token"):
+			json.NewEncoder(w).Encode(map[string]string{"access_token": "tok"})
+		case strings.HasSuffix(r.URL.Path, ":decrypt"):
+			http.Error(w, "fail", http.StatusInternalServerError)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer ts.Close()
+	restore := setGCPTestClient(ts)
+	defer restore()
+
+	p := gcpKMSPlugin{}
+	if _, err := p.Load(context.Background(), "projects/p/locations/l/keyRings/r/cryptoKeys/k:cipher"); err == nil {
+		t.Fatal("expected error")
+	}
+}

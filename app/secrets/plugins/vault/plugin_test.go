@@ -81,3 +81,37 @@ func TestVaultLoadMissingConfig(t *testing.T) {
 		t.Fatal("expected error when config missing")
 	}
 }
+
+func TestVaultLoadDecodeError(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, "notjson")
+	}))
+	defer ts.Close()
+	restore := setVaultTestClient(ts)
+	defer restore()
+
+	t.Setenv("VAULT_ADDR", "http://vault")
+	t.Setenv("VAULT_TOKEN", "tok")
+
+	p := vaultPlugin{}
+	if _, err := p.Load(context.Background(), "secret/data/foo"); err == nil {
+		t.Fatal("expected decode error")
+	}
+}
+
+func TestVaultLoadValueMissing(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, `{"data":{"data":{}}}`)
+	}))
+	defer ts.Close()
+	restore := setVaultTestClient(ts)
+	defer restore()
+
+	t.Setenv("VAULT_ADDR", "http://vault")
+	t.Setenv("VAULT_TOKEN", "tok")
+
+	p := vaultPlugin{}
+	if _, err := p.Load(context.Background(), "secret/data/foo"); err == nil {
+		t.Fatal("expected missing value error")
+	}
+}

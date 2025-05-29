@@ -88,3 +88,76 @@ func TestAzureKMSLoadError(t *testing.T) {
 		t.Fatal("expected error")
 	}
 }
+
+func TestAzureKMSMissingCreds(t *testing.T) {
+	p := azureKMSPlugin{}
+	if _, err := p.Load(context.Background(), "https://vault.example.com/secrets/foo"); err == nil {
+		t.Fatal("expected error for missing credentials")
+	}
+}
+
+func TestAzureKMSTokenDecodeError(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "POST" {
+			w.Write([]byte("badjson"))
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer ts.Close()
+	restore := setAzureTestClient(ts)
+	defer restore()
+
+	t.Setenv("AZURE_TENANT_ID", "tenant")
+	t.Setenv("AZURE_CLIENT_ID", "id")
+	t.Setenv("AZURE_CLIENT_SECRET", "sec")
+
+	p := azureKMSPlugin{}
+	if _, err := p.Load(context.Background(), "https://vault.example.com/secrets/foo"); err == nil {
+		t.Fatal("expected decode error")
+	}
+}
+
+func TestAzureKMSSecretDecodeError(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == "POST" && r.URL.Path == "/tenant/oauth2/v2.0/token":
+			w.Header().Set("Content-Type", "application/json")
+			fmt.Fprint(w, `{"access_token":"tok"}`)
+		case r.Method == "GET" && r.URL.Path == "/secrets/foo":
+			w.Write([]byte("notjson"))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer ts.Close()
+	restore := setAzureTestClient(ts)
+	defer restore()
+
+	t.Setenv("AZURE_TENANT_ID", "tenant")
+	t.Setenv("AZURE_CLIENT_ID", "id")
+	t.Setenv("AZURE_CLIENT_SECRET", "sec")
+
+	p := azureKMSPlugin{}
+	if _, err := p.Load(context.Background(), "https://vault.example.com/secrets/foo"); err == nil {
+		t.Fatal("expected decode error")
+	}
+}
+
+func TestAzureKMSTokenRequestFailure(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "fail", http.StatusInternalServerError)
+	}))
+	defer ts.Close()
+	restore := setAzureTestClient(ts)
+	defer restore()
+
+	t.Setenv("AZURE_TENANT_ID", "tenant")
+	t.Setenv("AZURE_CLIENT_ID", "id")
+	t.Setenv("AZURE_CLIENT_SECRET", "sec")
+
+	p := azureKMSPlugin{}
+	if _, err := p.Load(context.Background(), "https://vault.example.com/secrets/foo"); err == nil {
+		t.Fatal("expected error")
+	}
+}
