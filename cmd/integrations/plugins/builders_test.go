@@ -57,14 +57,22 @@ func TestBuilderErrors(t *testing.T) {
 	}{
 		{"asana", []string{}},
 		{"ghe", []string{"-domain", "d", "-token", "t"}},
+		{"confluence", []string{}},
 		{"slack", []string{"-token", "t"}},
 		{"twilio", []string{}},
 		{"workday", []string{"-token", "t"}},
 		{"github", []string{"-token", "t"}},
+		{"gitlab", []string{}},
 		{"openai", []string{}},
 		{"sendgrid", []string{}},
+		{"servicenow", []string{}},
 		{"monday", []string{}},
+		{"jira", []string{}},
 		{"okta", []string{"-token", "t"}},
+		{"linear", []string{}},
+		{"stripe", []string{}},
+		{"trufflehog", []string{}},
+		{"zendesk", []string{}},
 	}
 	for _, tt := range tests {
 		b := Get(tt.name)
@@ -84,7 +92,7 @@ func TestBuilderErrors(t *testing.T) {
 }
 
 func TestBuilderParseError(t *testing.T) {
-	for _, name := range []string{"asana", "openai"} {
+	for _, name := range []string{"asana", "openai", "confluence", "jira"} {
 		b := Get(name)
 		if b == nil {
 			t.Fatalf("%s builder missing", name)
