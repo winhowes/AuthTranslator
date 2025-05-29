@@ -30,7 +30,6 @@ Think of it as a *cookie‑cutter* that stamps out a ready‑to‑run block in y
 | `stripe` | `https://api.stripe.com` | `token` |
 | `trufflehog` | `https://trufflehog.cloud/api` | `token` |
 | `twilio` | `https://api.twilio.com` | `basic` |
-| `workday` | `https://<domain>/api` | `token` |
 | `zendesk` | `https://api.zendesk.com` | `token` |
 *(Full list lives under **[`app/integrations/plugins/`](../app/integrations/plugins/)**)*
 ## Creating an integration via the CLI
