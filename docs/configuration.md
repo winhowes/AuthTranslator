@@ -29,7 +29,7 @@ integrations:
         prefix: "Bearer "
     transport:
       timeout: 10s
-      tls_skip_verify: false
+      tls_insecure_skip_verify: false
     in_rate_limit:  100
     out_rate_limit: 800
     rate_limit_window: 1m
@@ -73,7 +73,7 @@ integrations:
 | Field             | Type     | Default | Description                                          |
 | ----------------- | -------- | ------- | ---------------------------------------------------- |
 | `timeout`                 | duration | `30s`   | End‑to‑end timeout for upstream call. |
-| `tls_skip_verify`         | bool     | `false` | Disable server certificate verification (dev only!). |
+| `tls_insecure_skip_verify` | bool     | `false` | Disable server certificate verification (dev only!). |
 | `proxy_url`               | URL      | –       | Forward through an HTTP proxy. |
 | `idle_conn_timeout`       | duration | `0`     | How long idle connections stay pooled. |
 | `tls_handshake_timeout`   | duration | `0`     | Maximum time to wait for TLS handshakes. |
