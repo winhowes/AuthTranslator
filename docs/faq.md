@@ -88,7 +88,9 @@ Remember limits are **per callerÂ ID** *and* **per integration**. If your loadâ€
 * Liveness: `/_at_internal/healthz`
 * Prometheus metrics: `/_at_internal/metrics`
 
-Both are always enabled and do **not** require authentication.
+The health endpoint is always enabled. Metrics are exposed by default but you can
+disable them with `-enable-metrics=false` and require HTTP Basic credentials via
+`-metrics-user` and `-metrics-pass`.
 
 ---
 
