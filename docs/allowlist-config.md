@@ -66,17 +66,23 @@ Capabilities are defined **next to each integration plugin**. They expand into o
 ```yaml
 rules:
   - path:   /api/chat.postMessage          # path pattern, anchored
-    methods:                               # each method has its own constraints
-      POST:
-        query:                             # map of query params (ANDed)
+    methods:
+      GET: {}                              # allow GET with no extra filters
+      POST:                                # map key is the HTTP verb
+        query:                             # list of key=value pairs (ANDed)
           channel: [C12345678]
-        headers:                           # header=list of values; empty list checks only presence
+        headers:                           # header=value list; empty list checks only presence
           X-Custom-Trace: [abc123]
         body:                              # optional JSON *or* form filters
           json:
             text: "Hello world"            # matched recursively
           form: {}
 ```
+
+Each key under `methods:` represents an HTTP method. Mapping a method to `{}`
+means the request is allowed for that verb as soon as the path matches. Add
+`query`, `headers`, or `body` constraints inside a method block to further limit
+which requests are permitted.
 
 > **Subset principle** *Every* field you specify must match the request; unspecified fields are ignored. This means your rule must be a **subset** of the incoming request.
 
