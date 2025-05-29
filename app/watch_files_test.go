@@ -22,7 +22,7 @@ func TestWatchFiles(t *testing.T) {
 	go watchFiles(ctx, []string{name}, ch)
 
 	// give watcher time to start
-	time.Sleep(20 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
 
 	if err := os.WriteFile(name, []byte("1"), 0o644); err != nil {
 		t.Fatal(err)
@@ -51,7 +51,7 @@ func TestWatchFilesRename(t *testing.T) {
 	go watchFiles(ctx, []string{name}, ch)
 
 	// allow watcher to start
-	time.Sleep(20 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
 
 	// rename the file to trigger an event and remove the watch
 	newName := name + ".old"
@@ -71,7 +71,7 @@ func TestWatchFilesRename(t *testing.T) {
 		t.Fatal(err)
 	}
 	// give watcher time to re-add
-	time.Sleep(20 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
 	if err := os.WriteFile(name, []byte("y"), 0o644); err != nil {
 		t.Fatal(err)
 	}
