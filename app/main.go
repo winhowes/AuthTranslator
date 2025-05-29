@@ -484,7 +484,11 @@ func watchFiles(ctx context.Context, files []string, out chan<- struct{}) {
 							logger.Error("watch re-add failed", "file", name, "error", err)
 							return
 						}
-						time.Sleep(10 * time.Millisecond)
+						select {
+						case <-ctx.Done():
+							return
+						case <-time.After(10 * time.Millisecond):
+						}
 					}
 				}(ev.Name)
 			} else if ev.Op&fsnotify.Create != 0 {
