@@ -78,3 +78,10 @@ func TestValidateRequestBodyMismatch(t *testing.T) {
 		t.Fatal("expected body mismatch to fail")
 	}
 }
+
+func TestSplitPathEmpty(t *testing.T) {
+	got := splitPath("")
+	if len(got) != 0 {
+		t.Fatalf("expected empty slice, got %v", got)
+	}
+}

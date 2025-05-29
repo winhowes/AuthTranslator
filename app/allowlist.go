@@ -19,7 +19,11 @@ var allowlists = struct {
 }{m: make(map[string]map[string]CallerConfig)}
 
 func splitPath(p string) []string {
-	clean := strings.Trim(path.Clean(p), "/")
+	clean := path.Clean(p)
+	if clean == "." {
+		return []string{}
+	}
+	clean = strings.Trim(clean, "/")
 	if clean == "" {
 		return []string{}
 	}
