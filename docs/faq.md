@@ -36,7 +36,7 @@ kill -s SIGHUP <pid>
 
 ### 5 Can I run more than one replica behind a load balancer?
 
-Yes. For **rate‑limiting** accuracy you should point the pods at a shared Redis instance (`REDIS_URL`). Everything else is stateless.
+Yes. For **rate‑limiting** accuracy you should point the pods at a shared Redis instance using the `-redis-addr` flag. Everything else is stateless.
 
 ---
 

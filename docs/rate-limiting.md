@@ -41,7 +41,7 @@ integrations:
 | `memory` | Zero deps, fastest (\~100 ns)   | Not shared across pods, resets on restart | Local dev, single‑pod demo.     |
 | `redis`  | Durable across restarts, shared | +0.2 ms per call; need Redis cluster      | Production / multiple replicas. |
 
-**Redis URI** is read from `REDIS_URL` env var (`redis://user:pass@host:6379/0`).
+**Redis URI** is configured via the `-redis-addr` flag (e.g., `-redis-addr redis://user:pass@host:6379/0`).
 
 ---
 

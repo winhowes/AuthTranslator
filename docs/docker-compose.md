@@ -20,13 +20,13 @@ services:
       # Secret URIs resolve env: …
       SLACK_TOKEN: "xoxb‑REPLACE"
       SLACK_SIGNING: "8f2b‑REPLACE"
-      # Enable Redis rate‑limit backend (optional)
-      REDIS_URL: "redis://redis:6379/0"
+      # Optional: enable Redis-backed rate limits
     volumes:
       - ./config:/conf:ro          # bind‑mount configs for hot reload
     command: |
       -config /conf/config.yaml \
       -allowlist /conf/allowlist.yaml \
+      -redis-addr redis://redis:6379/0 \
       -watch                       # reload on file change
     depends_on:
       - redis
@@ -79,7 +79,7 @@ Navigate to:
 | Task                    | How                                                                                           |
 | ----------------------- | --------------------------------------------------------------------------------------------- |
 | Change the exposed port | Edit `ports:` → `- "9000:8080"`.                                                              |
-| Disable Redis           | Remove the `redis` service and the `REDIS_URL` env. The proxy falls back to in‑memory limits. |
+| Disable Redis           | Remove the `redis` service and drop the `-redis-addr` flag. The proxy falls back to in‑memory limits. |
 | Add extra env secrets   | Append under `environment:` (`STRIPE_KEY=…`).                                                 |
 | Mount PEM certificates  | Add another entry under `volumes:` and reference with `file:/` secret URIs.                   |
 

@@ -35,7 +35,8 @@ This:
 | `image.tag`        | `latest`                          | Image tag or digest.                                               |
 | `replicaCount`     | `1`                               | Horizontal scaling factor.                                         |
 | `service.type`     | `ClusterIP`                       | `LoadBalancer` or `NodePort` as needed.                            |
-| `redis.enabled`    | `false`                           | When `true`, chart deploys a Redis sub-chart and sets `REDIS_URL`. |
+| `redisAddress`     | `""`                              | Connection string passed to `-redis-addr`. |
+| `redisCA`          | `""`                              | CA file verifying Redis TLS passed to `-redis-ca`. |
 | `configYaml`       | *(string)*                        | Raw YAML for `config.yaml`.                                        |
 | `allowlistYaml`    | *(string)*                        | Raw YAML for `allowlist.yaml`.                                     |
 | `extraEnv`         | `{}`                              | Map of extra env vars (e.g., `STRIPE_TOKEN`).                      |
@@ -51,8 +52,7 @@ image:
 
 replicaCount: 2
 
-redis:
-  enabled: true
+redisAddress: "redis://redis:6379/0"
 
 configYaml: |
   apiVersion: v1alpha1
@@ -108,11 +108,10 @@ charts/authtranslator/
   Chart.yaml          # metadata
   values.yaml         # user-tunable defaults
   templates/
+    _helpers.tpl
+    configmap.yaml
     deployment.yaml
     service.yaml
-    configmap.yaml
-    secret.yaml
-    redis.yaml        # included only when enabled
 ```
 
 Feel free to add ingress, PodDisruptionBudget, or HPA templates as your cluster demands.
