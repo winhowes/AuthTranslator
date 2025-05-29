@@ -163,7 +163,7 @@ The project exists to make it trivial to translate one type of authentication in
 
 3. **Running**
 
-   The listen address can be configured with the `-addr` flag. By default the server listens on `:8080`. Incoming requests are matched against the `X-AT-Int` header, if present, or otherwise the host header to determine the route and associated authentication plugin. Use `-disable_x_at_int` to ignore the header entirely or `-x_at_int_host` to only respect the header when a specific host is requested. The configuration file is chosen with `-config` (default `config.json`). The allowlist file can be specified with `-allowlist`; it defaults to `allowlist.json`. Set `-redis-addr` to persist rate limits in Redis; failures fall back to memory with an error log.
+   The listen address can be configured with the `-addr` flag. By default the server listens on `:8080`. Incoming requests are matched against the `X-AT-Int` header, if present, or otherwise the host header to determine the route and associated authentication plugin. Use `-disable_x_at_int` to ignore the header entirely or `-x_at_int_host` to only respect the header when a specific host is requested. The configuration file is chosen with `-config` (default `config.json`). The allowlist file can be specified with `-allowlist`; it defaults to `allowlist.json`. Set `-redis-addr` to persist rate limits in Redis; failures fall back to memory with an error log. Use `-redis-timeout` to control how long dialing Redis can take.
    Send `SIGHUP` or run with `-watch` to reload these files automatically without
    restarting. If the allowlist fails to load during reload, the previously loaded
    entries remain in effect.
@@ -177,6 +177,7 @@ The project exists to make it trivial to translate one type of authentication in
    - `-x_at_int_host` – only respect `X-AT-Int` when this host is requested
    - `-tls-cert` and `-tls-key` – TLS certificate and key to serve HTTPS
    - `-redis-addr` – Redis address for rate limit counters
+   - `-redis-timeout` – timeout for dialing Redis (default `5s`)
    - `-max_body_size` – maximum bytes buffered from request bodies
    - `-log-level` – log verbosity (`DEBUG`, `INFO`, `WARN`, `ERROR`)
    - `-log-format` – log output format (`text` or `json`)
@@ -566,7 +567,7 @@ Example Terraform files are provided in the `terraform` directory for AWS, GCP a
 - [`terraform/azure`](terraform/azure/README.md) contains a configuration for deploying to Azure Container Instances.
 
 Set the required variables for your environment and run `terraform apply` inside the desired folder to create the service.
-All modules accept an optional `redis_address` variable to pass the `-redis-addr` flag to the container if you have a Redis instance. Each README lists the required variables along with example commands for initialization and deployment.
+All modules accept optional `redis_address` and `redis_timeout` variables to pass the `-redis-addr` and `-redis-timeout` flags to the container if you have a Redis instance. Each README lists the required variables along with example commands for initialization and deployment.
 
 ## Contributing
 
