@@ -381,3 +381,37 @@ func TestJWTOutgoingAddAuthMultipleSecrets(t *testing.T) {
 		t.Fatalf("unexpected header %s", got)
 	}
 }
+
+func TestJWTAuthMultipleSecrets(t *testing.T) {
+	secrets.ClearCache()
+	keyGood := "good"
+	keyBad := "bad"
+	tok := makeHS256Token("aud", "id", keyGood, time.Now().Add(time.Hour).Unix())
+	r := &http.Request{Header: http.Header{"Authorization": []string{"Bearer " + tok}}}
+	p := JWTAuth{}
+	t.Setenv("GOOD", keyGood)
+	t.Setenv("BAD", keyBad)
+	cfg, err := p.ParseParams(map[string]interface{}{
+		"secrets":  []string{"env:BAD", "env:GOOD"},
+		"audience": "aud",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !p.Authenticate(context.Background(), r, cfg) {
+		t.Fatal("expected authentication to succeed with second secret")
+	}
+	if id, ok := p.Identify(r, cfg); !ok || id != "id" {
+		t.Fatalf("unexpected id %s", id)
+	}
+}
+
+func TestJWTParseParamsUnknownField(t *testing.T) {
+	p := JWTAuth{}
+	if _, err := p.ParseParams(map[string]interface{}{
+		"secrets": []string{"env:X"},
+		"unknown": true,
+	}); err == nil {
+		t.Fatal("expected error for unknown field")
+	}
+}

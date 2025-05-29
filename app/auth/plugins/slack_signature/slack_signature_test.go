@@ -229,3 +229,34 @@ func TestSlackSignatureBodyReadError(t *testing.T) {
 		t.Fatal("expected auth to fail on body read error")
 	}
 }
+
+func TestSlackSignatureAuthMultipleSecrets(t *testing.T) {
+	body := "multi"
+	ts := strconv.FormatInt(time.Now().Unix(), 10)
+	base := fmt.Sprintf("v0:%s:%s", ts, body)
+	mac := hmac.New(sha256.New, []byte("good"))
+	mac.Write([]byte(base))
+	sig := "v0=" + hex.EncodeToString(mac.Sum(nil))
+
+	r := &http.Request{Header: http.Header{
+		"X-Slack-Request-Timestamp": []string{ts},
+		"X-Slack-Signature":         []string{sig},
+	}, Body: io.NopCloser(strings.NewReader(body))}
+	p := SlackSignatureAuth{}
+	t.Setenv("BAD", "bad")
+	t.Setenv("GOOD", "good")
+	cfg, err := p.ParseParams(map[string]interface{}{"secrets": []string{"env:BAD", "env:GOOD"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !p.Authenticate(context.Background(), r, cfg) {
+		t.Fatal("expected authentication to succeed using second secret")
+	}
+}
+
+func TestSlackSignatureParseParamsUnknownField(t *testing.T) {
+	p := SlackSignatureAuth{}
+	if _, err := p.ParseParams(map[string]interface{}{"secrets": []string{"env:S"}, "extra": true}); err == nil {
+		t.Fatal("expected error")
+	}
+}
