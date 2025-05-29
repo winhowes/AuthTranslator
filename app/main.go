@@ -75,6 +75,9 @@ var redisTimeout = flag.Duration("redis-timeout", 5*time.Second, "dial timeout f
 var maxBodySizeFlag = flag.Int64("max_body_size", authplugins.MaxBodySize, "maximum bytes buffered from request bodies (0 to disable)")
 var showVersion = flag.Bool("version", false, "print version and exit")
 var watch = flag.Bool("watch", false, "watch config and allowlist files for changes")
+var metricsUser = flag.String("metrics-user", "", "username for metrics endpoint")
+var metricsPass = flag.String("metrics-pass", "", "password for metrics endpoint")
+var enableMetrics = flag.Bool("enable-metrics", true, "expose /metrics endpoint")
 var logger = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 
 func usage() {
@@ -591,7 +594,9 @@ func main() {
 	}
 
 	http.HandleFunc("/healthz", healthzHandler)
-	http.HandleFunc("/metrics", metricsHandler)
+	if *enableMetrics {
+		http.HandleFunc("/metrics", metricsHandler)
+	}
 
 	http.HandleFunc("/", proxyHandler)
 
