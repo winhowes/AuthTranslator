@@ -255,3 +255,14 @@ func TestHMACIncomingEdgeCases(t *testing.T) {
 		t.Fatal("expected authentication to succeed")
 	}
 }
+
+func TestHMACParseParamsMissingSecrets(t *testing.T) {
+	in := HMACSignatureAuth{}
+	out := HMACSignature{}
+	if _, err := in.ParseParams(map[string]interface{}{}); err == nil {
+		t.Fatal("expected error for missing secrets")
+	}
+	if _, err := out.ParseParams(map[string]interface{}{}); err == nil {
+		t.Fatal("expected error for missing secrets")
+	}
+}
