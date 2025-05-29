@@ -32,3 +32,10 @@ func TestParseParamsTypeMismatch(t *testing.T) {
 		t.Fatal("expected type error")
 	}
 }
+
+func TestParseParamsMarshalError(t *testing.T) {
+	m := map[string]interface{}{"bad": make(chan int)}
+	if _, err := ParseParams[sampleParams](m); err == nil {
+		t.Fatal("expected marshal error")
+	}
+}
