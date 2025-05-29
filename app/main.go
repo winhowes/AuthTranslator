@@ -187,6 +187,7 @@ type RateLimiter struct {
 	resetTicker *time.Ticker
 	done        chan struct{}
 	useRedis    bool
+	conns       chan net.Conn
 }
 
 func NewRateLimiter(limit int, duration time.Duration) *RateLimiter {
@@ -196,6 +197,10 @@ func NewRateLimiter(limit int, duration time.Duration) *RateLimiter {
 		done:     make(chan struct{}),
 		useRedis: *redisAddr != "",
 		requests: make(map[string]int),
+	}
+
+	if rl.useRedis {
+		rl.conns = make(chan net.Conn, 4)
 	}
 
 	if limit > 0 {
@@ -228,6 +233,17 @@ func (rl *RateLimiter) Stop() {
 	default:
 		close(rl.done)
 	}
+
+	if rl.conns != nil {
+		for {
+			select {
+			case c := <-rl.conns:
+				c.Close()
+			default:
+				return
+			}
+		}
+	}
 }
 
 func (rl *RateLimiter) Allow(key string) bool {
@@ -255,21 +271,47 @@ func (rl *RateLimiter) Allow(key string) bool {
 }
 
 func (rl *RateLimiter) allowRedis(key string) (bool, error) {
-	conn, err := net.Dial("tcp", *redisAddr)
-	if err != nil {
-		return false, err
+	var conn net.Conn
+	if rl.conns != nil {
+		select {
+		case conn = <-rl.conns:
+		default:
+		}
 	}
-	defer conn.Close()
+	var err error
+	if conn == nil {
+		conn, err = net.Dial("tcp", *redisAddr)
+		if err != nil {
+			return false, err
+		}
+	}
+	bad := false
 
 	n, err := redisCmdInt(conn, "INCR", key)
 	if err != nil {
-		return false, err
+		bad = true
 	}
 	if n == 1 {
 		_, err = redisCmdInt(conn, "EXPIRE", key, strconv.Itoa(int(rl.window.Seconds())))
 		if err != nil {
-			return false, err
+			bad = true
 		}
+	}
+	if rl.conns != nil {
+		if bad {
+			conn.Close()
+		} else {
+			select {
+			case rl.conns <- conn:
+			default:
+				conn.Close()
+			}
+		}
+	} else {
+		conn.Close()
+	}
+	if err != nil {
+		return false, err
 	}
 	return n <= rl.limit, nil
 }
