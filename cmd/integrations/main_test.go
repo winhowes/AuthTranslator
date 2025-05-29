@@ -339,3 +339,42 @@ func TestDeleteIntegrationWriteError(t *testing.T) {
 		t.Fatalf("expected error output")
 	}
 }
+
+func TestMainUpdateUnknownPlugin(t *testing.T) {
+	cmd := exec.Command(os.Args[0], "-test.run=TestMainHelper", "--", "update", "nop")
+	cmd.Env = append(os.Environ(), "GO_WANT_INTEGRATIONS_HELPER=1")
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("expected error")
+	}
+	if !strings.Contains(string(out), "unknown plugin nop") {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestMainUpdateBuilderError(t *testing.T) {
+	cmd := exec.Command(os.Args[0], "-test.run=TestMainHelper", "--", "update", "slack", "-token", "t")
+	cmd.Env = append(os.Environ(), "GO_WANT_INTEGRATIONS_HELPER=1")
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("expected error")
+	}
+	if !strings.Contains(string(out), "-token and -signing-secret are required") {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestMainListError(t *testing.T) {
+	dir := t.TempDir()
+	cfg := filepath.Join(dir, "cfg.yaml")
+	os.Mkdir(cfg, 0755)
+	cmd := exec.Command(os.Args[0], "-test.run=TestMainHelper", "--", "-file", cfg, "list")
+	cmd.Env = append(os.Environ(), "GO_WANT_INTEGRATIONS_HELPER=1")
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("expected error")
+	}
+	if len(out) == 0 {
+		t.Fatalf("expected error output")
+	}
+}

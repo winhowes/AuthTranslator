@@ -49,3 +49,39 @@ func TestBuilders(t *testing.T) {
 		})
 	}
 }
+
+func TestBuilderErrors(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+	}{
+		{"asana", []string{}},
+		{"ghe", []string{"-domain", "d", "-token", "t"}},
+		{"slack", []string{"-token", "t"}},
+		{"twilio", []string{}},
+		{"workday", []string{"-token", "t"}},
+	}
+	for _, tt := range tests {
+		b := Get(tt.name)
+		if b == nil {
+			t.Fatalf("builder %s not registered", tt.name)
+		}
+		if _, err := b(tt.args); err == nil {
+			t.Errorf("%s: expected error for args %v", tt.name, tt.args)
+		}
+	}
+
+	if Get("nonexistent") != nil {
+		t.Errorf("expected nil builder for unknown plugin")
+	}
+}
+
+func TestBuilderParseError(t *testing.T) {
+	b := Get("asana")
+	if b == nil {
+		t.Fatalf("asana builder missing")
+	}
+	if _, err := b([]string{"-bogus"}); err == nil {
+		t.Fatalf("expected parse error")
+	}
+}
