@@ -72,9 +72,15 @@ integrations:
 #### `Transport`
 | Field             | Type     | Default | Description                                          |
 | ----------------- | -------- | ------- | ---------------------------------------------------- |
-| `timeout`         | duration | `30s`   | End‑to‑end timeout for upstream call.                |
-| `tls_skip_verify` | bool     | `false` | Disable server certificate verification (dev only!). |
-| `proxy_url`       | URL      | –       | Forward through an HTTP proxy.                       |
+| `timeout`                 | duration | `30s`   | End‑to‑end timeout for upstream call. |
+| `tls_skip_verify`         | bool     | `false` | Disable server certificate verification (dev only!). |
+| `proxy_url`               | URL      | –       | Forward through an HTTP proxy. |
+| `idle_conn_timeout`       | duration | `0`     | How long idle connections stay pooled. |
+| `tls_handshake_timeout`   | duration | `0`     | Maximum time to wait for TLS handshakes. |
+| `response_header_timeout` | duration | `0`     | Time to wait for the first response header. |
+| `disable_keep_alives`     | bool     | `false` | Disable HTTP keep‑alive connections. |
+| `max_idle_conns`          | int      | `0`     | Total idle connections to keep open. |
+| `max_idle_conns_per_host` | int      | `0`     | Idle connection limit per upstream host. |
 
 ---
 
