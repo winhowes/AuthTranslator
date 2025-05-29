@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -288,7 +287,7 @@ func TestMainHelper(t *testing.T) {
 			break
 		}
 	}
-	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+	flag.CommandLine.Parse(os.Args[1:])
 	main()
 	os.Exit(0)
 }
@@ -384,14 +383,10 @@ func writeTempFile(t *testing.T, data string) string {
 	return f.Name()
 }
 
-func buildApp(t *testing.T) string {
-	bin := filepath.Join(t.TempDir(), "appbin")
-	cmd := exec.Command("go", "build", "-o", bin, ".")
-	cmd.Env = os.Environ()
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("build failed: %v\n%s", err, out)
-	}
-	return bin
+func runMainCmd(args ...string) *exec.Cmd {
+	cmd := exec.Command(os.Args[0], append([]string{"-test.run=TestMainHelper", "--"}, args...)...)
+	cmd.Env = append(os.Environ(), "GO_WANT_MAIN_HELPER=1")
+	return cmd
 }
 
 func freeAddr(t *testing.T) string {
@@ -410,8 +405,7 @@ func TestMainRunAndShutdown(t *testing.T) {
 	al := writeTempFile(t, `[]`)
 	defer os.Remove(al)
 
-	bin := buildApp(t)
-	cmd := exec.Command(bin, "-config", cfg, "-allowlist", al, "-addr", "127.0.0.1:0")
+	cmd := runMainCmd("-config", cfg, "-allowlist", al, "-addr", "127.0.0.1:0")
 	if err := cmd.Start(); err != nil {
 		t.Fatalf("start failed: %v", err)
 	}
@@ -438,8 +432,7 @@ func TestMainReloadSignal(t *testing.T) {
 	al := writeTempFile(t, `[]`)
 	defer os.Remove(al)
 
-	bin := buildApp(t)
-	cmd := exec.Command(bin, "-config", cfg, "-allowlist", al, "-addr", "127.0.0.1:0")
+	cmd := runMainCmd("-config", cfg, "-allowlist", al, "-addr", "127.0.0.1:0")
 	if err := cmd.Start(); err != nil {
 		t.Fatalf("start failed: %v", err)
 	}
@@ -471,9 +464,8 @@ func TestMainMetricsDisabled(t *testing.T) {
 	al := writeTempFile(t, `[]`)
 	defer os.Remove(al)
 
-	bin := buildApp(t)
 	addr := freeAddr(t)
-	cmd := exec.Command(bin, "-config", cfg, "-allowlist", al, "-addr", addr, "-enable-metrics=false")
+	cmd := runMainCmd("-config", cfg, "-allowlist", al, "-addr", addr, "-enable-metrics=false")
 	if err := cmd.Start(); err != nil {
 		t.Fatalf("start failed: %v", err)
 	}
@@ -505,9 +497,8 @@ func TestMainMetricsEnabled(t *testing.T) {
 	al := writeTempFile(t, `[]`)
 	defer os.Remove(al)
 
-	bin := buildApp(t)
 	addr := freeAddr(t)
-	cmd := exec.Command(bin, "-config", cfg, "-allowlist", al, "-addr", addr)
+	cmd := runMainCmd("-config", cfg, "-allowlist", al, "-addr", addr)
 	if err := cmd.Start(); err != nil {
 		t.Fatalf("start failed: %v", err)
 	}
@@ -541,9 +532,8 @@ func TestMainTLSMissingKey(t *testing.T) {
 	cert := writeTempFile(t, "dummy")
 	defer os.Remove(cert)
 
-	bin := buildApp(t)
 	addr := freeAddr(t)
-	cmd := exec.Command(bin, "-config", cfg, "-allowlist", al, "-addr", addr, "-tls-cert", cert)
+	cmd := runMainCmd("-config", cfg, "-allowlist", al, "-addr", addr, "-tls-cert", cert)
 	err := cmd.Run()
 	if err == nil {
 		t.Fatal("expected process to exit with error")
@@ -559,9 +549,8 @@ func TestMainWatchReload(t *testing.T) {
 	al := writeTempFile(t, `[]`)
 	defer os.Remove(al)
 
-	bin := buildApp(t)
 	addr := freeAddr(t)
-	cmd := exec.Command(bin, "-config", cfg, "-allowlist", al, "-addr", addr, "-watch")
+	cmd := runMainCmd("-config", cfg, "-allowlist", al, "-addr", addr, "-watch")
 	if err := cmd.Start(); err != nil {
 		t.Fatalf("start failed: %v", err)
 	}
