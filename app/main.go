@@ -527,7 +527,6 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	hostLookup := strings.ToLower(host)
-	logger.Info("incoming request", "method", r.Method, "host", host, "path", r.URL.Path, "remote", r.RemoteAddr)
 	integ, ok := GetIntegration(hostLookup)
 	if !ok {
 		logger.Warn("no integration configured", "host", host)
@@ -564,6 +563,8 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+
+	logger.Info("incoming request", "method", r.Method, "integration", integ.Name, "path", r.URL.Path, "caller_id", callerID)
 
 	if !integ.inLimiter.Allow(rateKey) {
 		logger.Warn("caller exceeded rate limit", "caller", rateKey, "host", host)

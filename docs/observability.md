@@ -56,19 +56,18 @@ The proxy logs in **JSON** using Go’s `slog`. Fields:
 | Key           | Example                   | Meaning                                                     |
 | ------------- | ------------------------- | ----------------------------------------------------------- |
 | `level`       | `INFO` / `WARN` / `ERROR` | Log severity                                                |
-| `msg`         | `"forwarded request"`     | Human‑readable message                                      |
-| `integration` | `"slack"`                 | Integration block name                                      |
-| `caller_id`   | `"user‑123"`              | Identifier from incoming plugin                             |
-| `request_id`  | `"c5ab…"`                 | 16‑byte random hex, shared across logs for a single request |
-| `latency_ms`  | `12`                      | End‑to‑end upstream duration                                |
+| `msg`         | `"incoming request"` / `"upstream response"` | Log message |
+| `integration` | `"slack"`                 | Integration block name |
+| `caller_id`   | `"user-123"`              | Identifier from incoming plugin |
+| `method`      | `"POST"`                  | HTTP method (request log) |
+| `path`        | `"/api/chat.postMessage"` | Request path (request log) |
+| `status`      | `200`                     | Upstream status code (response log) |
 
 Sample line (wrapped for readability):
 
 ```json
-{"time":"2025-05-29T07:00:12Z","level":"INFO","msg":"forwarded request",
- "integration":"slack","caller_id":"user-123","request_id":"c5ab78d0",
- "method":"POST","path":"/api/chat.postMessage","status":200,
- "latency_ms":78}
+{"time":"2025-05-29T07:00:12Z","level":"INFO","msg":"incoming request","method":"POST","integration":"slack","path":"/api/chat.postMessage","caller_id":"user-123"}
+{"time":"2025-05-29T07:00:12Z","level":"INFO","msg":"upstream response","integration":"slack","status":200}
 ```
 
 ### Log level
