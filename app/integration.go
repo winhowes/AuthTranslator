@@ -123,13 +123,16 @@ type RequestConstraint = integrationplugins.RequestConstraint
 
 // Integration represents a configured proxy integration.
 type Integration struct {
-	Name            string             `json:"name"`
-	Destination     string             `json:"destination"`
-	InRateLimit     int                `json:"in_rate_limit"`
-	OutRateLimit    int                `json:"out_rate_limit"`
-	IncomingAuth    []AuthPluginConfig `json:"incoming_auth"`
-	OutgoingAuth    []AuthPluginConfig `json:"outgoing_auth"`
-	RateLimitWindow string             `json:"rate_limit_window"`
+	Name                  string             `json:"name"`
+	Destination           string             `json:"destination"`
+	InRateLimit           int                `json:"in_rate_limit"`
+	OutRateLimit          int                `json:"out_rate_limit"`
+	IncomingAuth          []AuthPluginConfig `json:"incoming_auth"`
+	OutgoingAuth          []AuthPluginConfig `json:"outgoing_auth"`
+	RateLimitWindow       string             `json:"rate_limit_window"`
+	DisableKeepAlives     bool               `json:"disable_keep_alives"`
+	TLSHandshakeTimeout   string             `json:"tls_handshake_timeout"`
+	ResponseHeaderTimeout string             `json:"response_header_timeout"`
 
 	inLimiter  *RateLimiter
 	outLimiter *RateLimiter
@@ -218,6 +221,25 @@ func prepareIntegration(i *Integration) error {
 			}
 		}
 	}
+
+	tr := http.DefaultTransport.(*http.Transport).Clone()
+	if old, ok := i.proxy.Transport.(*http.Transport); ok {
+		tr = old.Clone()
+	}
+	if i.DisableKeepAlives {
+		tr.DisableKeepAlives = true
+	}
+	if i.TLSHandshakeTimeout != "" {
+		if d, err := time.ParseDuration(i.TLSHandshakeTimeout); err == nil {
+			tr.TLSHandshakeTimeout = d
+		}
+	}
+	if i.ResponseHeaderTimeout != "" {
+		if d, err := time.ParseDuration(i.ResponseHeaderTimeout); err == nil {
+			tr.ResponseHeaderTimeout = d
+		}
+	}
+	i.proxy.Transport = tr
 
 	return nil
 }

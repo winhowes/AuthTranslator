@@ -21,6 +21,18 @@ func validateConfig(c *Config) error {
 				return fmt.Errorf("integration %s has invalid rate_limit_window", i.Name)
 			}
 		}
+		if i.TLSHandshakeTimeout != "" {
+			d, err := time.ParseDuration(i.TLSHandshakeTimeout)
+			if err != nil || d <= 0 {
+				return fmt.Errorf("integration %s has invalid tls_handshake_timeout", i.Name)
+			}
+		}
+		if i.ResponseHeaderTimeout != "" {
+			d, err := time.ParseDuration(i.ResponseHeaderTimeout)
+			if err != nil || d <= 0 {
+				return fmt.Errorf("integration %s has invalid response_header_timeout", i.Name)
+			}
+		}
 	}
 	return nil
 }

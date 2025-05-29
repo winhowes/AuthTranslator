@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net/http"
 	"testing"
 	"time"
 
@@ -205,5 +206,31 @@ func TestIntegrationInvalidWindow(t *testing.T) {
 	}
 	if err := AddIntegration(i); err == nil {
 		t.Fatal("expected error for non-positive window")
+	}
+}
+
+func TestIntegrationDisableKeepAlives(t *testing.T) {
+	i := &Integration{
+		Name:              "keepoff",
+		Destination:       "http://example.com",
+		DisableKeepAlives: true,
+	}
+	if err := AddIntegration(i); err != nil {
+		t.Fatalf("add: %v", err)
+	}
+	t.Cleanup(func() {
+		if i.inLimiter != nil {
+			i.inLimiter.Stop()
+		}
+		if i.outLimiter != nil {
+			i.outLimiter.Stop()
+		}
+	})
+	tr, ok := i.proxy.Transport.(*http.Transport)
+	if !ok {
+		t.Fatal("transport not *http.Transport")
+	}
+	if !tr.DisableKeepAlives {
+		t.Fatal("DisableKeepAlives not set")
 	}
 }
