@@ -21,9 +21,9 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 
-	"github.com/winhowes/AuthTranslator/app/authplugins"
-	_ "github.com/winhowes/AuthTranslator/app/authplugins/plugins"
-	_ "github.com/winhowes/AuthTranslator/app/integrationplugins/plugins"
+	"github.com/winhowes/AuthTranslator/app/auth"
+	_ "github.com/winhowes/AuthTranslator/app/auth/plugins"
+	_ "github.com/winhowes/AuthTranslator/app/integrations/plugins"
 	"github.com/winhowes/AuthTranslator/app/secrets"
 	_ "github.com/winhowes/AuthTranslator/app/secrets/plugins"
 )

@@ -13,8 +13,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/winhowes/AuthTranslator/app/authplugins"
-	integrationplugins "github.com/winhowes/AuthTranslator/app/integrationplugins"
+	"github.com/winhowes/AuthTranslator/app/auth"
+	integrationplugins "github.com/winhowes/AuthTranslator/app/integrations"
 	"github.com/winhowes/AuthTranslator/app/secrets"
 )
 

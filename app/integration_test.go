@@ -11,10 +11,10 @@ import (
 	"testing"
 	"time"
 
-	_ "github.com/winhowes/AuthTranslator/app/authplugins/basic"
-	_ "github.com/winhowes/AuthTranslator/app/authplugins/google_oidc"
-	mtls "github.com/winhowes/AuthTranslator/app/authplugins/mtls"
-	_ "github.com/winhowes/AuthTranslator/app/authplugins/token"
+	_ "github.com/winhowes/AuthTranslator/app/auth/plugins/basic"
+	_ "github.com/winhowes/AuthTranslator/app/auth/plugins/google_oidc"
+	mtls "github.com/winhowes/AuthTranslator/app/auth/plugins/mtls"
+	_ "github.com/winhowes/AuthTranslator/app/auth/plugins/token"
 	_ "github.com/winhowes/AuthTranslator/app/secrets/plugins"
 )
 

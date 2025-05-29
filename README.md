@@ -334,12 +334,12 @@ categories are supported:
 - **Integration plugins** – define reusable integration configurations and
   capability helpers for the CLI.
 
-Auth plugins live in `app/authplugins`. Implement the
+Auth plugins live in `app/auth/plugins`. Implement the
 `IncomingAuthPlugin` or `OutgoingAuthPlugin` interface and register your type in
 an `init()` function using `authplugins.RegisterIncoming` or
 `authplugins.RegisterOutgoing`. The registered name is referenced in the
 configuration. See
-[app/authplugins/example/README.md](app/authplugins/example/README.md) for a
+[app/auth/plugins/example/README.md](app/auth/plugins/example/README.md) for a
 minimal template, which shows how to exclude example code from normal builds
 with a `//go:build` tag.
 

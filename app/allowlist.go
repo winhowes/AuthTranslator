@@ -9,8 +9,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/winhowes/AuthTranslator/app/authplugins"
-	integrationplugins "github.com/winhowes/AuthTranslator/app/integrationplugins"
+	"github.com/winhowes/AuthTranslator/app/auth"
+	integrationplugins "github.com/winhowes/AuthTranslator/app/integrations"
 )
 
 var allowlists = struct {

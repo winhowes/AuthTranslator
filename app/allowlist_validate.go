@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	integrationplugins "github.com/winhowes/AuthTranslator/app/integrationplugins"
+	integrationplugins "github.com/winhowes/AuthTranslator/app/integrations"
 )
 
 // validateAllowlistEntries checks for duplicate integrations, well formatted
