@@ -18,6 +18,14 @@ var allowlists = struct {
 	m map[string]map[string]CallerConfig
 }{m: make(map[string]map[string]CallerConfig)}
 
+func splitPath(p string) []string {
+	clean := strings.Trim(path.Clean(p), "/")
+	if clean == "" {
+		return []string{}
+	}
+	return strings.Split(clean, "/")
+}
+
 // validateAllowlist ensures callers and rules are unique after capability
 // expansion. The ID "" is treated as "*".
 func validateAllowlist(name string, callers []CallerConfig) error {
@@ -60,6 +68,9 @@ func SetAllowlist(name string, callers []CallerConfig) error {
 
 	m := make(map[string]CallerConfig, len(callers))
 	for _, c := range callers {
+		for ri := range c.Rules {
+			c.Rules[ri].Segments = splitPath(c.Rules[ri].Path)
+		}
 		id := c.ID
 		if id == "" {
 			id = "*"
@@ -87,9 +98,7 @@ func GetAllowlist(name string) []CallerConfig {
 // matchPath checks whether the request path matches the pattern. '*' matches a
 // single path segment while '**' matches any remaining segments.
 func matchPath(pattern, p string) bool {
-	pattSegs := strings.Split(strings.Trim(path.Clean(pattern), "/"), "/")
-	segs := strings.Split(strings.Trim(path.Clean(p), "/"), "/")
-	return matchSegments(pattSegs, segs)
+	return matchSegments(splitPath(pattern), splitPath(p))
 }
 
 func matchSegments(pattern, path []string) bool {
@@ -224,6 +233,8 @@ func matchValue(data, rule interface{}) bool {
 // findConstraint returns the RequestConstraint for the given caller, path and
 // method if one exists.
 func findConstraint(i *Integration, callerID, pth, method string) (RequestConstraint, bool) {
+	segments := splitPath(pth)
+
 	allowlists.RLock()
 	callers := allowlists.m[i.Name]
 	wildcard, hasWildcard := callers["*"]
@@ -232,7 +243,7 @@ func findConstraint(i *Integration, callerID, pth, method string) (RequestConstr
 
 	if ok {
 		for _, r := range c.Rules {
-			if matchPath(r.Path, pth) {
+			if matchSegments(r.Segments, segments) {
 				if m, ok := r.Methods[method]; ok {
 					return m, true
 				}
@@ -241,7 +252,7 @@ func findConstraint(i *Integration, callerID, pth, method string) (RequestConstr
 	}
 	if hasWildcard {
 		for _, r := range wildcard.Rules {
-			if matchPath(r.Path, pth) {
+			if matchSegments(r.Segments, segments) {
 				if m, ok := r.Methods[method]; ok {
 					return m, true
 				}
