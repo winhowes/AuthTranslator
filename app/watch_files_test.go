@@ -46,7 +46,9 @@ func TestWatchFilesRename(t *testing.T) {
 	defer os.Remove(name)
 
 	ch := make(chan struct{}, 2)
-	go watchFiles([]string{name}, ch)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go watchFiles(ctx, []string{name}, ch)
 
 	// allow watcher to start
 	time.Sleep(20 * time.Millisecond)
