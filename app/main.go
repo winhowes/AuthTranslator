@@ -136,23 +136,51 @@ func reload() error {
 		return err
 	}
 
-	// Clear existing integrations and stop their limiters.
+	// Build new integration set without mutating the existing one so we can
+	// roll back on failure.
+	integrations.RLock()
+	oldIntegrations := integrations.m
+	integrations.RUnlock()
+
+	newMap := make(map[string]*Integration)
+	for i := range cfg.Integrations {
+		integ := cfg.Integrations[i]
+		if err := prepareIntegration(&integ); err != nil {
+			// cleanup any created limiters
+			for _, ni := range newMap {
+				ni.inLimiter.Stop()
+				ni.outLimiter.Stop()
+			}
+			return fmt.Errorf("failed to load integration %s: %w", integ.Name, err)
+		}
+		if _, exists := newMap[integ.Name]; exists {
+			for _, ni := range newMap {
+				ni.inLimiter.Stop()
+				ni.outLimiter.Stop()
+			}
+			return fmt.Errorf("integration %s already exists", integ.Name)
+		}
+		window := integ.rateLimitDur
+		if window == 0 {
+			window = time.Minute
+		}
+		integ.inLimiter = NewRateLimiter(integ.InRateLimit, window)
+		integ.outLimiter = NewRateLimiter(integ.OutRateLimit, window)
+		newMap[integ.Name] = &integ
+	}
+
+	// Replace integrations and stop the old ones after success.
 	integrations.Lock()
-	for _, i := range integrations.m {
+	integrations.m = newMap
+	integrations.Unlock()
+
+	for _, i := range oldIntegrations {
 		i.inLimiter.Stop()
 		i.outLimiter.Stop()
 	}
-	integrations.m = make(map[string]*Integration)
-	integrations.Unlock()
 
 	// Clear secret cache so reloaded integrations use fresh values.
 	secrets.ClearCache()
-
-	for i := range cfg.Integrations {
-		if err := AddIntegration(&cfg.Integrations[i]); err != nil {
-			return fmt.Errorf("failed to load integration %s: %w", cfg.Integrations[i].Name, err)
-		}
-	}
 
 	entries, err := loadAllowlists(*allowlistFile)
 	allowlists.RLock()

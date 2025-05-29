@@ -151,6 +151,13 @@ func TestReloadIntegrationError(t *testing.T) {
 	integrations.m = make(map[string]*Integration)
 	integrations.Unlock()
 
+	// add a valid integration that should survive the failed reload
+	base := &Integration{Name: "base", Destination: "http://example.com"}
+	if err := AddIntegration(base); err != nil {
+		t.Fatalf("setup base integration: %v", err)
+	}
+	t.Cleanup(func() { base.inLimiter.Stop(); base.outLimiter.Stop() })
+
 	cfgFile, err := os.CreateTemp("", "cfg*.yaml")
 	if err != nil {
 		t.Fatal(err)
@@ -175,6 +182,10 @@ func TestReloadIntegrationError(t *testing.T) {
 	flag.Set("allowlist", alFile.Name())
 	if err := reload(); err == nil {
 		t.Fatal("expected integration error")
+	}
+
+	if _, ok := GetIntegration("base"); !ok {
+		t.Fatal("existing integration lost after failed reload")
 	}
 }
 
