@@ -1,6 +1,6 @@
-# `config.yaml` Basics
+# config.yaml at a glance
 
-Each integration block tells AuthTranslator where to forward requests and how to authenticate both incoming and outgoing traffic.
+Each **integration** block tells AuthTranslator where to send traffic and how to translate credentials on the way in _and_ out.
 
 ```yaml
 integrations:
@@ -27,7 +27,7 @@ integrations:
       requests: 800
 ```
 
-The integration name (`slack` above) is referenced by the allowlist. Incoming plugins run in order until one succeeds, producing the caller ID. Outgoing plugins modify each request before forwarding it to the `destination` URL.
+The integration name (`slack` above) is referenced by the allowlist. Incoming plugins run in order until one succeeds, optionally producing the caller ID (depending on the auth plugins). Outgoing plugins modify each request before forwarding it to the `destination` URL.
 
 ## Multiple secrets
 
