@@ -68,7 +68,7 @@ Adds the configured token to the `X-Api-Key` header on each request.
 
 ## Writing your own plugin
 
-1. **Create a new package** under `plugins/auth/<name>`.
+1. **Create a new package** under `app/auth/plugins/<name>`.
 2. Implement exactly one of:
 
    ```go
@@ -82,9 +82,9 @@ Adds the configured token to the `X-Api-Key` header on each request.
    ```go
    auth.Register("<name>", &MyPlugin{})
    ```
-4. `go test ./plugins/...` – the main binary picks it up automatically.
+4. `go test ./app/...` – the main binary picks it up automatically.
 
-A minimal example lives in [`plugins/auth/example`](../plugins/auth/example).
+A minimal example lives in [`app/auth/plugins/example`](../app/auth/plugins/example).
 
 ---
 
