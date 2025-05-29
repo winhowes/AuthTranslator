@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"math"
 	"net/http"
 	"strconv"
 	"time"
@@ -95,6 +96,9 @@ func (s *SlackSignatureAuth) Authenticate(ctx context.Context, r *http.Request, 
 
 func abs(i int64) int64 {
 	if i < 0 {
+		if i == math.MinInt64 {
+			return math.MaxInt64
+		}
 		return -i
 	}
 	return i
