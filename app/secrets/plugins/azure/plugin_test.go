@@ -15,6 +15,12 @@ type azureRewriteTransport struct {
 	host   string
 }
 
+type errorRoundTripper struct{}
+
+func (errorRoundTripper) RoundTrip(*http.Request) (*http.Response, error) {
+	return nil, fmt.Errorf("network error")
+}
+
 func (t *azureRewriteTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	req.URL.Scheme = t.scheme
 	req.URL.Host = t.host
@@ -159,5 +165,16 @@ func TestAzureKMSTokenRequestFailure(t *testing.T) {
 	p := azureKMSPlugin{}
 	if _, err := p.Load(context.Background(), "https://vault.example.com/secrets/foo"); err == nil {
 		t.Fatal("expected error")
+	}
+}
+
+func TestAzureKMSBadURL(t *testing.T) {
+	t.Setenv("AZURE_TENANT_ID", "tenant")
+	t.Setenv("AZURE_CLIENT_ID", "id")
+	t.Setenv("AZURE_CLIENT_SECRET", "sec")
+
+	p := azureKMSPlugin{}
+	if _, err := p.Load(context.Background(), "http://[::1"); err == nil {
+		t.Fatal("expected error for bad url")
 	}
 }

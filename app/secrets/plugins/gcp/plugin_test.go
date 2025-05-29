@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -22,6 +23,12 @@ func (t *gcpRewriteTransport) RoundTrip(req *http.Request) (*http.Response, erro
 	req.URL.Scheme = t.scheme
 	req.URL.Host = t.host
 	return t.rt.RoundTrip(req)
+}
+
+type errorRoundTripper struct{}
+
+func (errorRoundTripper) RoundTrip(*http.Request) (*http.Response, error) {
+	return nil, fmt.Errorf("network error")
 }
 
 func setGCPTestClient(ts *httptest.Server) func() {
@@ -168,6 +175,23 @@ func TestGCPKMSDecryptFail(t *testing.T) {
 	defer ts.Close()
 	restore := setGCPTestClient(ts)
 	defer restore()
+
+	p := gcpKMSPlugin{}
+	if _, err := p.Load(context.Background(), "projects/p/locations/l/keyRings/r/cryptoKeys/k:cipher"); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestGCPKMSTokenRequestError(t *testing.T) {
+	oldDef := http.DefaultClient
+	old := HTTPClient
+	c := &http.Client{Transport: errorRoundTripper{}}
+	http.DefaultClient = c
+	HTTPClient = c
+	defer func() {
+		http.DefaultClient = oldDef
+		HTTPClient = old
+	}()
 
 	p := gcpKMSPlugin{}
 	if _, err := p.Load(context.Background(), "projects/p/locations/l/keyRings/r/cryptoKeys/k:cipher"); err == nil {
