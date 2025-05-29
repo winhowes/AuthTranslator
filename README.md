@@ -322,14 +322,40 @@ Integration plugins can bundle common allowlist rules into **capabilities**. Ass
 
 ### Secret Plugin Environment Variables
 
-| Prefix | Environment Variables | Description |
-| ------ | -------------------- | ----------- |
-| `env`  | Names referenced in the configuration (e.g. `env:IN_TOKEN`) | Secrets are read directly from those environment variables. |
-| `file` | _none_ | Reads file contents from disk for `file:` secrets. |
-| `aws`  | `AWS_KMS_KEY` | Base64 encoded 32 byte key used for decrypting `aws:` secrets. |
-| `azure`| `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET` | Credentials for fetching `azure:` secrets from Key Vault. |
-| `gcp`  | _none_ | Uses the GCP metadata service for authentication when resolving `gcp:` secrets. |
-| `vault`| `VAULT_ADDR`, `VAULT_TOKEN` | Fetches secrets from HashiCorp Vault via the HTTP API. |
+| Prefix | Environment Variables | Description | Example |
+| ------ | -------------------- | ----------- | ------- |
+| `env`  | Names referenced in the configuration (e.g. `env:IN_TOKEN`) | Secrets are read directly from those environment variables. | `env:IN_TOKEN` resolves to `$IN_TOKEN` |
+| `file` | _none_ | Reads file contents from disk for `file:` secrets. | `file:/etc/token` reads `/etc/token` |
+| `aws`  | `AWS_KMS_KEY` | Base64 encoded 32 byte key used for decrypting `aws:` secrets. | `aws:prod/token` decrypts the stored value |
+| `azure`| `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET` | Credentials for fetching `azure:` secrets from Key Vault. | `azure:/kv/token` fetches `token` from Key Vault |
+| `gcp`  | _none_ | Uses the GCP metadata service for authentication when resolving `gcp:` secrets. | `gcp:/projects/p/secrets/token` from Secret Manager |
+| `vault`| `VAULT_ADDR`, `VAULT_TOKEN` | Fetches secrets from HashiCorp Vault via the HTTP API. | `vault:secret/data/api` reads from Vault |
+
+Example usage:
+
+```bash
+export IN_TOKEN=secret-in            # env:IN_TOKEN
+echo "out" > /tmp/out.token         # file:/tmp/out.token
+export AWS_KMS_KEY=$(cat kms.b64)    # decrypts aws:prod/token
+export AZURE_TENANT_ID=xxxxx
+export AZURE_CLIENT_ID=yyyyy
+export AZURE_CLIENT_SECRET=zzzzz
+# gcp plugin relies on metadata service
+export VAULT_ADDR=https://vault.example.com
+export VAULT_TOKEN=s.myroot
+```
+
+```json
+{
+  "integrations": [
+    {
+      "name": "example",
+      "incoming_auth": [{"type": "token", "params": {"secrets": ["vault:secret/data/api"]}}],
+      "outgoing_auth": [{"type": "token", "params": {"secrets": ["env:IN_TOKEN", "file:/tmp/out.token"]}}]
+    }
+  ]
+}
+```
 
 ### Writing Plugins
 
