@@ -458,6 +458,7 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 		if p != nil {
 			if !p.Authenticate(r, cfg.parsed) {
 				logger.Warn("authentication failed", "host", host, "remote", r.RemoteAddr)
+				incAuthFailure(integ.Name)
 				http.Error(w, "Unauthorized", http.StatusUnauthorized)
 				return
 			}
@@ -513,6 +514,7 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 	if rec.status == 0 {
 		rec.status = http.StatusOK
 	}
+	recordStatus(integ.Name, rec.status)
 	logger.Info("upstream response", "host", host, "status", rec.status)
 }
 
