@@ -55,11 +55,11 @@ incoming_auth:
 
 ```yaml
 outgoing_auth:
-  type: token
-  params:
-    secrets:
-      - env:API_TOKEN
-    header: X-Api-Key
+  - type: token
+    params:
+      secrets:
+        - env:API_TOKEN
+      header: X-Api-Key
 ```
 
 Adds the configured token to the `X-Api-Key` header on each request.

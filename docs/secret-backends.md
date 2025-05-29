@@ -4,12 +4,12 @@ AuthTranslator never expects you to paste raw API keys into a YAML file. Inste
 
 ```yaml
 outgoing_auth:
-  type: token
-  params:
-    secrets:
-      - gcp:projects/acme/locations/global/keyRings/auth/cryptoKeys/token:ciphertext
-    header: Authorization
-    prefix: "Bearer "
+  - type: token
+    params:
+      secrets:
+        - gcp:projects/acme/locations/global/keyRings/auth/cryptoKeys/token:ciphertext
+      header: Authorization
+      prefix: "Bearer "
 ```
 
 ---
