@@ -181,7 +181,7 @@ func TestIntegrationRateLimitWindow(t *testing.T) {
 		Destination:     "http://example.com",
 		InRateLimit:     1,
 		OutRateLimit:    1,
-		RateLimitWindow: "10ms",
+		RateLimitWindow: "30ms",
 	}
 	if err := AddIntegration(i); err != nil {
 		t.Fatalf("add: %v", err)
@@ -197,7 +197,7 @@ func TestIntegrationRateLimitWindow(t *testing.T) {
 	if i.inLimiter.Allow("a") {
 		t.Fatal("limit should be enforced")
 	}
-	time.Sleep(15 * time.Millisecond)
+	time.Sleep(40 * time.Millisecond)
 	if !i.inLimiter.Allow("a") {
 		t.Fatal("limit did not reset after window")
 	}

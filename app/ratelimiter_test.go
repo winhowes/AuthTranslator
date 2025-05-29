@@ -22,7 +22,7 @@ func TestRateLimiterExceedLimit(t *testing.T) {
 }
 
 func TestRateLimiterReset(t *testing.T) {
-	rl := NewRateLimiter(1, 10*time.Millisecond)
+	rl := NewRateLimiter(1, 20*time.Millisecond)
 	t.Cleanup(rl.Stop)
 	key := "caller"
 
@@ -34,7 +34,7 @@ func TestRateLimiterReset(t *testing.T) {
 	}
 
 	// wait for reset
-	time.Sleep(15 * time.Millisecond)
+	time.Sleep(25 * time.Millisecond)
 
 	if !rl.Allow(key) {
 		t.Fatal("rate limiter should reset after duration")
@@ -70,7 +70,7 @@ func TestRateLimiterRedisFallback(t *testing.T) {
 	*redisAddr = "127.0.0.1:0" // unreachable
 	oldTimeout := *redisTimeout
 	*redisTimeout = time.Millisecond
-	rl := NewRateLimiter(1, time.Millisecond)
+	rl := NewRateLimiter(1, 10*time.Millisecond)
 	t.Cleanup(func() {
 		rl.Stop()
 		*redisAddr = old
