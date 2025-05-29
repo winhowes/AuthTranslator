@@ -512,6 +512,9 @@ If you have [`golangci-lint`](https://github.com/golangci/golangci-lint) install
 golangci-lint run
 ```
 
+The CI workflow caches the Go modules directory using `actions/cache` to speed
+up dependency installation.
+
 ## Docker
 
 Build the container image:
