@@ -134,7 +134,7 @@ type Integration struct {
 
 	rateLimitDur time.Duration `json:"-"`
 
-  IdleConnTimeout       string `json:"idle_conn_timeout,omitempty"`
+	IdleConnTimeout       string `json:"idle_conn_timeout,omitempty"`
 	TLSHandshakeTimeout   string `json:"tls_handshake_timeout,omitempty"`
 	ResponseHeaderTimeout string `json:"response_header_timeout,omitempty"`
 	TLSInsecureSkipVerify bool   `json:"tls_insecure_skip_verify,omitempty"`
