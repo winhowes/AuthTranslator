@@ -2,16 +2,22 @@ package jwt
 
 import (
 	"context"
+	"crypto"
 	"crypto/hmac"
+	"crypto/rand"
+	"crypto/rsa"
 	"crypto/sha256"
+	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"net/http"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/winhowes/AuthTranslator/app/secrets"
 	_ "github.com/winhowes/AuthTranslator/app/secrets/plugins"
 )
 
@@ -123,5 +129,123 @@ func TestJWTParseParamsDefaultsAndError(t *testing.T) {
 	}
 	if _, err := p.ParseParams(map[string]interface{}{}); err == nil {
 		t.Fatal("expected error")
+	}
+}
+
+func makeRS256TokenClaims(t *testing.T, key *rsa.PrivateKey, aud, iss, sub string, exp int64) string {
+	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"RS256"}`))
+	claims := map[string]interface{}{"aud": aud, "iss": iss, "sub": sub, "exp": exp}
+	payloadBytes, _ := json.Marshal(claims)
+	payload := base64.RawURLEncoding.EncodeToString(payloadBytes)
+	signingInput := header + "." + payload
+	hash := sha256.Sum256([]byte(signingInput))
+	sig, err := rsa.SignPKCS1v15(rand.Reader, key, crypto.SHA256, hash[:])
+	if err != nil {
+		t.Fatal(err)
+	}
+	signature := base64.RawURLEncoding.EncodeToString(sig)
+	return signingInput + "." + signature
+}
+
+// failPlugin simulates a failing secrets provider.
+type failPlugin struct{}
+
+func (failPlugin) Prefix() string                               { return "fail" }
+func (failPlugin) Load(context.Context, string) (string, error) { return "", fmt.Errorf("fail") }
+
+func TestJWTAuthRS256(t *testing.T) {
+	secrets.ClearCache()
+	key, err := rsa.GenerateKey(rand.Reader, 1024)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tok := makeRS256TokenClaims(t, key, "aud", "iss", "user", time.Now().Add(time.Hour).Unix())
+	pubBytes, err := x509.MarshalPKIXPublicKey(&key.PublicKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pemBytes := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: pubBytes})
+	t.Setenv("PUB", string(pemBytes))
+	p := JWTAuth{}
+	cfg, err := p.ParseParams(map[string]interface{}{"secrets": []string{"env:PUB"}, "audience": "aud", "issuer": "iss"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := &http.Request{Header: http.Header{"Authorization": []string{"Bearer " + tok}}}
+	if !p.Authenticate(context.Background(), r, cfg) {
+		t.Fatal("expected authentication to succeed")
+	}
+	if id, ok := p.Identify(r, cfg); !ok || id != "user" {
+		t.Fatalf("unexpected id %s", id)
+	}
+}
+
+func TestJWTAuthUnsupportedAlgo(t *testing.T) {
+	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"none"}`))
+	payload := base64.RawURLEncoding.EncodeToString([]byte(`{}`))
+	tok := header + "." + payload + ".sig"
+	r := &http.Request{Header: http.Header{"Authorization": []string{"Bearer " + tok}}}
+	p := JWTAuth{}
+	t.Setenv("K", "key")
+	cfg, err := p.ParseParams(map[string]interface{}{"secrets": []string{"env:K"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Authenticate(context.Background(), r, cfg) {
+		t.Fatal("expected auth to fail")
+	}
+}
+
+func TestJWTOutgoingEdgeCases(t *testing.T) {
+	secrets.ClearCache()
+	secrets.Register(failPlugin{})
+	p := JWTAuthOut{}
+	r := &http.Request{Header: http.Header{}}
+	// bad params type
+	p.AddAuth(context.Background(), r, struct{}{})
+	if h := r.Header.Get("Authorization"); h != "" {
+		t.Fatalf("expected empty header, got %s", h)
+	}
+	// missing secrets
+	r = &http.Request{Header: http.Header{}}
+	p.AddAuth(context.Background(), r, &outParams{})
+	if h := r.Header.Get("Authorization"); h != "" {
+		t.Fatalf("expected empty header, got %s", h)
+	}
+	// secret load error
+	r = &http.Request{Header: http.Header{}}
+	p.AddAuth(context.Background(), r, &outParams{Secrets: []string{"fail:oops"}})
+	if h := r.Header.Get("Authorization"); h != "" {
+		t.Fatalf("expected empty header, got %s", h)
+	}
+	// custom header/prefix success
+	t.Setenv("TOK", "t1")
+	r = &http.Request{Header: http.Header{}}
+	cfg := &outParams{Secrets: []string{"env:TOK"}, Header: "Authz", Prefix: "pre "}
+	p.AddAuth(context.Background(), r, cfg)
+	if got := r.Header.Get("Authz"); got != "pre t1" {
+		t.Fatalf("expected 'pre t1', got %s", got)
+	}
+}
+
+func TestJWTOutgoingParseParams(t *testing.T) {
+	p := JWTAuthOut{}
+	t.Setenv("TOK", "tok")
+	cfg, err := p.ParseParams(map[string]interface{}{"secrets": []string{"env:TOK"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := cfg.(*outParams)
+	if out.Header != "Authorization" || out.Prefix != "Bearer " {
+		t.Fatalf("unexpected defaults: %#v", out)
+	}
+	if _, err := p.ParseParams(map[string]interface{}{}); err == nil {
+		t.Fatal("expected error for missing secrets")
+	}
+	if req := p.RequiredParams(); len(req) != 1 || req[0] != "secrets" {
+		t.Fatalf("unexpected required params: %v", req)
+	}
+	if opt := p.OptionalParams(); len(opt) != 2 || opt[0] != "header" {
+		t.Fatalf("unexpected optional params: %v", opt)
 	}
 }
