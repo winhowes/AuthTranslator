@@ -58,7 +58,7 @@ callers:
 >
 > (Use `--help` for the exact flag name.)
 >
-> For guidelines on adding new capabilities, see [integrations.md](integrations.md).
+> For guidelines on adding new capabilities, see [integration-plugins.md](integration-plugins.md).
 
 ### Granular Rule
 
