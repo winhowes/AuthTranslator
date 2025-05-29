@@ -11,8 +11,10 @@ AuthTranslator surfaces **health probes, Prometheus metrics, and structured logs
 | `/_at_internal/healthz` | `GET`  | Liveness: returns **200 OK** once the HTTP server is up. No external deps are checked.                | Kubernetes `livenessProbe` every 10 s |
 | `/_at_internal/metrics` | `GET`  | Exposes **Prometheus** text format. Includes Go runtime metrics and AuthTranslator‑specific counters. | Prometheus `scrape_interval` 15 s     |
 
-Both endpoints are always available; no extra flag is required. The readiness
-check also returns an `X-Last-Reload` header showing the most recent
+The health endpoint is always available. The metrics endpoint is exposed by
+default but can be disabled with `-enable-metrics=false`. Provide
+`-metrics-user` and `-metrics-pass` to require HTTP Basic credentials. The
+readiness check also returns an `X-Last-Reload` header showing the most recent
 configuration reload time.
 
 ---
