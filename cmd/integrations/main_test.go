@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"strings"
 	"testing"
 
@@ -230,5 +231,70 @@ func TestMainUpdateDeleteCommands(t *testing.T) {
 
 	if len(methods) != 2 || methods[0] != http.MethodPut || methods[1] != http.MethodDelete {
 		t.Fatalf("requests not issued as expected: %v", methods)
+	}
+}
+
+// Helper process for exercising main() in a separate process.
+func TestMainHelper(t *testing.T) {
+	if os.Getenv("GO_WANT_INTEGRATIONS_HELPER") != "1" {
+		return
+	}
+	for i, a := range os.Args {
+		if a == "--" {
+			os.Args = append([]string{os.Args[0]}, os.Args[i+1:]...)
+			break
+		}
+	}
+	// Recreate flag set and server flag so we can parse arguments.
+	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+	server = flag.CommandLine.String("server", *server, "integration endpoint")
+	main()
+	os.Exit(0)
+}
+
+func TestMainUnknownPlugin(t *testing.T) {
+	cmd := exec.Command(os.Args[0], "-test.run=TestMainHelper", "--", "unknown")
+	cmd.Env = append(os.Environ(), "GO_WANT_INTEGRATIONS_HELPER=1")
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("expected error, got nil")
+	}
+	if !strings.Contains(string(out), "unknown plugin unknown") {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestMainServerError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "boom", http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	cmd := exec.Command(os.Args[0], "-test.run=TestMainHelper", "--", "-server", srv.URL+"/integrations", "update", "slack", "-token", "t", "-signing-secret", "s")
+	cmd.Env = append(os.Environ(), "GO_WANT_INTEGRATIONS_HELPER=1")
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("expected error, got nil")
+	}
+	if !strings.Contains(string(out), "server error") {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestMainListInvalidJSON(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("notjson"))
+	}))
+	defer srv.Close()
+
+	cmd := exec.Command(os.Args[0], "-test.run=TestMainHelper", "--", "-server", srv.URL+"/integrations", "list")
+	cmd.Env = append(os.Environ(), "GO_WANT_INTEGRATIONS_HELPER=1")
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("expected error, got nil")
+	}
+	if !strings.Contains(string(out), "invalid character") {
+		t.Fatalf("unexpected output: %s", out)
 	}
 }
