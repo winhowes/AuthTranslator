@@ -613,3 +613,27 @@ func TestMainWatchReload(t *testing.T) {
 		t.Fatal("config change did not trigger reload")
 	}
 }
+
+func TestMainMetricsFlagMismatch(t *testing.T) {
+	cfg := writeTempFile(t, `{"integrations":[{"name":"test","destination":"http://example.com"}]}`)
+	defer os.Remove(cfg)
+	al := writeTempFile(t, `[]`)
+	defer os.Remove(al)
+
+	addr := freeAddr(t)
+	cases := [][]string{
+		{"-metrics-user", "admin"},
+		{"-metrics-pass", "secret"},
+	}
+	for i, c := range cases {
+		args := append([]string{"-config", cfg, "-allowlist", al, "-addr", addr}, c...)
+		cmd := runMainCmd(args...)
+		err := cmd.Run()
+		if err == nil {
+			t.Fatalf("case %d: expected error for metrics flag mismatch", i)
+		}
+		if ee, ok := err.(*exec.ExitError); !ok || ee.ExitCode() == 0 {
+			t.Fatalf("case %d: unexpected exit status: %v", i, err)
+		}
+	}
+}
