@@ -1,4 +1,4 @@
-# config.yaml at a glance
+# `config.yaml` at a glance
 
 Each **integration** block tells AuthTranslator where to send traffic and how to translate credentials on the way in _and_ out.
 
