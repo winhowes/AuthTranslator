@@ -7,7 +7,7 @@ outgoing_auth:
   type: token
   params:
     secrets:
-      - gcp-secret://projects/acme/secrets/slackToken/latest
+      - gcp:projects/acme/locations/global/keyRings/auth/cryptoKeys/token:ciphertext
     header: Authorization
     prefix: "Bearer "
 ```
@@ -20,9 +20,9 @@ outgoing_auth:
 | ---------------- | ------------------------------------------------------------------- | ------------------------------------------------------------- |
 | `env`            | `env:SLACK_TOKEN`                                                   | Local dev & CI – the token sits in an env var.                |
 | `file`           | `file:///etc/secrets/slack_token`                                   | Kubernetes **secret volume** or Docker bind‑mount.            |
-| `gcp-secret`     | `gcp-secret://projects/acme/secrets/slackToken/latest`              | Running on GKE / Cloud Run; leverages **Secret Manager** IAM. |
-| `aws-secret`     | `aws-secret://arn:aws:secretsmanager:us‑west‑2:123456:secret:slack` | EKS, ECS or EC2 with **Secrets Manager** policy.              |
-| `azure-keyvault` | `azure-keyvault://kv‑name/secret-name`                              | AKS or VM SS with **Managed Identity**.                       |
+| `gcp`            | `gcp:projects/acme/locations/global/keyRings/auth/cryptoKeys/token:ciphertext` | Running on GKE / Cloud Run; decrypt via **Cloud KMS**. |
+| `aws`            | `aws:Ci0KU29tZUNpcGhlcnRleHQ=` | AES‑GCM encrypted values decrypted using `AWS_KMS_KEY`. |
+| `azure`          | `azure:https://kv-name.vault.azure.net/secrets/secret-name`         | AKS or VM SS with **Managed Identity**.                       |
 | `vault`          | `vault://kv/data/slack#token`                                       | Self‑hosted **HashiCorp Vault** cluster.                      |
 
 > **Not exhaustive** — you can add more with \~50 LoC (see below).
@@ -35,9 +35,9 @@ Some schemes rely on environment variables for authentication or decryption:
 | ------ | -------------------- | ----------- | ------- |
 | `env`  | Names referenced in the configuration (e.g. `env:IN_TOKEN`) | Secrets are read directly from those variables. | `env:IN_TOKEN` resolves to `$IN_TOKEN` |
 | `file` | _none_ | Reads file contents from disk for `file:` secrets. | `file:/etc/token` reads `/etc/token` |
-| `aws-secret` | `AWS_KMS_KEY` | Base64 encoded 32 byte key for decrypting `aws:` secrets. | `aws:prod/token` decrypts the stored value |
-| `azure-keyvault` | `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET` | Credentials for fetching `azure:` secrets from Key Vault. | `azure:/kv/token` fetches `token` from Key Vault |
-| `gcp-secret` | _none_ | Uses the GCP metadata service when resolving `gcp:` secrets. | `gcp:/projects/p/secrets/token` from Secret Manager |
+| `aws` | `AWS_KMS_KEY` | Base64 encoded 32 byte key for decrypting `aws:` secrets. | `aws:Ci0KU29tZUNpcGhlcnRleHQ=` |
+| `azure` | `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET` | Credentials for fetching `azure:` secrets from Key Vault. | `azure:https://kv-name.vault.azure.net/secrets/token` |
+| `gcp` | _none_ | Uses the GCP metadata service when resolving `gcp:` secrets. | `gcp:projects/p/locations/l/keyRings/r/cryptoKeys/k:cipher` |
 | `vault` | `VAULT_ADDR`, `VAULT_TOKEN` | Fetches secrets from HashiCorp Vault via its HTTP API. | `vault:secret/data/api` reads from Vault |
 
 ```bash
@@ -47,7 +47,7 @@ export AWS_KMS_KEY=$(cat kms.b64)    # decrypts aws:prod/token
 export AZURE_TENANT_ID=xxxxx
 export AZURE_CLIENT_ID=yyyyy
 export AZURE_CLIENT_SECRET=zzzzz
-# gcp-secret relies on metadata service
+# gcp relies on metadata service
 export VAULT_ADDR=https://vault.example.com
 export VAULT_TOKEN=s.myroot
 ```

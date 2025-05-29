@@ -76,9 +76,9 @@ Secrets can be pulled from several providers:
 
 * **env:** `SLACK_TOKEN=…`
 * **file:** path to an on‑disk file
-* **gcp‑secret:** Google Secret Manager
-* **aws‑secret:** AWS Secrets Manager
-* **azure‑keyvault:** Azure Key Vault
+* **gcp:** Google Cloud KMS
+* **aws:** AWS Secrets Manager
+* **azure:** Azure Key Vault
 * **vault:** HashiCorp Vault
 
 Need another store? Writing a plug‑in takes \~50 LoC – see [`app/secrets/plugins/env`](app/secrets/plugins/env).
