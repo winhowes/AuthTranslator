@@ -1,4 +1,4 @@
-[# Integration Plugins
+# Integration Plugins
 
 While **auth plugins** focus on translating credentials, an **integration plugin** bundles everything required to speak to a specific upstream service—URL, auth hints, default rate‑limits, and convenience CLI helpers.
 Think of it as a *cookie‑cutter* that stamps out a ready‑to‑run block in your `config.yaml` so teams don’t reinvent the wheel for common SaaS APIs.
@@ -13,9 +13,9 @@ Think of it as a *cookie‑cutter* that stamps out a ready‑to‑run block in y
 
 | Name     | Upstream base URL        | Default outgoing auth | Extras                                                             |
 | -------- | ------------------------ | --------------------- | ------------------------------------------------------------------ |
-| `slack`  | `https://slack.com`      | `slack_app_token`     | Adds `Content‑Type: application/json` and retries 429 w/ back‑off. |
-| `github` | `https://api.github.com` | `bearer_static`       | Sets `User‑Agent: authtranslator` and bumps Go’s idle conn limit.  |
-| `stripe` | `https://api.stripe.com` | `basic_static`        | Forces HTTP/1.1 per Stripe docs.                                   |
+| `slack`  | `https://slack.com`      | `token`               | Adds `Authorization: Bearer <token>` and retries 429 with back‑off. |
+| `github` | `https://api.github.com` | `token`               | Sets `User‑Agent: authtranslator` and bumps Go's idle connection limit. |
+| `stripe` | `https://api.stripe.com` | `basic`               | Forces HTTP/1.1 per Stripe docs.                                   |
 
 *(Full list lives under ******[`plugins/integration/`](../plugins/integration/)******)*
 
@@ -53,7 +53,7 @@ Minimal template:
 func New(opts Options) (*config.Integration, error) {
     return &config.Integration{
         Destination:   "https://example.com",
-        OutgoingAuth:  config.PluginSpec{Type: "header_static", Params: map[string]any{"header": "X-Api-Key", "value": "env:EXAMPLE_KEY"}},
+        OutgoingAuth:  config.PluginSpec{Type: "token", Params: map[string]any{"header": "X-Api-Key", "secrets": []string{"env:EXAMPLE_KEY"}}},
         Transport:     config.Transport{Timeout: 10 * time.Second},
         RateLimit:     config.RateLimit{Window: time.Minute, Requests: 1000},
     }, nil
@@ -82,4 +82,3 @@ From here you can tweak fields—e.g. turn on `tls_skip_verify` for a dev sandbo
 * **Namespace tags** Add `tags: [chat, slack]` so dashboards can group traffic.
 * **Keep zero secrets** Integration plugins should only reference secret URIs, never raw tokens.
 
-](https://chatgpt.com/c/6837f80a-afdc-8006-b041-fabc16df451b)

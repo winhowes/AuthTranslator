@@ -21,9 +21,12 @@ integrations:
   slack:
     destination: https://slack.com
     outgoing_auth:
-      type: slack_app_token
+      type: token
       params:
-        token: env:SLACK_TOKEN          # secret URI – see docs/secret-backends.md
+        secrets:
+          - env:SLACK_TOKEN            # secret URI – see docs/secret-backends.md
+        header: Authorization
+        prefix: "Bearer "
     transport:
       timeout: 10s
       tls_skip_verify: false
@@ -54,7 +57,7 @@ integrations:
 #### `PluginSpec`
 
 ```yaml
- type: bearer_token
+ type: jwt
  params:
    issuer: https://auth.example.com
    audience: slack-proxy

@@ -1,6 +1,6 @@
 # Deploying with Helm
 
-This guide walks through installing **AuthTranslator** on Kubernetes using the Helm chart found in **`charts/authtranslator/`**. Helm ≥ 3.9 is assumed.
+This guide walks through installing **AuthTranslator** on Kubernetes using the Helm chart found in **`charts/authtranslator/`**. Helm ≥ 3.9 is assumed. See [charts/authtranslator/README.md](../charts/authtranslator/README.md) for a full list of chart values.
 
 > **Why Helm?**  Templating secrets, ConfigMaps, and Optional Redis in one place makes day‑2 ops (upgrades, rollbacks) far easier than raw manifests.
 
@@ -60,9 +60,12 @@ configYaml: |
     slack:
       destination: https://slack.com
       outgoing_auth:
-        type: slack_app_token
+        type: token
         params:
-          token: env:SLACK_TOKEN
+          secrets:
+            - env:SLACK_TOKEN
+          header: Authorization
+          prefix: "Bearer "
 
 allowlistYaml: |
   callers:
