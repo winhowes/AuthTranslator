@@ -661,6 +661,10 @@ func main() {
 	flag.Usage = usage
 	flag.Parse()
 
+	if (*metricsUser != "" && *metricsPass == "") || (*metricsUser == "" && *metricsPass != "") {
+		log.Fatal("both -metrics-user and -metrics-pass must be provided")
+	}
+
 	authplugins.MaxBodySize = *maxBodySizeFlag
 
 	if *showVersion {
