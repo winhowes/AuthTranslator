@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"strconv"
@@ -287,10 +289,43 @@ func (rl *RateLimiter) allowRedis(key string) (bool, error) {
 		}
 	}
 	var err error
+	var password string
 	if conn == nil {
-		conn, err = net.DialTimeout("tcp", *redisAddr, *redisTimeout)
+		addr := *redisAddr
+		useTLS := false
+		if strings.Contains(addr, "://") {
+			u, err := url.Parse(addr)
+			if err != nil {
+				return false, err
+			}
+			if u.Host != "" {
+				addr = u.Host
+			}
+			switch u.Scheme {
+			case "rediss":
+				useTLS = true
+			case "", "redis":
+			default:
+				return false, fmt.Errorf("unsupported redis scheme %q", u.Scheme)
+			}
+			if u.User != nil {
+				password, _ = u.User.Password()
+			}
+		}
+		d := net.Dialer{Timeout: *redisTimeout}
+		if useTLS {
+			conn, err = tls.DialWithDialer(&d, "tcp", addr, &tls.Config{InsecureSkipVerify: true})
+		} else {
+			conn, err = d.Dial("tcp", addr)
+		}
 		if err != nil {
 			return false, err
+		}
+		if password != "" {
+			if err := redisCmd(conn, "AUTH", password); err != nil {
+				conn.Close()
+				return false, err
+			}
 		}
 	}
 	bad := false
@@ -349,6 +384,34 @@ func redisCmdInt(conn net.Conn, args ...string) (int, error) {
 		return 0, fmt.Errorf("redis error: %s", strings.TrimSpace(line))
 	default:
 		return 0, fmt.Errorf("unexpected reply: %q", prefix)
+	}
+}
+
+func redisCmd(conn net.Conn, args ...string) error {
+	var buf bytes.Buffer
+	fmt.Fprintf(&buf, "*%d\r\n", len(args))
+	for _, a := range args {
+		fmt.Fprintf(&buf, "$%d\r\n%s\r\n", len(a), a)
+	}
+	if _, err := conn.Write(buf.Bytes()); err != nil {
+		return err
+	}
+	br := bufio.NewReader(conn)
+	prefix, err := br.ReadByte()
+	if err != nil {
+		return err
+	}
+	line, err := br.ReadString('\n')
+	if err != nil {
+		return err
+	}
+	switch prefix {
+	case '+', ':':
+		return nil
+	case '-':
+		return fmt.Errorf("redis error: %s", strings.TrimSpace(line))
+	default:
+		return fmt.Errorf("unexpected reply: %q", prefix)
 	}
 }
 
