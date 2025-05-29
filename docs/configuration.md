@@ -87,14 +87,13 @@ Two ways to authorise a caller:
 
 ```yaml
 apiVersion: v1alpha1
-callers:
-  demo-user:
-    slack:
+- integration: slack
+  callers:
+    - id: demo-user
       # easiest: assign a capability
       capabilities: [slack.chat.write.public]
 
-  service‑42:
-    slack:
+    - id: service‑42
       # granular example
       rules:
         - path:   /api/chat.postMessage
