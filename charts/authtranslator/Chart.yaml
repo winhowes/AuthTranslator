@@ -1,0 +1,5 @@
+apiVersion: v2
+name: authtranslator
+version: 0.1.0
+description: A Helm chart for deploying AuthTranslator
+appVersion: "1.0"

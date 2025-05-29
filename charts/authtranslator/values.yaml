@@ -1,0 +1,39 @@
+image:
+  repository: ghcr.io/winhowes/authtranslator
+  tag: latest
+  pullPolicy: IfNotPresent
+
+redisAddress: ""
+
+config: |
+  integrations:
+    - name: example
+      destination: http://backend.example.com
+      in_rate_limit: 100
+      out_rate_limit: 1000
+      rate_limit_window: 1m
+      max_idle_conns: 100
+      max_idle_conns_per_host: 20
+      incoming_auth:
+        - type: token
+          params:
+            secrets:
+              - env:IN_TOKEN
+            header: X-Auth
+      outgoing_auth:
+        - type: token
+          params:
+            secrets:
+              - env:OUT_TOKEN
+            header: X-Auth
+
+allowlist: |
+  - integration: example
+    callers:
+      - id: sample
+        rules:
+          - path: /search
+            methods:
+              GET:
+                query:
+                  q: ["example"]

@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "authtranslator.fullname" . }}
+  labels:
+    {{- include "authtranslator.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "authtranslator.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        {{- include "authtranslator.labels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: authtranslator
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["./authtranslator"]
+          args:
+            {{- if .Values.redisAddress }}
+            - "-redis-addr"
+            - {{ .Values.redisAddress | quote }}
+            {{- end }}
+          volumeMounts:
+            - name: config
+              mountPath: /app/config.yaml
+              subPath: config.yaml
+            - name: config
+              mountPath: /app/allowlist.yaml
+              subPath: allowlist.yaml
+          ports:
+            - containerPort: 8080
+              name: http
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "authtranslator.fullname" . }}-config

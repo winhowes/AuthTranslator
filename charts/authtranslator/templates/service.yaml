@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "authtranslator.fullname" . }}
+  labels:
+    {{- include "authtranslator.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: {{ include "authtranslator.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
