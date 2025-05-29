@@ -64,7 +64,7 @@ Example: If a caller peaks at 12 RPS and you choose a 60 s window → `12 × 
   ```json
   {"lvl":"WARN","msg":"rate‑limit exceeded","caller_id":"bot‑123","integration":"slack","limit":800,"window":"60s"}
   ```
-* Prometheus: `authtranslator_rate_limit_exceeded_total{integration="slack"}`
+* Prometheus: `authtranslator_rate_limit_events_total{integration="slack"}`
 
 Grafana sample dashboard lives in `docs/ops/grafana-rate-limits.json`.
 

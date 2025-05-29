@@ -83,7 +83,7 @@ Sample line (wrapped for readability):
 | Alert                     | Expression                                                        | Rationale                        |
 | ------------------------- | ----------------------------------------------------------------- | -------------------------------- |
 | High 5xx rate             | `sum(rate(authtranslator_requests_total{code=~"5.."}[5m])) > 0.1` | Upstream failures or mis‑config. |
-| Prolonged rate‑limit hits | `increase(authtranslator_rate_limit_exceeded_total[5m]) > 100`    | Callers need higher quota.       |
+| Prolonged rate‑limit hits | `increase(authtranslator_rate_limit_events_total[5m]) > 100`    | Callers need higher quota.       |
 | Health endpoint down      | Blackbox probe against `/_at_internal/healthz` fails              | Pod crash or network break.      |
 
 Tune thresholds to your traffic patterns.
