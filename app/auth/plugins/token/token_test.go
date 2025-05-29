@@ -112,3 +112,57 @@ func TestTokenAuthenticatePrefixMismatch(t *testing.T) {
 		t.Fatal("expected fail without prefix")
 	}
 }
+
+func TestTokenAddAuthWrongConfigType(t *testing.T) {
+	r := &http.Request{Header: http.Header{}}
+	p := TokenAuthOut{}
+	// pass wrong config type; should not panic or set header
+	p.AddAuth(context.Background(), r, struct{}{})
+	if val := r.Header.Get("Authorization"); val != "" {
+		t.Fatalf("expected no header set, got %s", val)
+	}
+}
+
+func TestTokenAuthenticateWrongConfigType(t *testing.T) {
+	r := &http.Request{Header: http.Header{"H": []string{"tok"}}}
+	p := TokenAuth{}
+	if p.Authenticate(context.Background(), r, 5) {
+		t.Fatal("expected authentication to fail with wrong config")
+	}
+}
+
+func TestTokenAddAuthMultipleSecrets(t *testing.T) {
+	r := &http.Request{Header: http.Header{}}
+	p := TokenAuthOut{}
+	t.Setenv("TOK1", "a")
+	t.Setenv("TOK2", "b")
+	cfg, err := p.ParseParams(map[string]interface{}{
+		"secrets": []string{"env:TOK1", "env:TOK2"},
+		"header":  "H",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.AddAuth(context.Background(), r, cfg)
+	got := r.Header.Get("H")
+	if got != "a" && got != "b" {
+		t.Fatalf("expected one of the secrets, got %s", got)
+	}
+}
+
+func TestTokenAuthenticateMultipleSecrets(t *testing.T) {
+	r := &http.Request{Header: http.Header{"H": []string{"good"}}}
+	p := TokenAuth{}
+	t.Setenv("BAD", "bad")
+	t.Setenv("GOOD", "good")
+	cfg, err := p.ParseParams(map[string]interface{}{
+		"secrets": []string{"env:BAD", "env:GOOD"},
+		"header":  "H",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !p.Authenticate(context.Background(), r, cfg) {
+		t.Fatal("expected authentication to succeed with second secret")
+	}
+}
