@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"os"
 	"os/exec"
@@ -314,5 +315,54 @@ func TestMainReloadFailure(t *testing.T) {
 	}
 	if ee, ok := err.(*exec.ExitError); !ok || ee.ExitCode() == 0 {
 		t.Fatalf("unexpected exit status: %v", err)
+	}
+}
+
+func TestParseLevelValues(t *testing.T) {
+	cases := map[string]slog.Level{
+		"debug":   slog.LevelDebug,
+		"INFO":    slog.LevelInfo,
+		"Warn":    slog.LevelWarn,
+		"WARNING": slog.LevelWarn,
+		"ERROR":   slog.LevelError,
+		"bogus":   slog.LevelInfo,
+	}
+	for in, want := range cases {
+		if got := parseLevel(in); got != want {
+			t.Errorf("parseLevel(%q)=%v want %v", in, got, want)
+		}
+	}
+}
+
+func TestRedisTTLArgsEdgecases(t *testing.T) {
+	tests := []struct {
+		dur      time.Duration
+		cmd, val string
+	}{
+		{1500 * time.Millisecond, "PEXPIRE", "1500"},
+		{500 * time.Millisecond, "PEXPIRE", "500"},
+		{0, "EXPIRE", "0"},
+		{-500 * time.Millisecond, "EXPIRE", "0"},
+	}
+	for _, tc := range tests {
+		cmd, val := redisTTLArgs(tc.dur)
+		if cmd != tc.cmd || val != tc.val {
+			t.Errorf("redisTTLArgs(%v)=%s %s want %s %s", tc.dur, cmd, val, tc.cmd, tc.val)
+		}
+	}
+}
+
+func TestRedisCmdUnexpectedPrefix(t *testing.T) {
+	srv, cli := net.Pipe()
+	defer cli.Close()
+	go func() {
+		br := bufio.NewReader(srv)
+		br.ReadBytes('\n')
+		br.ReadBytes('\n')
+		srv.Write([]byte("?bad\r\n"))
+		srv.Close()
+	}()
+	if err := redisCmd(cli, "PING"); err == nil {
+		t.Fatal("expected error for unexpected reply prefix")
 	}
 }
