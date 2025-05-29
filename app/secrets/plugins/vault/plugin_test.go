@@ -15,6 +15,12 @@ type vaultRewriteTransport struct {
 	host   string
 }
 
+type errorRoundTripper struct{}
+
+func (errorRoundTripper) RoundTrip(*http.Request) (*http.Response, error) {
+	return nil, fmt.Errorf("network error")
+}
+
 func (t *vaultRewriteTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	req.URL.Scheme = t.scheme
 	req.URL.Host = t.host
@@ -113,5 +119,15 @@ func TestVaultLoadValueMissing(t *testing.T) {
 	p := vaultPlugin{}
 	if _, err := p.Load(context.Background(), "secret/data/foo"); err == nil {
 		t.Fatal("expected missing value error")
+	}
+}
+
+func TestVaultLoadBadAddr(t *testing.T) {
+	t.Setenv("VAULT_ADDR", "http://[::1")
+	t.Setenv("VAULT_TOKEN", "tok")
+
+	p := vaultPlugin{}
+	if _, err := p.Load(context.Background(), "secret/data/foo"); err == nil {
+		t.Fatal("expected url parse error")
 	}
 }
