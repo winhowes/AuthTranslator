@@ -6,7 +6,7 @@ AuthTranslator implements a **fixed‑window counter with elastic expiry** (aka 
 
 ## How it works
 
-1. When a request is authorised, the proxy builds a key: `<callerID>:<integration>`.
+1. When a request is authorised, the proxy builds a key: `<callerID>:<integration>`. If none of the inbound auth methods provide a caller ID, the client’s IP address is used instead.
 2. It increments a counter in the chosen backend (**memory** or **Redis**).
 3. If the counter ≤ *N* → continue. If it would exceed *N* → reject with **429**.
 4. The counter’s TTL is extended to `window` seconds every time it’s incremented (elastic expiry).
