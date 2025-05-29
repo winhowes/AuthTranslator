@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -288,7 +287,7 @@ func TestMainHelper(t *testing.T) {
 			break
 		}
 	}
-	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+	flag.CommandLine.Parse(os.Args[1:])
 	main()
 	os.Exit(0)
 }
@@ -384,14 +383,10 @@ func writeTempFile(t *testing.T, data string) string {
 	return f.Name()
 }
 
-func buildApp(t *testing.T) string {
-	bin := filepath.Join(t.TempDir(), "appbin")
-	cmd := exec.Command("go", "build", "-o", bin, ".")
-	cmd.Env = os.Environ()
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("build failed: %v\n%s", err, out)
-	}
-	return bin
+func runMainCmd(args ...string) *exec.Cmd {
+	cmd := exec.Command(os.Args[0], append([]string{"-test.run=TestMainHelper", "--"}, args...)...)
+	cmd.Env = append(os.Environ(), "GO_WANT_MAIN_HELPER=1")
+	return cmd
 }
 
 func freeAddr(t *testing.T) string {
@@ -410,8 +405,7 @@ func TestMainRunAndShutdown(t *testing.T) {
 	al := writeTempFile(t, `[]`)
 	defer os.Remove(al)
 
-	bin := buildApp(t)
-	cmd := exec.Command(bin, "-config", cfg, "-allowlist", al, "-addr", "127.0.0.1:0")
+	cmd := runMainCmd("-config", cfg, "-allowlist", al, "-addr", "127.0.0.1:0")
 	if err := cmd.Start(); err != nil {
 		t.Fatalf("start failed: %v", err)
 	}
@@ -438,8 +432,7 @@ func TestMainReloadSignal(t *testing.T) {
 	al := writeTempFile(t, `[]`)
 	defer os.Remove(al)
 
-	bin := buildApp(t)
-	cmd := exec.Command(bin, "-config", cfg, "-allowlist", al, "-addr", "127.0.0.1:0")
+	cmd := runMainCmd("-config", cfg, "-allowlist", al, "-addr", "127.0.0.1:0")
 	if err := cmd.Start(); err != nil {
 		t.Fatalf("start failed: %v", err)
 	}
@@ -471,9 +464,8 @@ func TestMainMetricsDisabled(t *testing.T) {
 	al := writeTempFile(t, `[]`)
 	defer os.Remove(al)
 
-	bin := buildApp(t)
 	addr := freeAddr(t)
-	cmd := exec.Command(bin, "-config", cfg, "-allowlist", al, "-addr", addr, "-enable-metrics=false")
+	cmd := runMainCmd("-config", cfg, "-allowlist", al, "-addr", addr, "-enable-metrics=false")
 	if err := cmd.Start(); err != nil {
 		t.Fatalf("start failed: %v", err)
 	}
@@ -505,9 +497,8 @@ func TestMainMetricsEnabled(t *testing.T) {
 	al := writeTempFile(t, `[]`)
 	defer os.Remove(al)
 
-	bin := buildApp(t)
 	addr := freeAddr(t)
-	cmd := exec.Command(bin, "-config", cfg, "-allowlist", al, "-addr", addr)
+	cmd := runMainCmd("-config", cfg, "-allowlist", al, "-addr", addr)
 	if err := cmd.Start(); err != nil {
 		t.Fatalf("start failed: %v", err)
 	}
@@ -541,14 +532,84 @@ func TestMainTLSMissingKey(t *testing.T) {
 	cert := writeTempFile(t, "dummy")
 	defer os.Remove(cert)
 
-	bin := buildApp(t)
 	addr := freeAddr(t)
-	cmd := exec.Command(bin, "-config", cfg, "-allowlist", al, "-addr", addr, "-tls-cert", cert)
+	cmd := runMainCmd("-config", cfg, "-allowlist", al, "-addr", addr, "-tls-cert", cert)
 	err := cmd.Run()
 	if err == nil {
 		t.Fatal("expected process to exit with error")
 	}
 	if ee, ok := err.(*exec.ExitError); !ok || ee.ExitCode() == 0 {
 		t.Fatalf("unexpected exit status: %v", err)
+	}
+}
+
+func TestMainWatchReload(t *testing.T) {
+	cfg := writeTempFile(t, `{"integrations":[{"name":"test","destination":"http://example.com"}]}`)
+	defer os.Remove(cfg)
+	al := writeTempFile(t, `[]`)
+	defer os.Remove(al)
+
+	addr := freeAddr(t)
+	cmd := runMainCmd("-config", cfg, "-allowlist", al, "-addr", addr, "-watch")
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("start failed: %v", err)
+	}
+	done := make(chan error, 1)
+	go func() { done <- cmd.Wait() }()
+	defer func() {
+		cmd.Process.Signal(os.Interrupt)
+		select {
+		case <-done:
+		case <-time.After(2 * time.Second):
+			cmd.Process.Kill()
+			<-done
+		}
+	}()
+
+	time.Sleep(200 * time.Millisecond)
+
+	getReload := func() string {
+		resp, err := http.Get("http://" + addr + "/_at_internal/healthz")
+		if err != nil {
+			t.Fatalf("request failed: %v", err)
+		}
+		defer resp.Body.Close()
+		return resp.Header.Get("X-Last-Reload")
+	}
+
+	first := getReload()
+	if first == "" {
+		t.Fatal("missing initial reload header")
+	}
+	firstTime, err := time.Parse(time.RFC3339, first)
+	if err != nil {
+		t.Fatalf("invalid reload time: %v", err)
+	}
+
+	time.Sleep(time.Second)
+
+	// write same contents with a newline to trigger a write event
+	if err := os.WriteFile(cfg, []byte(`{"integrations":[{"name":"test","destination":"http://example.com"}]}`+"\n"), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	var second string
+	start := time.Now()
+	for time.Since(start) < 3*time.Second {
+		time.Sleep(100 * time.Millisecond)
+		second = getReload()
+		if second != "" && second != first {
+			break
+		}
+	}
+	if second == "" {
+		t.Fatal("config change did not trigger reload")
+	}
+	secondTime, err := time.Parse(time.RFC3339, second)
+	if err != nil {
+		t.Fatalf("invalid reload time: %v", err)
+	}
+	if !secondTime.After(firstTime) {
+		t.Fatal("config change did not trigger reload")
 	}
 }
