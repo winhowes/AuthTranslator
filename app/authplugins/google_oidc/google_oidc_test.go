@@ -1,6 +1,7 @@
 package googleoidc
 
 import (
+	"context"
 	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
@@ -42,7 +43,7 @@ func TestGoogleOIDCAddAuth(t *testing.T) {
 	}
 
 	r := &http.Request{Header: http.Header{}}
-	p.AddAuth(r, cfg)
+	p.AddAuth(context.Background(), r, cfg)
 	if got := r.Header.Get("Authorization"); got != "Bearer tok123" {
 		t.Fatalf("expected 'Bearer tok123', got %s", got)
 	}
@@ -67,7 +68,7 @@ func TestGoogleOIDCDefaults(t *testing.T) {
 		t.Fatal(err)
 	}
 	r := &http.Request{Header: http.Header{}}
-	p.AddAuth(r, cfg)
+	p.AddAuth(context.Background(), r, cfg)
 	if got := r.Header.Get("Authorization"); got != "Bearer tok" {
 		t.Fatalf("unexpected header %s", got)
 	}
@@ -119,7 +120,7 @@ func TestGoogleOIDCIncomingAuth(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !p.Authenticate(r, cfg) {
+	if !p.Authenticate(context.Background(), r, cfg) {
 		t.Fatal("expected authentication to succeed")
 	}
 	if id, ok := p.Identify(r, cfg); !ok || id != "user1" {
@@ -150,7 +151,7 @@ func TestGoogleOIDCIncomingAuthFail(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p.Authenticate(r, cfg) {
+	if p.Authenticate(context.Background(), r, cfg) {
 		t.Fatal("expected authentication to fail")
 	}
 }

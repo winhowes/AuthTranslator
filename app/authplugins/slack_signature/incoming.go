@@ -1,6 +1,7 @@
 package slacksignature
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
@@ -55,7 +56,7 @@ func (s *SlackSignatureAuth) ParseParams(m map[string]interface{}) (interface{},
 	return p, nil
 }
 
-func (s *SlackSignatureAuth) Authenticate(r *http.Request, p interface{}) bool {
+func (s *SlackSignatureAuth) Authenticate(ctx context.Context, r *http.Request, p interface{}) bool {
 	cfg, ok := p.(*slackSigParams)
 	if !ok {
 		return false
@@ -78,7 +79,7 @@ func (s *SlackSignatureAuth) Authenticate(r *http.Request, p interface{}) bool {
 		return false
 	}
 	for _, ref := range cfg.Secrets {
-		secret, err := secrets.LoadSecret(ref)
+		secret, err := secrets.LoadSecret(ctx, ref)
 		if err != nil {
 			continue
 		}

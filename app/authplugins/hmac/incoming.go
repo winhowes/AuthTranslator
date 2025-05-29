@@ -1,6 +1,7 @@
 package hmacsig
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha1"
 	"crypto/sha256"
@@ -62,7 +63,7 @@ func (h *HMACSignatureAuth) ParseParams(m map[string]interface{}) (interface{}, 
 	return p, nil
 }
 
-func (h *HMACSignatureAuth) Authenticate(r *http.Request, params interface{}) bool {
+func (h *HMACSignatureAuth) Authenticate(ctx context.Context, r *http.Request, params interface{}) bool {
 	cfg, ok := params.(*inParams)
 	if !ok {
 		return false
@@ -80,7 +81,7 @@ func (h *HMACSignatureAuth) Authenticate(r *http.Request, params interface{}) bo
 		return false
 	}
 	for _, ref := range cfg.Secrets {
-		secret, err := secrets.LoadSecret(ref)
+		secret, err := secrets.LoadSecret(ctx, ref)
 		if err != nil {
 			continue
 		}

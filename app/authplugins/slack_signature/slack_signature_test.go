@@ -1,6 +1,7 @@
 package slacksignature
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
@@ -34,7 +35,7 @@ func TestSlackSignatureAuth(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !p.Authenticate(r, cfg) {
+	if !p.Authenticate(context.Background(), r, cfg) {
 		t.Fatal("expected authentication to succeed")
 	}
 }
@@ -58,7 +59,7 @@ func TestSlackSignatureAuthOldTimestamp(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p.Authenticate(r, cfg) {
+	if p.Authenticate(context.Background(), r, cfg) {
 		t.Fatal("expected authentication to fail")
 	}
 }

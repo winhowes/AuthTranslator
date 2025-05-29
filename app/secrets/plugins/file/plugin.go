@@ -1,6 +1,7 @@
 package plugins
 
 import (
+	"context"
 	"os"
 	"strings"
 
@@ -12,7 +13,7 @@ type filePlugin struct{}
 
 func (filePlugin) Prefix() string { return "file" }
 
-func (filePlugin) Load(id string) (string, error) {
+func (filePlugin) Load(ctx context.Context, id string) (string, error) {
 	b, err := os.ReadFile(id)
 	if err != nil {
 		return "", err

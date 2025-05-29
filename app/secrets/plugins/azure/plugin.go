@@ -4,6 +4,7 @@ import "github.com/winhowes/AuthTranslator/app/secrets"
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -28,7 +29,7 @@ func (azureKMSPlugin) Prefix() string { return "azure" }
 // Load resolves the secret identified by id using Azure Key Vault. The
 // plugin expects a service principal to be configured via the environment
 // variables AZURE_TENANT_ID, AZURE_CLIENT_ID and AZURE_CLIENT_SECRET.
-func (azureKMSPlugin) Load(id string) (string, error) {
+func (azureKMSPlugin) Load(ctx context.Context, id string) (string, error) {
 	tenantID := os.Getenv("AZURE_TENANT_ID")
 	clientID := os.Getenv("AZURE_CLIENT_ID")
 	clientSecret := os.Getenv("AZURE_CLIENT_SECRET")

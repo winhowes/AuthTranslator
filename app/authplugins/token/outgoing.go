@@ -1,6 +1,7 @@
 package token
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
@@ -34,12 +35,12 @@ func (t *TokenAuthOut) ParseParams(m map[string]interface{}) (interface{}, error
 	return p, nil
 }
 
-func (t *TokenAuthOut) AddAuth(r *http.Request, p interface{}) {
+func (t *TokenAuthOut) AddAuth(ctx context.Context, r *http.Request, p interface{}) {
 	cfg, ok := p.(*outParams)
 	if !ok || len(cfg.Secrets) == 0 {
 		return
 	}
-	token, err := secrets.LoadRandomSecret(cfg.Secrets)
+	token, err := secrets.LoadRandomSecret(ctx, cfg.Secrets)
 	if err != nil {
 		return
 	}

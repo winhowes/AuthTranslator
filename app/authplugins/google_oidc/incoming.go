@@ -1,6 +1,7 @@
 package googleoidc
 
 import (
+        "context"
 	"crypto"
 	"crypto/rsa"
 	"crypto/sha256"
@@ -200,7 +201,7 @@ func parseAndVerify(tok string) (map[string]interface{}, bool) {
 	return claims, true
 }
 
-func (g *GoogleOIDCAuth) Authenticate(r *http.Request, params interface{}) bool {
+func (g *GoogleOIDCAuth) Authenticate(ctx context.Context, r *http.Request, params interface{}) bool {
 	cfg, ok := params.(*inParams)
 	if !ok {
 		return false

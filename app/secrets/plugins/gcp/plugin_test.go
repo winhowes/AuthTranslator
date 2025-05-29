@@ -1,6 +1,7 @@
 package plugins
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"io"
@@ -63,7 +64,7 @@ func TestGCPKMSLoad(t *testing.T) {
 	defer restore()
 
 	p := gcpKMSPlugin{}
-	got, err := p.Load("projects/p/locations/l/keyRings/r/cryptoKeys/k:cipher")
+	got, err := p.Load(context.Background(), "projects/p/locations/l/keyRings/r/cryptoKeys/k:cipher")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -81,7 +82,7 @@ func TestGCPKMSLoadError(t *testing.T) {
 	defer restore()
 
 	p := gcpKMSPlugin{}
-	if _, err := p.Load("projects/p/locations/l/keyRings/r/cryptoKeys/k:cipher"); err == nil {
+	if _, err := p.Load(context.Background(), "projects/p/locations/l/keyRings/r/cryptoKeys/k:cipher"); err == nil {
 		t.Fatal("expected error")
 	}
 }

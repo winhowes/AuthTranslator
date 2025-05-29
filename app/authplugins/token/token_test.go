@@ -1,6 +1,7 @@
 package token
 
 import (
+	"context"
 	"net/http"
 	"testing"
 
@@ -15,7 +16,7 @@ func TestTokenOutgoingPrefix(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	p.AddAuth(r, cfg)
+	p.AddAuth(context.Background(), r, cfg)
 	if got := r.Header.Get("Authorization"); got != "Bearer secret" {
 		t.Fatalf("expected 'Bearer secret', got %s", got)
 	}
@@ -29,7 +30,7 @@ func TestTokenIncomingPrefix(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !p.Authenticate(r, cfg) {
+	if !p.Authenticate(context.Background(), r, cfg) {
 		t.Fatal("expected authentication to succeed with prefix")
 	}
 }
@@ -42,7 +43,7 @@ func TestTokenIncomingPrefixMismatch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p.Authenticate(r, cfg) {
+	if p.Authenticate(context.Background(), r, cfg) {
 		t.Fatal("expected authentication to fail when prefix not configured")
 	}
 }

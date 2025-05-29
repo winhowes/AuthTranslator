@@ -1,6 +1,7 @@
 package jwt
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
@@ -34,7 +35,7 @@ func TestJWTAuth(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !p.Authenticate(r, cfg) {
+	if !p.Authenticate(context.Background(), r, cfg) {
 		t.Fatal("expected authentication to succeed")
 	}
 	id, ok := p.Identify(r, cfg)
@@ -53,7 +54,7 @@ func TestJWTAuthFail(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p.Authenticate(r, cfg) {
+	if p.Authenticate(context.Background(), r, cfg) {
 		t.Fatal("expected authentication to fail")
 	}
 }
@@ -66,7 +67,7 @@ func TestJWTOutgoingAddAuth(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	p.AddAuth(r, cfg)
+	p.AddAuth(context.Background(), r, cfg)
 	if got := r.Header.Get("Authorization"); got != "Bearer tok123" {
 		t.Fatalf("expected 'Bearer tok123', got %s", got)
 	}

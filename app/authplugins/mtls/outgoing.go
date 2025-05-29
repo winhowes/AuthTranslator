@@ -1,6 +1,7 @@
 package mtls
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"net/http"
@@ -30,11 +31,11 @@ func (m *MTLSAuthOut) ParseParams(mp map[string]interface{}) (interface{}, error
 	if p.Cert == "" || p.Key == "" {
 		return nil, fmt.Errorf("missing cert or key")
 	}
-	certPEM, err := secrets.LoadSecret(p.Cert)
+	certPEM, err := secrets.LoadSecret(context.Background(), p.Cert)
 	if err != nil {
 		return nil, fmt.Errorf("load cert: %w", err)
 	}
-	keyPEM, err := secrets.LoadSecret(p.Key)
+	keyPEM, err := secrets.LoadSecret(context.Background(), p.Key)
 	if err != nil {
 		return nil, fmt.Errorf("load key: %w", err)
 	}
@@ -47,7 +48,7 @@ func (m *MTLSAuthOut) ParseParams(mp map[string]interface{}) (interface{}, error
 }
 
 // AddAuth currently performs no per-request actions for mTLS.
-func (m *MTLSAuthOut) AddAuth(r *http.Request, p interface{}) {}
+func (m *MTLSAuthOut) AddAuth(ctx context.Context, r *http.Request, p interface{}) {}
 
 // Transport exposes the configured mTLS transport for integration usage.
 func (m *MTLSAuthOut) Transport(p interface{}) *http.Transport {

@@ -1,6 +1,9 @@
 package authplugins
 
-import "net/http"
+import (
+	"context"
+	"net/http"
+)
 
 // IncomingAuthPlugin processes authentication from incoming callers.
 // ParseParams should validate and convert the raw parameter map into a
@@ -8,7 +11,7 @@ import "net/http"
 type IncomingAuthPlugin interface {
 	Name() string
 	ParseParams(map[string]interface{}) (interface{}, error)
-	Authenticate(r *http.Request, params interface{}) bool
+	Authenticate(ctx context.Context, r *http.Request, params interface{}) bool
 	RequiredParams() []string
 	OptionalParams() []string
 }
@@ -23,7 +26,7 @@ type Identifier interface {
 type OutgoingAuthPlugin interface {
 	Name() string
 	ParseParams(map[string]interface{}) (interface{}, error)
-	AddAuth(r *http.Request, params interface{})
+	AddAuth(ctx context.Context, r *http.Request, params interface{})
 	RequiredParams() []string
 	OptionalParams() []string
 }

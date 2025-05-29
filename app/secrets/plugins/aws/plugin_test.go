@@ -1,6 +1,7 @@
 package plugins
 
 import (
+	"context"
 	"crypto/aes"
 	"crypto/cipher"
 	"encoding/base64"
@@ -35,7 +36,7 @@ func TestAWSKMSPluginLoad(t *testing.T) {
 
 	id := encryptAWS(t, key, "secret")
 	p := &awsKMSPlugin{}
-	got, err := p.Load(id)
+	got, err := p.Load(context.Background(), id)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -46,7 +47,7 @@ func TestAWSKMSPluginLoad(t *testing.T) {
 
 func TestAWSKMSPluginLoadMissingKey(t *testing.T) {
 	p := &awsKMSPlugin{}
-	if _, err := p.Load("deadbeef"); err == nil {
+	if _, err := p.Load(context.Background(), "deadbeef"); err == nil {
 		t.Fatal("expected error when key missing")
 	}
 }
@@ -58,7 +59,7 @@ func TestAWSKMSPluginInvalidCiphertext(t *testing.T) {
 	}
 	t.Setenv("AWS_KMS_KEY", base64.StdEncoding.EncodeToString(key))
 	p := &awsKMSPlugin{}
-	if _, err := p.Load("!!notbase64!!"); err == nil {
+	if _, err := p.Load(context.Background(), "!!notbase64!!"); err == nil {
 		t.Fatal("expected error for invalid ciphertext")
 	}
 }

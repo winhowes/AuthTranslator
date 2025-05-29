@@ -1,6 +1,7 @@
 package basic
 
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
 	"net/http"
@@ -39,12 +40,12 @@ func (b *BasicAuthOut) ParseParams(m map[string]interface{}) (interface{}, error
 	return p, nil
 }
 
-func (b *BasicAuthOut) AddAuth(r *http.Request, p interface{}) {
+func (b *BasicAuthOut) AddAuth(ctx context.Context, r *http.Request, p interface{}) {
 	cfg, ok := p.(*outParams)
 	if !ok || len(cfg.Secrets) == 0 {
 		return
 	}
-	cred, err := secrets.LoadRandomSecret(cfg.Secrets)
+	cred, err := secrets.LoadRandomSecret(ctx, cfg.Secrets)
 	if err != nil {
 		return
 	}

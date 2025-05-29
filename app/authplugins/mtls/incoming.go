@@ -1,6 +1,7 @@
 package mtls
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/winhowes/AuthTranslator/app/authplugins"
@@ -21,7 +22,7 @@ func (m *MTLSAuth) ParseParams(data map[string]interface{}) (interface{}, error)
 	return authplugins.ParseParams[mtlsParams](data)
 }
 
-func (m *MTLSAuth) Authenticate(r *http.Request, p interface{}) bool {
+func (m *MTLSAuth) Authenticate(ctx context.Context, r *http.Request, p interface{}) bool {
 	cfg, ok := p.(*mtlsParams)
 	if !ok {
 		return false
