@@ -22,6 +22,19 @@ func TestTokenOutgoingPrefix(t *testing.T) {
 	}
 }
 
+func TestTokenOutgoingMissingSecret(t *testing.T) {
+	r := &http.Request{Header: http.Header{}}
+	p := TokenAuthOut{}
+	cfg, err := p.ParseParams(map[string]interface{}{"secrets": []string{"env:MISS"}, "header": "H"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.AddAuth(context.Background(), r, cfg)
+	if got := r.Header.Get("H"); got != "" {
+		t.Fatalf("expected empty header, got %s", got)
+	}
+}
+
 func TestTokenIncomingPrefix(t *testing.T) {
 	r := &http.Request{Header: http.Header{"Authorization": []string{"Bearer secret"}}}
 	p := TokenAuth{}

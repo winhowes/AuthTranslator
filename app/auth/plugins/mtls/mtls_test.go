@@ -47,6 +47,19 @@ func TestMTLSAuthFail(t *testing.T) {
 	}
 }
 
+func TestMTLSAuthSubjectMismatch(t *testing.T) {
+	cert := &x509.Certificate{Subject: pkix.Name{CommonName: "other"}}
+	r := &http.Request{TLS: &tls.ConnectionState{VerifiedChains: [][]*x509.Certificate{{cert}}, PeerCertificates: []*x509.Certificate{cert}}}
+	p := MTLSAuth{}
+	cfg, err := p.ParseParams(map[string]interface{}{"subjects": []string{"client"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Authenticate(context.Background(), r, cfg) {
+		t.Fatal("expected authentication to fail")
+	}
+}
+
 func TestMTLSOutgoingParse(t *testing.T) {
 	key, _ := rsa.GenerateKey(rand.Reader, 1024)
 	tmpl := &x509.Certificate{
@@ -99,6 +112,13 @@ func TestMTLSOutgoingAddAuth(t *testing.T) {
 	p.AddAuth(context.Background(), r, cfg)
 	if got := r.Header.Get("X-TLS-Client-CN"); got != "client" {
 		t.Fatalf("expected client CN header, got %s", got)
+	}
+}
+
+func TestMTLSOutgoingParseMissingSecrets(t *testing.T) {
+	p := MTLSAuthOut{}
+	if _, err := p.ParseParams(map[string]interface{}{"cert": "env:C", "key": "env:K"}); err == nil {
+		t.Fatal("expected error for missing cert or key")
 	}
 }
 
