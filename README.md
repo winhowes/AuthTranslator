@@ -1,3 +1,6 @@
+[![Go Report Card](https://goreportcard.com/badge/github.com/winhowes/AuthTranslator)](https://goreportcard.com/report/github.com/winhowes/AuthTranslator) [![Coverage](https://codecov.io/gh/winhowes/AuthTranslator/branch/main/graph/badge.svg)](https://codecov.io/gh/winhowes/AuthTranslator) [![Go Reference](https://pkg.go.dev/badge/github.com/winhowes/authtranslator.svg)](https://pkg.go.dev/github.com/winhowes/authtranslator)
+
+
 # AuthTranslator
 
 
