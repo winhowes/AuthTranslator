@@ -55,3 +55,15 @@ func TestValidateConfigBadDestination(t *testing.T) {
 		t.Fatalf("expected error for invalid destination")
 	}
 }
+
+func TestValidateConfigBadIdleConns(t *testing.T) {
+	c := Config{Integrations: []Integration{{Name: "a", Destination: "http://ex", MaxIdleConns: -1}}}
+	if err := validateConfig(&c); err == nil {
+		t.Fatalf("expected error for invalid max idle conns")
+	}
+
+	c = Config{Integrations: []Integration{{Name: "b", Destination: "http://ex", MaxIdleConnsPerHost: -2}}}
+	if err := validateConfig(&c); err == nil {
+		t.Fatalf("expected error for invalid max idle conns per host")
+	}
+}
