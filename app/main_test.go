@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -393,6 +394,16 @@ func buildApp(t *testing.T) string {
 	return bin
 }
 
+func freeAddr(t *testing.T) string {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	addr := l.Addr().String()
+	l.Close()
+	return addr
+}
+
 func TestMainRunAndShutdown(t *testing.T) {
 	cfg := writeTempFile(t, `{"integrations":[{"name":"test","destination":"http://example.com"}]}`)
 	defer os.Remove(cfg)
@@ -451,5 +462,93 @@ func TestMainReloadSignal(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		cmd.Process.Kill()
 		t.Fatal("timeout waiting for process exit")
+	}
+}
+
+func TestMainMetricsDisabled(t *testing.T) {
+	cfg := writeTempFile(t, `{"integrations":[{"name":"test","destination":"http://example.com"}]}`)
+	defer os.Remove(cfg)
+	al := writeTempFile(t, `[]`)
+	defer os.Remove(al)
+
+	bin := buildApp(t)
+	addr := freeAddr(t)
+	cmd := exec.Command(bin, "-config", cfg, "-allowlist", al, "-addr", addr, "-enable-metrics=false")
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("start failed: %v", err)
+	}
+	time.Sleep(200 * time.Millisecond)
+	resp, err := http.Get("http://" + addr + "/_at_internal/metrics")
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("expected 404 when metrics disabled, got %d", resp.StatusCode)
+	}
+	cmd.Process.Signal(os.Interrupt)
+	done := make(chan error, 1)
+	go func() { done <- cmd.Wait() }()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("process exit: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		cmd.Process.Kill()
+		t.Fatal("timeout waiting for process exit")
+	}
+}
+
+func TestMainMetricsEnabled(t *testing.T) {
+	cfg := writeTempFile(t, `{"integrations":[{"name":"test","destination":"http://example.com"}]}`)
+	defer os.Remove(cfg)
+	al := writeTempFile(t, `[]`)
+	defer os.Remove(al)
+
+	bin := buildApp(t)
+	addr := freeAddr(t)
+	cmd := exec.Command(bin, "-config", cfg, "-allowlist", al, "-addr", addr)
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("start failed: %v", err)
+	}
+	time.Sleep(200 * time.Millisecond)
+	resp, err := http.Get("http://" + addr + "/_at_internal/metrics")
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 when metrics enabled, got %d", resp.StatusCode)
+	}
+	cmd.Process.Signal(os.Interrupt)
+	done := make(chan error, 1)
+	go func() { done <- cmd.Wait() }()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("process exit: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		cmd.Process.Kill()
+		t.Fatal("timeout waiting for process exit")
+	}
+}
+
+func TestMainTLSMissingKey(t *testing.T) {
+	cfg := writeTempFile(t, `{"integrations":[{"name":"test","destination":"http://example.com"}]}`)
+	defer os.Remove(cfg)
+	al := writeTempFile(t, `[]`)
+	defer os.Remove(al)
+	cert := writeTempFile(t, "dummy")
+	defer os.Remove(cert)
+
+	bin := buildApp(t)
+	addr := freeAddr(t)
+	cmd := exec.Command(bin, "-config", cfg, "-allowlist", al, "-addr", addr, "-tls-cert", cert)
+	err := cmd.Run()
+	if err == nil {
+		t.Fatal("expected process to exit with error")
+	}
+	if ee, ok := err.(*exec.ExitError); !ok || ee.ExitCode() == 0 {
+		t.Fatalf("unexpected exit status: %v", err)
 	}
 }
