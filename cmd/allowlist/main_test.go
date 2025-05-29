@@ -1,7 +1,7 @@
 package main
 
 import (
-	"encoding/json"
+	yaml "gopkg.in/yaml.v3"
 	"io"
 	"os"
 	"path/filepath"
@@ -29,7 +29,7 @@ func captureOutput(f func()) string {
 
 func TestAddEntryNewFile(t *testing.T) {
 	tmpDir := t.TempDir()
-	path := filepath.Join(tmpDir, "allow.json")
+	path := filepath.Join(tmpDir, "allow.yaml")
 
 	old := *file
 	*file = path
@@ -42,8 +42,8 @@ func TestAddEntryNewFile(t *testing.T) {
 		t.Fatalf("failed reading file: %v", err)
 	}
 	var entries []plugins.AllowlistEntry
-	if err := json.Unmarshal(data, &entries); err != nil {
-		t.Fatalf("failed to parse json: %v", err)
+	if err := yaml.Unmarshal(data, &entries); err != nil {
+		t.Fatalf("failed to parse yaml: %v", err)
 	}
 	want := []plugins.AllowlistEntry{
 		{
@@ -54,18 +54,18 @@ func TestAddEntryNewFile(t *testing.T) {
 		},
 	}
 	if !reflect.DeepEqual(entries, want) {
-		t.Fatalf("entries mismatch:\n%v\nwant\n%v", entries, want)
+		t.Fatalf("entries mismatch:\n%#v\nwant\n%#v", entries, want)
 	}
 }
 
 func TestAddEntryUpdateExisting(t *testing.T) {
 	tmpDir := t.TempDir()
-	path := filepath.Join(tmpDir, "allow.json")
+	path := filepath.Join(tmpDir, "allow.yaml")
 
 	initial := []plugins.AllowlistEntry{
 		{Integration: "foo", Callers: []plugins.CallerConfig{{ID: "u1"}}},
 	}
-	data, _ := json.MarshalIndent(initial, "", "    ")
+	data, _ := yaml.Marshal(initial)
 	if err := os.WriteFile(path, data, 0644); err != nil {
 		t.Fatal(err)
 	}
@@ -81,7 +81,7 @@ func TestAddEntryUpdateExisting(t *testing.T) {
 		t.Fatalf("failed reading file: %v", err)
 	}
 	var entries []plugins.AllowlistEntry
-	if err := json.Unmarshal(out, &entries); err != nil {
+	if err := yaml.Unmarshal(out, &entries); err != nil {
 		t.Fatalf("failed to unmarshal: %v", err)
 	}
 	want := []plugins.AllowlistEntry{
@@ -110,7 +110,7 @@ func TestListCapsOutput(t *testing.T) {
 
 func TestRemoveEntry(t *testing.T) {
 	tmpDir := t.TempDir()
-	path := filepath.Join(tmpDir, "allow.json")
+	path := filepath.Join(tmpDir, "allow.yaml")
 
 	initial := []plugins.AllowlistEntry{
 		{
@@ -120,7 +120,7 @@ func TestRemoveEntry(t *testing.T) {
 			},
 		},
 	}
-	data, _ := json.MarshalIndent(initial, "", "    ")
+	data, _ := yaml.Marshal(initial)
 	if err := os.WriteFile(path, data, 0644); err != nil {
 		t.Fatal(err)
 	}
@@ -136,7 +136,7 @@ func TestRemoveEntry(t *testing.T) {
 		t.Fatalf("failed reading file: %v", err)
 	}
 	var entries []plugins.AllowlistEntry
-	if err := json.Unmarshal(out, &entries); err != nil {
+	if err := yaml.Unmarshal(out, &entries); err != nil {
 		t.Fatalf("failed to unmarshal: %v", err)
 	}
 	want := []plugins.AllowlistEntry{
@@ -154,7 +154,7 @@ func TestRemoveEntry(t *testing.T) {
 
 func TestRemoveEntryDeletesCaller(t *testing.T) {
 	tmpDir := t.TempDir()
-	path := filepath.Join(tmpDir, "allow.json")
+	path := filepath.Join(tmpDir, "allow.yaml")
 
 	initial := []plugins.AllowlistEntry{
 		{
@@ -162,7 +162,7 @@ func TestRemoveEntryDeletesCaller(t *testing.T) {
 			Callers:     []plugins.CallerConfig{{ID: "u1", Capabilities: []plugins.CapabilityConfig{{Name: "cap1"}}}},
 		},
 	}
-	data, _ := json.MarshalIndent(initial, "", "    ")
+	data, _ := yaml.Marshal(initial)
 	if err := os.WriteFile(path, data, 0644); err != nil {
 		t.Fatal(err)
 	}
@@ -178,7 +178,7 @@ func TestRemoveEntryDeletesCaller(t *testing.T) {
 		t.Fatalf("failed reading file: %v", err)
 	}
 	var entries []plugins.AllowlistEntry
-	if err := json.Unmarshal(out, &entries); err != nil {
+	if err := yaml.Unmarshal(out, &entries); err != nil {
 		t.Fatalf("failed to unmarshal: %v", err)
 	}
 	want := []plugins.AllowlistEntry{}

@@ -1,16 +1,17 @@
 package main
 
 import (
-	"encoding/json"
+	"bytes"
 	"flag"
 	"fmt"
+	yaml "gopkg.in/yaml.v3"
 	"os"
 	"strings"
 
 	"github.com/winhowes/AuthTranslator/cmd/allowlist/plugins"
 )
 
-var file = flag.String("file", "allowlist.json", "allowlist file")
+var file = flag.String("file", "allowlist.yaml", "allowlist file")
 
 func usage() {
 	fmt.Fprintf(flag.CommandLine.Output(), `Usage: allowlist [options] <command>\n\n`)
@@ -80,7 +81,7 @@ func addEntry(args []string) {
 	}
 	var entries []plugins.AllowlistEntry
 	if len(data) > 0 {
-		if err := json.Unmarshal(data, &entries); err != nil {
+		if err := yaml.Unmarshal(data, &entries); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			return
 		}
@@ -111,7 +112,8 @@ func addEntry(args []string) {
 	}
 	callerCfg.Capabilities = append(callerCfg.Capabilities, plugins.CapabilityConfig{Name: *capName, Params: params})
 
-	out, _ := json.MarshalIndent(entries, "", "    ")
+	out, _ := yaml.Marshal(entries)
+
 	if err := os.WriteFile(*file, out, 0644); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -140,7 +142,7 @@ func removeEntry(args []string) {
 		return
 	}
 	var entries []plugins.AllowlistEntry
-	if err := json.Unmarshal(data, &entries); err != nil {
+	if err := yaml.Unmarshal(data, &entries); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return
 	}
@@ -158,11 +160,18 @@ func removeEntry(args []string) {
 				if caps[i].Name == *capName {
 					caps = append(caps[:i], caps[i+1:]...)
 					i--
+					continue
 				}
 			}
-			entries[ei].Callers[ci].Capabilities = caps
 			if len(caps) == 0 {
 				entries[ei].Callers = append(entries[ei].Callers[:ci], entries[ei].Callers[ci+1:]...)
+			} else {
+				for i := range caps {
+					if len(caps[i].Params) == 0 {
+						caps[i].Params = nil
+					}
+				}
+				entries[ei].Callers[ci].Capabilities = caps
 			}
 			break
 		}
@@ -172,7 +181,8 @@ func removeEntry(args []string) {
 		break
 	}
 
-	out, _ := json.MarshalIndent(entries, "", "    ")
+	out, _ := yaml.Marshal(entries)
+	out = bytes.ReplaceAll(out, []byte("params: {}"), []byte("params: null"))
 	if err := os.WriteFile(*file, out, 0644); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

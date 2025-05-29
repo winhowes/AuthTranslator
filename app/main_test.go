@@ -24,8 +24,8 @@ func TestAddrFlagSet(t *testing.T) {
 }
 
 func TestConfigFlagDefault(t *testing.T) {
-	if *configFile != "config.json" {
-		t.Fatalf("expected default config.json, got %s", *configFile)
+	if *configFile != "config.yaml" {
+		t.Fatalf("expected default config.yaml, got %s", *configFile)
 	}
 }
 
@@ -33,11 +33,11 @@ func TestConfigFlagSet(t *testing.T) {
 	old := *configFile
 	t.Cleanup(func() { flag.Set("config", old) })
 
-	if err := flag.Set("config", "custom.json"); err != nil {
+	if err := flag.Set("config", "custom.yaml"); err != nil {
 		t.Fatal(err)
 	}
-	if *configFile != "custom.json" {
-		t.Fatalf("expected config custom.json, got %s", *configFile)
+	if *configFile != "custom.yaml" {
+		t.Fatalf("expected config custom.yaml, got %s", *configFile)
 	}
 }
 
