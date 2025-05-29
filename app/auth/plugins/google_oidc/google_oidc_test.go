@@ -543,3 +543,46 @@ func TestGoogleOIDCParamMethods(t *testing.T) {
 		t.Fatalf("unexpected optional params %v", got)
 	}
 }
+
+func TestFetchTokenError(t *testing.T) {
+	oldClient := HTTPClient
+	HTTPClient = &http.Client{Transport: &failTransport{}}
+	defer func() { HTTPClient = oldClient }()
+	MetadataHost = "http://example.com"
+	if _, _, err := fetchToken("aud"); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestVerifyRS256DecodeError(t *testing.T) {
+	key, _ := rsa.GenerateKey(rand.Reader, 1024)
+	parts := []string{"a", "b", "!!"}
+	if verifyRS256(parts, &key.PublicKey) {
+		t.Fatal("expected failure")
+	}
+}
+
+func TestGoogleOIDCAddAuthWrongConfigType(t *testing.T) {
+	r := &http.Request{Header: http.Header{}}
+	p := GoogleOIDC{}
+	p.AddAuth(context.Background(), r, 5)
+	if val := r.Header.Get("Authorization"); val != "" {
+		t.Fatalf("expected no header set, got %s", val)
+	}
+}
+
+func TestGetKeyFetchError(t *testing.T) {
+	oldClient := HTTPClient
+	HTTPClient = &http.Client{Transport: &failTransport{}}
+	defer func() { HTTPClient = oldClient }()
+	oldURL := CertsURL
+	CertsURL = "http://example.com"
+	defer func() { CertsURL = oldURL }()
+	keyCache.mu.Lock()
+	keyCache.keys = nil
+	keyCache.expiry = time.Time{}
+	keyCache.mu.Unlock()
+	if _, err := getKey("missing"); err == nil {
+		t.Fatal("expected error")
+	}
+}

@@ -193,3 +193,46 @@ func TestTokenAuthenticateBadToken(t *testing.T) {
 		t.Fatal("expected auth to fail with wrong token")
 	}
 }
+
+func TestTokenOutgoingParseParamsError(t *testing.T) {
+	p := TokenAuthOut{}
+	if _, err := p.ParseParams(map[string]interface{}{"header": "H"}); err == nil {
+		t.Fatal("expected error for missing secrets")
+	}
+	if _, err := p.ParseParams(map[string]interface{}{"secrets": []string{"env:X"}}); err == nil {
+		t.Fatal("expected error for missing header")
+	}
+}
+
+func TestTokenAuthRequiredParams(t *testing.T) {
+	in := TokenAuth{}
+	out := TokenAuthOut{}
+	if got := in.RequiredParams(); len(got) != 2 || got[0] != "secrets" || got[1] != "header" {
+		t.Fatalf("unexpected required params %v", got)
+	}
+	if got := out.RequiredParams(); len(got) != 2 || got[0] != "secrets" || got[1] != "header" {
+		t.Fatalf("unexpected required params %v", got)
+	}
+}
+
+func TestTokenAddAuthNoSecrets(t *testing.T) {
+	r := &http.Request{Header: http.Header{}}
+	p := TokenAuthOut{}
+	cfg := &outParams{Header: "H"}
+	p.AddAuth(context.Background(), r, cfg)
+	if val := r.Header.Get("H"); val != "" {
+		t.Fatalf("expected no header set, got %s", val)
+	}
+}
+
+func TestTokenAuthenticateSecretError(t *testing.T) {
+	r := &http.Request{Header: http.Header{"H": []string{"tok"}}}
+	p := TokenAuth{}
+	cfg, err := p.ParseParams(map[string]interface{}{"secrets": []string{"env:MISSING"}, "header": "H"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Authenticate(context.Background(), r, cfg) {
+		t.Fatal("expected authentication to fail due to secret load error")
+	}
+}
