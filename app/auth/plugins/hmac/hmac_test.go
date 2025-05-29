@@ -64,6 +64,14 @@ func TestHMACIncomingAuthFail(t *testing.T) {
 	}
 }
 
+func TestHMACParseParamsInvalidAlgo(t *testing.T) {
+	p := HMACSignatureAuth{}
+	t.Setenv("SECRET", "k")
+	if _, err := p.ParseParams(map[string]interface{}{"secrets": []string{"env:SECRET"}, "algo": "md5"}); err == nil {
+		t.Fatal("expected error for invalid algo")
+	}
+}
+
 func TestHMACPluginOptionalParams(t *testing.T) {
 	in := HMACSignatureAuth{}
 	out := HMACSignature{}
