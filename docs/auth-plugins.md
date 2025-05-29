@@ -94,11 +94,11 @@ Incoming plugins that want to feed the **allow‑list** and **rate‑limiter** s
 
 ```go
 type Identifier interface {
-    CallerID(*http.Request) (string, error)
+    Identify(r *http.Request, params interface{}) (string, bool)
 }
 ```
 
-Return a *stable, non‑secret* string – e.g. the JWT `sub` or an mTLS SAN – so downstream components can safely key on it.
+Return a *stable, non‑secret* string – e.g. the JWT `sub` or an mTLS SAN – so downstream components can safely key on it. The boolean result indicates whether an identifier was successfully derived.
 
 | Credential type | Suggested ID | Why                      |
 | --------------- | ------------ | ------------------------ |
