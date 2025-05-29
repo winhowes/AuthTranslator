@@ -1,12 +1,19 @@
 package main
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
+	"math/big"
 	"net/http"
+	"reflect"
 	"testing"
 	"time"
 
 	_ "github.com/winhowes/AuthTranslator/app/authplugins/basic"
 	_ "github.com/winhowes/AuthTranslator/app/authplugins/google_oidc"
+	mtls "github.com/winhowes/AuthTranslator/app/authplugins/mtls"
 	_ "github.com/winhowes/AuthTranslator/app/authplugins/token"
 	_ "github.com/winhowes/AuthTranslator/app/secrets/plugins"
 )
@@ -235,5 +242,94 @@ func TestIntegrationTransportSettings(t *testing.T) {
 	}
 	if tr.TLSClientConfig == nil || !tr.TLSClientConfig.InsecureSkipVerify {
 		t.Fatalf("TLS settings not applied")
+	}
+}
+
+func TestIntegrationDisableKeepAlives(t *testing.T) {
+	i := &Integration{
+		Name:              "keep",
+		Destination:       "http://example.com",
+		InRateLimit:       1,
+		OutRateLimit:      1,
+		DisableKeepAlives: true,
+	}
+	if err := AddIntegration(i); err != nil {
+		t.Fatalf("add: %v", err)
+	}
+	t.Cleanup(func() {
+		i.inLimiter.Stop()
+		i.outLimiter.Stop()
+	})
+
+	tr, ok := i.proxy.Transport.(*http.Transport)
+	if !ok {
+		t.Fatalf("expected http.Transport, got %T", i.proxy.Transport)
+	}
+	if !tr.DisableKeepAlives {
+		t.Fatalf("DisableKeepAlives not applied")
+	}
+}
+
+func TestIntegrationPluginTransport(t *testing.T) {
+	key, _ := rsa.GenerateKey(rand.Reader, 1024)
+	tmpl := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		NotBefore:    time.Now().Add(-time.Hour),
+		NotAfter:     time.Now().Add(time.Hour),
+	}
+	der, _ := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
+	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})
+	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)})
+	t.Setenv("CERT", string(certPEM))
+	t.Setenv("KEY", string(keyPEM))
+
+	p := mtls.MTLSAuthOut{}
+	cfg, err := p.ParseParams(map[string]interface{}{"cert": "env:CERT", "key": "env:KEY"})
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	baseTr := p.Transport(cfg)
+	if baseTr == nil {
+		t.Fatal("missing base transport")
+	}
+
+	i := &Integration{
+		Name:              "plug",
+		Destination:       "http://example.com",
+		InRateLimit:       1,
+		OutRateLimit:      1,
+		IdleConnTimeout:   "1s",
+		DisableKeepAlives: true,
+		OutgoingAuth: []AuthPluginConfig{{
+			Type:   "mtls",
+			Params: map[string]interface{}{"cert": "env:CERT", "key": "env:KEY"},
+		}},
+	}
+	if err := AddIntegration(i); err != nil {
+		t.Fatalf("add: %v", err)
+	}
+	t.Cleanup(func() {
+		i.inLimiter.Stop()
+		i.outLimiter.Stop()
+	})
+
+	tr, ok := i.proxy.Transport.(*http.Transport)
+	if !ok {
+		t.Fatalf("expected http.Transport, got %T", i.proxy.Transport)
+	}
+	if tr == baseTr {
+		t.Fatalf("transport not cloned")
+	}
+	if tr.IdleConnTimeout != time.Second || !tr.DisableKeepAlives {
+		t.Fatalf("integration settings not applied")
+	}
+	if baseTr.IdleConnTimeout != 0 {
+		t.Fatalf("base transport mutated")
+	}
+	if tr.TLSClientConfig == nil || len(tr.TLSClientConfig.Certificates) == 0 {
+		t.Fatalf("TLS certificates missing")
+	}
+	if !reflect.DeepEqual(tr.TLSClientConfig.Certificates, baseTr.TLSClientConfig.Certificates) {
+		t.Fatalf("certificates not preserved")
 	}
 }
