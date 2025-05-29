@@ -20,3 +20,17 @@ func TestValidateConfigBadTimeout(t *testing.T) {
 		t.Fatalf("expected error for invalid timeout")
 	}
 }
+
+func TestValidateConfigBadHandshakeTimeout(t *testing.T) {
+	c := Config{Integrations: []Integration{{Name: "a", Destination: "http://ex", TLSHandshakeTimeout: "bad"}}}
+	if err := validateConfig(&c); err == nil {
+		t.Fatalf("expected error for invalid handshake timeout")
+	}
+}
+
+func TestValidateConfigBadResponseTimeout(t *testing.T) {
+	c := Config{Integrations: []Integration{{Name: "a", Destination: "http://ex", ResponseHeaderTimeout: "nope"}}}
+	if err := validateConfig(&c); err == nil {
+		t.Fatalf("expected error for invalid response header timeout")
+	}
+}
