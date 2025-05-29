@@ -502,3 +502,29 @@ func TestMainAddRemoveCommands(t *testing.T) {
 		t.Fatalf("expected no entries, got %v", entries)
 	}
 }
+
+// Helper process for exercising addEntry in a separate process
+func TestAddEntryHelper(t *testing.T) {
+	if os.Getenv("GO_WANT_ADD_HELPER") != "1" {
+		return
+	}
+	cfg := os.Getenv("CFG")
+	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+	file = flag.CommandLine.String("file", cfg, "allowlist file")
+	addEntry([]string{"-integration", "foo", "-caller", "u1", "-capability", "cap"})
+	os.Exit(0)
+}
+
+func TestAddEntryWriteError(t *testing.T) {
+	dir := t.TempDir()
+	cfg := filepath.Join(dir, "no", "allow.yaml")
+	cmd := exec.Command(os.Args[0], "-test.run=TestAddEntryHelper", "--")
+	cmd.Env = append(os.Environ(), "GO_WANT_ADD_HELPER=1", "CFG="+cfg)
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("expected error")
+	}
+	if len(out) == 0 {
+		t.Fatalf("expected error output")
+	}
+}

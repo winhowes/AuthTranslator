@@ -378,3 +378,46 @@ func TestMainListError(t *testing.T) {
 		t.Fatalf("expected error output")
 	}
 }
+
+// Helper process for exercising updateIntegration in a separate process.
+func TestUpdateIntegrationHelper(t *testing.T) {
+	if os.Getenv("GO_WANT_UPDATE_HELPER") != "1" {
+		return
+	}
+	cfg := os.Getenv("CFG")
+	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+	file = flag.CommandLine.String("file", cfg, "config file")
+	updateIntegration(plugins.Integration{Name: "foo"})
+	os.Exit(0)
+}
+
+func TestUpdateIntegrationReadError(t *testing.T) {
+	dir := t.TempDir()
+	cfg := filepath.Join(dir, "cfg.yaml")
+	os.Mkdir(cfg, 0755)
+
+	cmd := exec.Command(os.Args[0], "-test.run=TestUpdateIntegrationHelper", "--")
+	cmd.Env = append(os.Environ(), "GO_WANT_UPDATE_HELPER=1", "CFG="+cfg)
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("expected error")
+	}
+	if len(out) == 0 {
+		t.Fatalf("expected error output")
+	}
+}
+
+func TestUpdateIntegrationWriteError(t *testing.T) {
+	dir := t.TempDir()
+	cfg := filepath.Join(dir, "sub", "cfg.yaml")
+
+	cmd := exec.Command(os.Args[0], "-test.run=TestUpdateIntegrationHelper", "--")
+	cmd.Env = append(os.Environ(), "GO_WANT_UPDATE_HELPER=1", "CFG="+cfg)
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("expected error")
+	}
+	if len(out) == 0 {
+		t.Fatalf("expected error output")
+	}
+}
