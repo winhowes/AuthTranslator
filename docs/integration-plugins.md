@@ -34,25 +34,34 @@ The CLI modifies `config.yaml` in place.
 
 ## Anatomy of an integration plugin
 
-1. **Package location**: `app/integrations/plugins/<name>`.
-2. **Registration** in `init()`:
+1. **Package location**: `cmd/integrations/plugins/<name>`.
+2. **Registration** in `init()` with the CLI registry:
 
    ```go
-   func init() { integration.Register("slack", New) }
+   func init() { plugins.Register("slack", builder) }
    ```
-3. **Options parsed from flags** (`--timeout`, etc.).
-4. **Return** a fully‑formed `config.Integration` struct—callers can marshal it to YAML.
+3. **Parse CLI flags** in the builder (`--timeout`, etc.).
+4. **Return** a `plugins.Integration` value that can be marshalled to YAML.
 
 Minimal template:
 
 ```go
-func New(opts Options) (*config.Integration, error) {
-    return &config.Integration{
-        Destination:   "https://example.com",
-        OutgoingAuth:  config.PluginSpec{Type: "token", Params: map[string]any{"header": "X-Api-Key", "secrets": []string{"env:EXAMPLE_KEY"}}},
+func builder(args []string) (plugins.Integration, error) {
+    fs := flag.NewFlagSet("example", flag.ContinueOnError)
+    name := fs.String("name", "example", "integration name")
+    if err := fs.Parse(args); err != nil {
+        return plugins.Integration{}, err
+    }
+    return plugins.Integration{
+        Name:           *name,
+        Destination:    "https://example.com",
+        OutgoingAuth: []plugins.AuthPluginConfig{{
+            Type:   "token",
+            Params: map[string]any{"header": "X-Api-Key", "secrets": []string{"env:EXAMPLE_KEY"}},
+        }},
         IdleConnTimeout: 10 * time.Second,
-        InRateLimit:   100,
-        OutRateLimit:  1000,
+        InRateLimit:     100,
+        OutRateLimit:    1000,
         RateLimitWindow: time.Minute,
     }, nil
 }
