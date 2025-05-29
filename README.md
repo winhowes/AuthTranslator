@@ -116,7 +116,10 @@ The project exists to make it trivial to translate one type of authentication in
    - `max_idle_conns` – total idle connections to keep pooled.
    - `max_idle_conns_per_host` – idle connections per upstream host.
 
-   The allowlist configuration lives in a separate `allowlist.yaml` file:
+   A JSON schema describing this file is available at
+   [`schemas/config.schema.json`](schemas/config.schema.json).
+
+  The allowlist configuration lives in a separate `allowlist.yaml` file:
 
   ```yaml
   - integration: example
@@ -127,6 +130,9 @@ The project exists to make it trivial to translate one type of authentication in
             methods:
               GET: {}
   ```
+
+   A JSON schema describing this file is available at
+   [`schemas/allowlist.schema.json`](schemas/allowlist.schema.json).
 
    Caller IDs are derived by the incoming auth plugins. Plugins that
    implement the `Identifier` interface return a string used to match the

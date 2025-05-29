@@ -1,0 +1,50 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["integrations"],
+  "properties": {
+    "integrations": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/integration" }
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "integration": {
+      "type": "object",
+      "required": ["name", "destination"],
+      "properties": {
+        "name": { "type": "string", "pattern": "^[a-zA-Z0-9-]+$" },
+        "destination": { "type": "string", "format": "uri" },
+        "in_rate_limit": { "type": "integer" },
+        "out_rate_limit": { "type": "integer" },
+        "rate_limit_window": { "type": "string" },
+        "incoming_auth": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/authPlugin" }
+        },
+        "outgoing_auth": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/authPlugin" }
+        },
+        "idle_conn_timeout": { "type": "string" },
+        "tls_handshake_timeout": { "type": "string" },
+        "response_header_timeout": { "type": "string" },
+        "tls_insecure_skip_verify": { "type": "boolean" },
+        "disable_keep_alives": { "type": "boolean" },
+        "max_idle_conns": { "type": "integer" },
+        "max_idle_conns_per_host": { "type": "integer" }
+      },
+      "additionalProperties": false
+    },
+    "authPlugin": {
+      "type": "object",
+      "required": ["type", "params"],
+      "properties": {
+        "type": { "type": "string" },
+        "params": { "type": "object" }
+      },
+      "additionalProperties": false
+    }
+  }
+}
