@@ -43,16 +43,19 @@ func validateRequired(v interface{}, rules paramRules) error {
 	for i := 0; i < rt.NumField(); i++ {
 		sf := rt.Field(i)
 
-		// Determine the JSON key name for the field.
+		// Determine the JSON key name for the field. Tags may omit the
+		// name like `json:",omitempty"` which means use the field name.
 		jsonTag := sf.Tag.Get("json")
 		name := sf.Name
 		if jsonTag != "" {
+			if jsonTag == "-" {
+				continue
+			}
 			if comma := strings.Index(jsonTag, ","); comma >= 0 {
-				if comma == 0 {
-					// Tag like ",omitempty" – field is skipped unless renamed; ignore.
-					continue
+				if comma > 0 {
+					name = jsonTag[:comma]
 				}
-				name = jsonTag[:comma]
+				// comma == 0 means default field name
 			} else {
 				name = jsonTag
 			}
