@@ -71,3 +71,44 @@ func TestTokenPluginOptionalParams(t *testing.T) {
 		t.Fatalf("unexpected optional params: %v", got)
 	}
 }
+func TestTokenParseParamsDefaultsAndError(t *testing.T) {
+	in := TokenAuth{}
+	_, err := in.ParseParams(map[string]interface{}{"secrets": []string{"env:X"}, "header": "H"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := in.ParseParams(map[string]interface{}{"header": "H"}); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestTokenAddAuthDefaultPrefix(t *testing.T) {
+	r := &http.Request{Header: http.Header{}}
+	p := TokenAuthOut{}
+	t.Setenv("T", "tok")
+	cfg, err := p.ParseParams(map[string]interface{}{"secrets": []string{"env:T"}, "header": "H"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.AddAuth(context.Background(), r, cfg)
+	if got := r.Header.Get("H"); got != "tok" {
+		t.Fatalf("expected token, got %s", got)
+	}
+}
+
+func TestTokenAuthenticatePrefixMismatch(t *testing.T) {
+	r := &http.Request{Header: http.Header{"H": []string{"pre tok"}}}
+	in := TokenAuth{}
+	t.Setenv("T", "tok")
+	cfg, err := in.ParseParams(map[string]interface{}{"secrets": []string{"env:T"}, "header": "H", "prefix": "pre "})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !in.Authenticate(context.Background(), r, cfg) {
+		t.Fatal("expected success")
+	}
+	cfg2, _ := in.ParseParams(map[string]interface{}{"secrets": []string{"env:T"}, "header": "H"})
+	if in.Authenticate(context.Background(), r, cfg2) {
+		t.Fatal("expected fail without prefix")
+	}
+}
