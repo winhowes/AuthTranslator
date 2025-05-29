@@ -5,7 +5,7 @@
 
 ## Features
 
-- **Reverse Proxy**: Forwards incoming HTTP requests to a target backend based on the requested host or `X-AT-Int` header. The header can be disabled or restricted to a specific host using command-line flags.
+- **Reverse Proxy**: Forwards incoming HTTP requests to a target backend based on the requested host or `X-AT-Int` header. The header can be disabled or restricted to a specific host using command-line flags. Typical deployments put AuthTranslator behind a wildcard DNS entry such as `*.auth.example.com` with a matching wildcard TLS certificate so each integration is addressed via its own subdomain.
 - **Pluggable Authentication**: Supports "basic", "token", `hmac_signature`, `jwt`, `mtls`, `url_path`, `github_signature` and `slack_signature` authentication types for both incoming and outgoing requests including Google OIDC with room for extension.
 - **Extensible Plugins**: Add new auth, secret and integration plugins to cover different systems.
 - **Rate Limiting**: Limits the number of requests per caller and per host within a rolling window (default `1m` but configurable per integration via `rate_limit_window`). A value of `0` disables limiting.
@@ -206,6 +206,8 @@
    ```bash
    curl -H "Host: example" -H "X-Auth: $IN_TOKEN" http://localhost:8080/
    ```
+In production the proxy usually sits behind a wildcard DNS record and matching wildcard TLS certificate so each integration can be reached via subdomains like `slack.auth.example.com`.
+
 ### Allowlist Rules
 
 Each caller entry lists path patterns and method constraints. `*` matches a
