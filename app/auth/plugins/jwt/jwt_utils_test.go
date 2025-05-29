@@ -100,3 +100,14 @@ func TestJWTAuthParamsFuncs(t *testing.T) {
 		t.Fatalf("unexpected optional params: %v", opt)
 	}
 }
+
+func TestVerifyRS256InvalidPem(t *testing.T) {
+	key, err := rsa.GenerateKey(rand.Reader, 1024)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, parts := makeRS256Token(t, key)
+	if verifyRS256(parts, []byte("not pem")) {
+		t.Fatal("expected verifyRS256 to fail with bad pem")
+	}
+}
