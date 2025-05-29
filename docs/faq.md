@@ -100,4 +100,4 @@ Not built‑in. Most users expose Prometheus metrics to Grafana.
 
 ### 14 How do I log request/response headers for debugging?
 
-Set `AUTH_TRANSLATOR_LOG_LEVEL=debug`. Secrets are automatically redacted.
+Run the proxy with `-log-level DEBUG`. Secrets are automatically redacted.

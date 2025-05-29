@@ -121,6 +121,6 @@ Identifiers flow through to:
 |   |
 | - |
 
-* Use `AUTH_TRANSLATOR_LOG_LEVEL=debug` to dump request headers after plugin injection (redacted for secrets).
+* Use `-log-level DEBUG` to dump request headers after plugin injection (redacted for secrets).
 
 ---
