@@ -97,16 +97,21 @@ apiVersion: v1alpha1
     - id: service‑42
       # granular example
       rules:
+        - path:   /api/health
+          methods:
+            GET: {}                     # allow simple health checks
+
         - path:   /api/chat.postMessage
-          method: POST
-          query:
-            - channel=^C[0-9A-Z]{8}$   # workspace channel IDs
-          body:
-            json:
-              text: "^.+"              # any non‑empty string
-            form: {}
-          headers:
-            X-Custom-Trace: [abc123]
+          methods:
+            POST:
+              query:
+                channel: ["^C[0-9A-Z]{8}$"]   # workspace channel IDs
+              body:
+                json:
+                  text: "^.+"              # any non‑empty string
+                form: {}
+              headers:
+                X-Custom-Trace: [abc123]
 ```
 
 ### Top‑level keys
@@ -130,7 +135,7 @@ apiVersion: v1alpha1
 | Field        | Type                 | Notes                                                  |
 | ------------ | -------------------- | ------------------------------------------------------ |
 | `path`       | string               | Anchored to the upstream path. Supports `*` and `**` wildcards. |
-| `methods`    | map[string]RequestConstraint | Map of HTTP method names to request constraints. |
+| `methods`     | map[string]RequestConstraint | Keys are HTTP verbs. Map a verb to `{}` to allow it without extra checks. |
 | `methods.<name>.query`   | map[string][]string | Each element is a list of allowed values per query key. All must match. |
 | `methods.<name>.headers` | map[string][]string | Header names and required values. Empty list checks only presence. |
 | `methods.<name>.body.json` | map[string]interface{} | Object matched recursively; must be a subset of the request. |
