@@ -11,16 +11,14 @@ Think of it as a *cookie‑cutter* that stamps out a ready‑to‑run block in y
 
 ## Built‑in integrations
 
-| Name     | Upstream base URL        | Default outgoing auth | Extras                                                             |
-| -------- | ------------------------ | --------------------- | ------------------------------------------------------------------ |
-| `slack`  | `https://slack.com`      | `token`               | Adds `Authorization: Bearer <token>` and retries 429 with back‑off. |
-| `github` | `https://api.github.com` | `token`               | Sets `User‑Agent: authtranslator` and bumps Go's idle connection limit. |
-| `stripe` | `https://api.stripe.com` | `basic`               | Forces HTTP/1.1 per Stripe docs.                                   |
 
-*(Full list lives under ******[`app/integrations/plugins/`](../app/integrations/plugins/)******)*
+| Name     | Upstream base URL        | Default outgoing auth | Extras |
+| -------- | ------------------------ | --------------------- | --------------------------------------------------- |
+| `slack`  | `https://slack.com`      | `token`               | Adds `Authorization: Bearer <token>` and retries 429 with back-off. |
+| `github` | `https://api.github.com` | `token`               | Sets `User-Agent: authtranslator` and bumps Go's idle connection limit. |
+| `stripe` | `https://api.stripe.com` | `token`               | Forces HTTP/1.1 per Stripe docs. |
 
----
-
+*(Full list lives under **[`app/integrations/plugins/`](../app/integrations/plugins/)**)*
 ## Creating an integration via the CLI
 
 ```bash
