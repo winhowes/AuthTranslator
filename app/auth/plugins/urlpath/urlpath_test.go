@@ -157,3 +157,31 @@ func TestURLPathIncomingEdgeCases(t *testing.T) {
 		t.Fatalf("path changed on failure: %s", r.URL.Path)
 	}
 }
+
+func TestURLPathParseParamsUnknownField(t *testing.T) {
+	in := URLPathAuth{}
+	if _, err := in.ParseParams(map[string]interface{}{
+		"secrets": []string{"env:S"},
+		"extra":   1,
+	}); err == nil {
+		t.Fatal("expected error for unknown field")
+	}
+	out := URLPathAuthOut{}
+	if _, err := out.ParseParams(map[string]interface{}{
+		"secrets": []string{"env:S"},
+		"extra":   1,
+	}); err == nil {
+		t.Fatal("expected error for unknown field")
+	}
+}
+
+func TestURLPathParseParamsTypeMismatch(t *testing.T) {
+	in := URLPathAuth{}
+	if _, err := in.ParseParams(map[string]interface{}{"secrets": "bad"}); err == nil {
+		t.Fatal("expected type error")
+	}
+	out := URLPathAuthOut{}
+	if _, err := out.ParseParams(map[string]interface{}{"secrets": "bad"}); err == nil {
+		t.Fatal("expected type error")
+	}
+}
