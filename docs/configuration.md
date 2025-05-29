@@ -21,7 +21,7 @@ The proxy currently infers its schema directly from Go structs. A top‑level `a
 ```yaml
 apiVersion: v1alpha1
 integrations:
-  slack:
+  - name: slack
     destination: https://slack.com
     outgoing_auth:
       - type: token
@@ -44,7 +44,7 @@ See [Secret Back-Ends](secret-backends.md) for all supported URI schemes.
 | Field          | Type                    | Default | Notes                                                    |   |
 | -------------- | ----------------------- | ------- | -------------------------------------------------------- | - |
 | `apiVersion`   | string                  | –       | Optional; reserved for future versions.                  |   |
-| `integrations` | map\[string]Integration | –       | Keys are user‑friendly names used in logs and allowlist. |   |
+| `integrations` | `[]Integration` | –       | List of integrations. Each element's `name` is used in logs and allowlist. |
 
 ### `Integration` object
 
