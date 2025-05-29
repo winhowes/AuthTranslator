@@ -80,13 +80,13 @@ The project exists to make it trivial to translate one type of authentication in
      "integrations": [
        {
          "name": "example",
-      "destination": "http://backend.example.com",
-      "in_rate_limit": 100,
-      "out_rate_limit": 1000,
-      "rate_limit_window": "1m",
-      "max_idle_conns": 100,
-      "max_idle_conns_per_host": 20,
-      "incoming_auth": [
+         "destination": "http://backend.example.com",
+         "in_rate_limit": 100,
+         "out_rate_limit": 1000,
+         "rate_limit_window": "1m",
+         "max_idle_conns": 100,
+         "max_idle_conns_per_host": 20,
+         "incoming_auth": [
            {"type": "token", "params": {"secrets": ["env:IN_TOKEN"], "header": "X-Auth"}}
          ],
          "outgoing_auth": [
@@ -123,7 +123,7 @@ The project exists to make it trivial to translate one type of authentication in
           ]
         }
       ]
-    }
+   }
   ]
   ```
 
@@ -196,19 +196,19 @@ The project exists to make it trivial to translate one type of authentication in
    ```json
    {
        "integrations": [
-           {
-               "name": "example",
-            "destination": "http://localhost:9000",
-            "in_rate_limit": 100,
-            "out_rate_limit": 1000,
-            "rate_limit_window": "1m",
-            "incoming_auth": [
-                   {"type": "token", "params": {"secrets": ["env:IN_TOKEN"], "header": "X-Auth"}}
-               ],
-               "outgoing_auth": [
-                   {"type": "token", "params": {"secrets": ["env:OUT_TOKEN"], "header": "X-Auth"}}
-               ]
-           }
+         {
+           "name": "example",
+           "destination": "http://localhost:9000",
+           "in_rate_limit": 100,
+           "out_rate_limit": 1000,
+           "rate_limit_window": "1m",
+           "incoming_auth": [
+             {"type": "token", "params": {"secrets": ["env:IN_TOKEN"], "header": "X-Auth"}}
+           ],
+           "outgoing_auth": [
+             {"type": "token", "params": {"secrets": ["env:OUT_TOKEN"], "header": "X-Auth"}}
+           ]
+         }
        ]
    }
    ```
@@ -287,7 +287,7 @@ array.
    - **jwt**: Validates generic JWTs using provided keys and can attach tokens on outgoing requests.
    - **mtls**: Requires a verified client certificate and optional subject match, and accepts outbound certificate configuration.
    - **token**: Header token comparison for simple shared secrets.
-  - **basic**: Performs HTTP Basic authentication using credentials loaded from configured secrets. The username becomes the caller ID for allowlist checks.
+   - **basic**: Performs HTTP Basic authentication using credentials loaded from configured secrets. The username becomes the caller ID for allowlist checks.
    - **hmac_signature**: Computes or verifies request HMAC digests with a configurable algorithm.
    - **github_signature**: Validates GitHub webhook signatures against shared secrets.
    - **slack_signature**: Validates Slack request signatures with timestamp tolerance.
