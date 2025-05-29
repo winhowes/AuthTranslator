@@ -19,3 +19,9 @@ variable "redis_address" {
   default     = ""
 }
 
+variable "redis_ca" {
+  description = "Optional CA certificate for Redis TLS"
+  type        = string
+  default     = ""
+}
+

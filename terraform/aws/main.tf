@@ -35,9 +35,10 @@ resource "aws_ecs_task_definition" "this" {
         hostPort      = 8080
         protocol      = "tcp"
       }]
-      command = var.redis_address != "" ? [
-        "./authtranslator", "-redis-addr", var.redis_address
-      ] : ["./authtranslator"]
+      command = concat([
+        "./authtranslator"
+        ], var.redis_address != "" ? ["-redis-addr", var.redis_address] : [],
+        var.redis_ca != "" ? ["-redis-ca", var.redis_ca] : [])
     }
   ])
 }

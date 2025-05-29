@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -74,6 +75,7 @@ var logLevel = flag.String("log-level", "INFO", "log level: DEBUG, INFO, WARN, E
 var logFormat = flag.String("log-format", "text", "log output format: text or json")
 var redisAddr = flag.String("redis-addr", "", "redis address for rate limits (host:port)")
 var redisTimeout = flag.Duration("redis-timeout", 5*time.Second, "dial timeout for redis")
+var redisCA = flag.String("redis-ca", "", "path to CA certificate for Redis TLS; disables InsecureSkipVerify")
 var maxBodySizeFlag = flag.Int64("max_body_size", authplugins.MaxBodySize, "maximum bytes buffered from request bodies (0 to disable)")
 var showVersion = flag.Bool("version", false, "print version and exit")
 var watch = flag.Bool("watch", false, "watch config and allowlist files for changes")
@@ -316,7 +318,21 @@ func (rl *RateLimiter) allowRedis(key string) (bool, error) {
 		}
 		d := net.Dialer{Timeout: *redisTimeout}
 		if useTLS {
-			conn, err = tls.DialWithDialer(&d, "tcp", addr, &tls.Config{InsecureSkipVerify: true})
+			tlsConf := &tls.Config{}
+			if *redisCA != "" {
+				caData, err := os.ReadFile(*redisCA)
+				if err != nil {
+					return false, err
+				}
+				pool := x509.NewCertPool()
+				if !pool.AppendCertsFromPEM(caData) {
+					return false, fmt.Errorf("failed to load CA file")
+				}
+				tlsConf.RootCAs = pool
+			} else {
+				tlsConf.InsecureSkipVerify = true
+			}
+			conn, err = tls.DialWithDialer(&d, "tcp", addr, tlsConf)
 		} else {
 			conn, err = d.Dial("tcp", addr)
 		}

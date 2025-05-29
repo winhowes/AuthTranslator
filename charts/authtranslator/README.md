@@ -10,6 +10,7 @@ This chart deploys [AuthTranslator](https://github.com/winhowes/AuthTranslator) 
 | `image.tag` | Image tag | `latest` |
 | `image.pullPolicy` | Image pull policy | `IfNotPresent` |
 | `redisAddress` | Redis connection string passed to `-redis-addr` | `""` |
+| `redisCA` | CA file for verifying Redis TLS passed to `-redis-ca` | `""` |
 | `config` | Contents of `config.yaml` stored in a ConfigMap | sample configuration |
 | `allowlist` | Contents of `allowlist.yaml` stored in a ConfigMap | sample allowlist |
 

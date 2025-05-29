@@ -30,7 +30,10 @@ resource "azurerm_container_group" "this" {
     cpu    = "0.5"
     memory = "1.0"
 
-    command = var.redis_address != "" ? ["./authtranslator", "-redis-addr", var.redis_address] : ["./authtranslator"]
+    command = concat([
+      "./authtranslator"
+      ], var.redis_address != "" ? ["-redis-addr", var.redis_address] : [],
+      var.redis_ca != "" ? ["-redis-ca", var.redis_ca] : [])
 
     ports {
       port     = 8080
