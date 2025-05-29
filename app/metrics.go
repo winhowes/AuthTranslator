@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"expvar"
 	"fmt"
@@ -124,7 +125,16 @@ func recordDuration(integration string, d time.Duration) {
 	h.Observe(d.Seconds())
 }
 
-func metricsHandler(w http.ResponseWriter, _ *http.Request) {
+func metricsHandler(w http.ResponseWriter, r *http.Request) {
+	if *metricsUser != "" || *metricsPass != "" {
+		user, pass, ok := r.BasicAuth()
+		if !ok || subtle.ConstantTimeCompare([]byte(user), []byte(*metricsUser)) != 1 ||
+			subtle.ConstantTimeCompare([]byte(pass), []byte(*metricsPass)) != 1 {
+			w.Header().Set("WWW-Authenticate", `Basic realm="metrics"`)
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+	}
 	w.Header().Set("Content-Type", "text/plain; version=0.0.4")
 	requestCounts.Do(func(kv expvar.KeyValue) {
 		fmt.Fprintf(w, "authtranslator_requests_total{integration=%q} %s\n", kv.Key, kv.Value.String())

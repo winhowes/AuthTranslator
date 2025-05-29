@@ -75,6 +75,9 @@ var redisTimeout = flag.Duration("redis-timeout", 5*time.Second, "dial timeout f
 var maxBodySizeFlag = flag.Int64("max_body_size", authplugins.MaxBodySize, "maximum bytes buffered from request bodies (0 to disable)")
 var showVersion = flag.Bool("version", false, "print version and exit")
 var watch = flag.Bool("watch", false, "watch config and allowlist files for changes")
+var metricsUser = flag.String("metrics-user", "", "username for metrics endpoint")
+var metricsPass = flag.String("metrics-pass", "", "password for metrics endpoint")
+var enableMetrics = flag.Bool("enable-metrics", true, "expose /metrics endpoint")
 var logger = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 
 func usage() {
@@ -373,14 +376,14 @@ func watchFiles(ctx context.Context, files []string, out chan<- struct{}) {
 			}
 			if ev.Op&(fsnotify.Rename|fsnotify.Remove) != 0 {
 				go func(name string) {
-					for i := 0; i < 5; i++ {
+					for i := 0; i < 50; i++ {
 						if err := w.Add(name); err == nil {
 							return
 						} else if !os.IsNotExist(err) {
 							logger.Error("watch re-add failed", "file", name, "error", err)
 							return
 						}
-						time.Sleep(100 * time.Millisecond)
+						time.Sleep(10 * time.Millisecond)
 					}
 				}(ev.Name)
 			} else if ev.Op&fsnotify.Create != 0 {
@@ -591,7 +594,9 @@ func main() {
 	}
 
 	http.HandleFunc("/_at_internal/healthz", healthzHandler)
-	http.HandleFunc("/_at_internal/metrics", metricsHandler)
+	if *enableMetrics {
+		http.HandleFunc("/_at_internal/metrics", metricsHandler)
+	}
 
 	http.HandleFunc("/", proxyHandler)
 

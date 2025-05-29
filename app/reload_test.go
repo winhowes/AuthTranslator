@@ -19,7 +19,7 @@ func TestReloadAllowlistStale(t *testing.T) {
 	allowlists.m = make(map[string]map[string]CallerConfig)
 	allowlists.Unlock()
 
-	cfgFile, err := os.CreateTemp("", "cfg*.json")
+	cfgFile, err := os.CreateTemp("", "cfg*.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -30,7 +30,7 @@ func TestReloadAllowlistStale(t *testing.T) {
 	}
 	cfgFile.Close()
 
-	alFile, err := os.CreateTemp("", "al*.json")
+	alFile, err := os.CreateTemp("", "al*.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,7 +85,7 @@ func TestReloadClearsSecretCache(t *testing.T) {
 	allowlists.m = make(map[string]map[string]CallerConfig)
 	allowlists.Unlock()
 
-	cfgFile, err := os.CreateTemp("", "cfg*.json")
+	cfgFile, err := os.CreateTemp("", "cfg*.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,7 +96,7 @@ func TestReloadClearsSecretCache(t *testing.T) {
 	}
 	cfgFile.Close()
 
-	alFile, err := os.CreateTemp("", "al*.json")
+	alFile, err := os.CreateTemp("", "al*.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}

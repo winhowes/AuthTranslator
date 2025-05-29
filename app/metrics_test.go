@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -82,5 +83,45 @@ func TestMetricsHandlerOutput(t *testing.T) {
 	}
 	if !strings.Contains(body, `authtranslator_request_duration_seconds_sum{integration="bar"}`) {
 		t.Fatal("missing bar duration histogram")
+	}
+}
+
+func TestMetricsHandlerAuth(t *testing.T) {
+	resetMetrics()
+	oldUser := *metricsUser
+	oldPass := *metricsPass
+	t.Cleanup(func() {
+		flag.Set("metrics-user", oldUser)
+		flag.Set("metrics-pass", oldPass)
+	})
+
+	if err := flag.Set("metrics-user", "admin"); err != nil {
+		t.Fatal(err)
+	}
+	if err := flag.Set("metrics-pass", "secret"); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	rr := httptest.NewRecorder()
+	metricsHandler(rr, req)
+	if rr.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 for missing creds, got %d", rr.Code)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	req.SetBasicAuth("admin", "wrong")
+	rr = httptest.NewRecorder()
+	metricsHandler(rr, req)
+	if rr.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 for bad creds, got %d", rr.Code)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	req.SetBasicAuth("admin", "secret")
+	rr = httptest.NewRecorder()
+	metricsHandler(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200 for valid creds, got %d", rr.Code)
 	}
 }

@@ -2,7 +2,7 @@
 
 # AuthTranslator
 
-AuthTranslator is a simple Go-based reverse proxy that injects authentication tokens and enforces per-host and per-caller rate limits. It is configured through a JSON file and demonstrates a plug-in style architecture for authentication methods.
+AuthTranslator is a simple Go-based reverse proxy that injects authentication tokens and enforces per-host and per-caller rate limits. It is configured through a YAML file and demonstrates a plug-in style architecture for authentication methods.
 
 The project exists to make it trivial to translate one type of authentication into another. By running AuthTranslator as a centralized proxy, a small group of administrators can manage the secrets for each integration while developers simply reference those integrations. Ideally, this project allows short‑lived credentials provided by your organization to be exchanged for the long‑lived tokens required by third‑party services, and inbound requests bearing long‑lived credentials transformed back into short‑lived secrets. This keeps sensitive keys out of day‑to‑day workflows while still allowing seamless access.
 
@@ -41,7 +41,7 @@ The project exists to make it trivial to translate one type of authentication in
 - **Redis Support**: Provide `-redis-addr` to use Redis for rate limit counters instead of in-memory tracking. If Redis is unavailable the limiter falls back to memory and logs an error.
 - **Request Body Limit**: The maximum buffered request body can be adjusted with `-max_body_size` (default 10MB). Set the flag to `0` to disable the limit entirely.
 - **Allowlist**: Integrations can restrict specific callers to particular paths, methods and required parameters.
-- **Configuration Driven**: Behavior is controlled via a JSON configuration file.
+- **Configuration Driven**: Behavior is controlled via a YAML configuration file.
 - **Validated Startup**: The configuration is checked at startup and errors are reported before serving traffic.
 - **Clean Shutdown**: On SIGINT or SIGTERM the server and rate limiters are gracefully stopped.
 - **Hot Reload**: Send `SIGHUP` to reload the configuration and allowlist without restarting.
@@ -169,6 +169,9 @@ The project exists to make it trivial to translate one type of authentication in
    - `-debug` – expose the `/integrations` endpoint for the CLI
    - `-version` – print the build version and exit
    - `-watch` – automatically reload when config or allowlist files change
+   - `-enable-metrics` – expose the `/metrics` endpoint (default `true`)
+   - `-metrics-user` – username required to access `/metrics`
+   - `-metrics-pass` – password required to access `/metrics`
 
 4. **Run Locally**
 
@@ -553,7 +556,7 @@ AuthTranslator writes log messages to standard output using Go's `log/slog` pack
 AuthTranslator exposes a readiness endpoint at `/_at_internal/healthz` which returns HTTP `200` when the server is running.
 The response includes an `X-Last-Reload` header indicating the last time configuration was reloaded.
 
-Metrics are available at `/_at_internal/metrics` using the Prometheus text format. The following metrics are exported:
+Metrics are available at `/_at_internal/metrics` using the Prometheus text format. Set `-enable-metrics=false` to disable the endpoint and provide `-metrics-user` and `-metrics-pass` to require HTTP Basic credentials. The following metrics are exported:
 
 - `authtranslator_requests_total{integration="<name>"}` – total requests processed per integration.
 - `authtranslator_rate_limit_events_total{integration="<name>"}` – requests rejected due to rate limits.
