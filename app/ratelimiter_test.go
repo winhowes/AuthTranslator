@@ -101,3 +101,10 @@ func TestRedisTTLArgs(t *testing.T) {
 		t.Fatalf("expected EXPIRE 0 for zero duration, got %s %s", cmd, val)
 	}
 }
+
+func TestRedisTTLArgsNegative(t *testing.T) {
+	cmd, val := redisTTLArgs(-500 * time.Millisecond)
+	if cmd != "EXPIRE" || val != "0" {
+		t.Fatalf("expected EXPIRE 0 for negative duration, got %s %s", cmd, val)
+	}
+}

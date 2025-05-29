@@ -2,8 +2,11 @@ package main
 
 import (
 	"bufio"
+	"fmt"
+	"io"
 	"net"
 	"testing"
+	"time"
 )
 
 func TestRedisCmdInt(t *testing.T) {
@@ -115,5 +118,56 @@ func TestRedisCmdUnexpected(t *testing.T) {
 
 	if err := redisCmd(cli, "PING"); err == nil {
 		t.Fatal("expected error for unexpected prefix")
+	}
+}
+
+type errConn struct{}
+
+func (errConn) Read(b []byte) (int, error)       { return 0, io.EOF }
+func (errConn) Write(b []byte) (int, error)      { return 0, fmt.Errorf("write fail") }
+func (errConn) Close() error                     { return nil }
+func (errConn) LocalAddr() net.Addr              { return nil }
+func (errConn) RemoteAddr() net.Addr             { return nil }
+func (errConn) SetDeadline(time.Time) error      { return nil }
+func (errConn) SetReadDeadline(time.Time) error  { return nil }
+func (errConn) SetWriteDeadline(time.Time) error { return nil }
+
+func TestRedisCmdIntWriteError(t *testing.T) {
+	if _, err := redisCmdInt(errConn{}, "PING"); err == nil {
+		t.Fatal("expected write error")
+	}
+}
+
+func TestRedisCmdWriteError(t *testing.T) {
+	if err := redisCmd(errConn{}, "PING"); err == nil {
+		t.Fatal("expected write error")
+	}
+}
+
+func TestRedisCmdIntReadError(t *testing.T) {
+	srv, cli := net.Pipe()
+	defer cli.Close()
+	go func() {
+		br := bufio.NewReader(srv)
+		br.ReadBytes('\n')
+		br.ReadBytes('\n')
+		srv.Close()
+	}()
+	if _, err := redisCmdInt(cli, "INCR", "key"); err == nil {
+		t.Fatal("expected read error")
+	}
+}
+
+func TestRedisCmdReadError(t *testing.T) {
+	srv, cli := net.Pipe()
+	defer cli.Close()
+	go func() {
+		br := bufio.NewReader(srv)
+		br.ReadBytes('\n')
+		br.ReadBytes('\n')
+		srv.Close()
+	}()
+	if err := redisCmd(cli, "PING"); err == nil {
+		t.Fatal("expected read error")
 	}
 }
