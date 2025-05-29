@@ -83,3 +83,22 @@ func TestWatchFilesRename(t *testing.T) {
 		t.Fatal("timeout waiting for write event after rename")
 	}
 }
+
+func TestWatchFilesCancel(t *testing.T) {
+	ch := make(chan struct{}, 1)
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() {
+		watchFiles(ctx, []string{"/path/does/not/exist"}, ch)
+		close(done)
+	}()
+	// let goroutine start
+	time.Sleep(50 * time.Millisecond)
+	cancel()
+	select {
+	case <-done:
+		// success
+	case <-time.After(time.Second):
+		t.Fatal("watchFiles did not exit after cancel")
+	}
+}
