@@ -35,6 +35,10 @@ var keyCache struct {
 	expiry time.Time
 }
 
+// fetchMu serializes fetches of the signing key set to avoid
+// unnecessary concurrent network requests when the cache expires.
+var fetchMu sync.Mutex
+
 // GoogleOIDCAuth validates Google issued ID tokens from incoming requests.
 type GoogleOIDCAuth struct{}
 
@@ -159,9 +163,18 @@ func getKey(kid string) (*rsa.PublicKey, error) {
 	needFetch := keyCache.keys == nil || time.Now().After(keyCache.expiry)
 	keyCache.mu.RUnlock()
 	if needFetch {
-		if err := fetchKeys(); err != nil {
-			return nil, err
+		fetchMu.Lock()
+		// Check again in case another goroutine refreshed the cache.
+		keyCache.mu.RLock()
+		needFetch = keyCache.keys == nil || time.Now().After(keyCache.expiry)
+		keyCache.mu.RUnlock()
+		if needFetch {
+			if err := fetchKeys(); err != nil {
+				fetchMu.Unlock()
+				return nil, err
+			}
 		}
+		fetchMu.Unlock()
 	}
 	keyCache.mu.RLock()
 	key, ok := keyCache.keys[kid]
