@@ -528,3 +528,51 @@ func TestAddEntryWriteError(t *testing.T) {
 		t.Fatalf("expected error output")
 	}
 }
+
+func TestRemoveEntryInvalidYAML(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "allow.yaml")
+	os.WriteFile(path, []byte(":"), 0644)
+	old := *file
+	*file = path
+	t.Cleanup(func() { *file = old })
+
+	out := captureStderr(func() {
+		removeEntry([]string{"-integration", "foo", "-caller", "u1", "-capability", "c"})
+	})
+	if out == "" {
+		t.Fatalf("expected error output")
+	}
+	data, _ := os.ReadFile(path)
+	if string(data) != ":" {
+		t.Fatalf("file changed")
+	}
+}
+
+func TestRemoveEntryReadFileError(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "dir")
+	os.Mkdir(path, 0755)
+	old := *file
+	*file = path
+	t.Cleanup(func() { *file = old })
+
+	out := captureStderr(func() {
+		removeEntry([]string{"-integration", "foo", "-caller", "u1", "-capability", "c"})
+	})
+	if out == "" {
+		t.Fatalf("expected error output")
+	}
+}
+
+func TestMainNoArgs(t *testing.T) {
+	cmd := exec.Command(os.Args[0], "-test.run=TestAllowlistMainHelper", "--")
+	cmd.Env = append(os.Environ(), "GO_WANT_ALLOWLIST_HELPER=1")
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("expected error")
+	}
+	if !strings.Contains(string(out), "Usage: allowlist") {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
