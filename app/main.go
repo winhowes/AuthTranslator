@@ -293,7 +293,7 @@ func (rl *RateLimiter) allowRedis(key string) (bool, error) {
 		}
 	}
 	var err error
-	var password string
+	var username, password string
 	if conn == nil {
 		addr := *redisAddr
 		useTLS := false
@@ -313,6 +313,7 @@ func (rl *RateLimiter) allowRedis(key string) (bool, error) {
 				return false, fmt.Errorf("unsupported redis scheme %q", u.Scheme)
 			}
 			if u.User != nil {
+				username = u.User.Username()
 				password, _ = u.User.Password()
 			}
 		}
@@ -339,8 +340,14 @@ func (rl *RateLimiter) allowRedis(key string) (bool, error) {
 		if err != nil {
 			return false, err
 		}
-		if password != "" {
-			if err := redisCmd(conn, "AUTH", password); err != nil {
+		if username != "" || password != "" {
+			args := []string{"AUTH"}
+			if username != "" {
+				args = append(args, username, password)
+			} else {
+				args = append(args, password)
+			}
+			if err := redisCmd(conn, args...); err != nil {
 				conn.Close()
 				return false, err
 			}

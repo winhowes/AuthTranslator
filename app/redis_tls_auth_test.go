@@ -18,7 +18,7 @@ import (
 	"time"
 )
 
-func readCommand(t *testing.T, br *bufio.Reader) string {
+func readCommand(t *testing.T, br *bufio.Reader) (string, []string) {
 	t.Helper()
 	line, err := br.ReadString('\n')
 	if err != nil {
@@ -31,24 +31,22 @@ func readCommand(t *testing.T, br *bufio.Reader) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	line, err = br.ReadString('\n') // $len
-	if err != nil {
-		t.Fatal(err)
-	}
-	line, err = br.ReadString('\n') // command
-	if err != nil {
-		t.Fatal(err)
-	}
-	cmd := strings.ToUpper(strings.TrimSpace(line))
-	for i := 1; i < count; i++ {
+	args := make([]string, 0, count)
+	for i := 0; i < count; i++ {
 		if _, err := br.ReadString('\n'); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := br.ReadString('\n'); err != nil {
+		line, err := br.ReadString('\n')
+		if err != nil {
 			t.Fatal(err)
 		}
+		args = append(args, strings.TrimSpace(line))
 	}
-	return cmd
+	if len(args) == 0 {
+		t.Fatal("no command received")
+	}
+	cmd := strings.ToUpper(args[0])
+	return cmd, args[1:]
 }
 
 func TestRateLimiterRedisAuth(t *testing.T) {
@@ -66,16 +64,19 @@ func TestRateLimiterRedisAuth(t *testing.T) {
 		}
 		defer c.Close()
 		br := bufio.NewReader(c)
-		if cmd := readCommand(t, br); cmd != "AUTH" {
+		if cmd, args := readCommand(t, br); cmd != "AUTH" {
 			t.Errorf("cmd %s, want AUTH", cmd)
+			return
+		} else if len(args) != 1 || args[0] != "pw" {
+			t.Errorf("AUTH args %v, want [pw]", args)
 			return
 		}
 		c.Write([]byte("+OK\r\n"))
-		if cmd := readCommand(t, br); cmd != "INCR" {
+		if cmd, _ := readCommand(t, br); cmd != "INCR" {
 			t.Errorf("cmd %s, want INCR", cmd)
 		}
 		c.Write([]byte(":1\r\n"))
-		if cmd := readCommand(t, br); cmd != "EXPIRE" {
+		if cmd, _ := readCommand(t, br); cmd != "EXPIRE" {
 			t.Errorf("cmd %s, want EXPIRE", cmd)
 		}
 		c.Write([]byte(":1\r\n"))
@@ -83,6 +84,54 @@ func TestRateLimiterRedisAuth(t *testing.T) {
 	oldAddr := *redisAddr
 	oldTimeout := *redisTimeout
 	*redisAddr = "redis://:pw@" + ln.Addr().String()
+	*redisTimeout = time.Second
+	rl := NewRateLimiter(1, time.Second)
+	defer func() {
+		rl.Stop()
+		*redisAddr = oldAddr
+		*redisTimeout = oldTimeout
+	}()
+	if !rl.Allow("k") {
+		t.Fatal("allow failed")
+	}
+	<-done
+}
+
+func TestRateLimiterRedisAuthUsername(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		c, err := ln.Accept()
+		if err != nil {
+			return
+		}
+		defer c.Close()
+		br := bufio.NewReader(c)
+		if cmd, args := readCommand(t, br); cmd != "AUTH" {
+			t.Errorf("cmd %s, want AUTH", cmd)
+			return
+		} else if len(args) != 2 || args[0] != "user" || args[1] != "pw" {
+			t.Errorf("AUTH args %v, want [user pw]", args)
+			return
+		}
+		c.Write([]byte("+OK\r\n"))
+		if cmd, _ := readCommand(t, br); cmd != "INCR" {
+			t.Errorf("cmd %s, want INCR", cmd)
+		}
+		c.Write([]byte(":1\r\n"))
+		if cmd, _ := readCommand(t, br); cmd != "EXPIRE" {
+			t.Errorf("cmd %s, want EXPIRE", cmd)
+		}
+		c.Write([]byte(":1\r\n"))
+	}()
+	oldAddr := *redisAddr
+	oldTimeout := *redisTimeout
+	*redisAddr = "redis://user:pw@" + ln.Addr().String()
 	*redisTimeout = time.Second
 	rl := NewRateLimiter(1, time.Second)
 	defer func() {
@@ -126,16 +175,16 @@ func TestRateLimiterRedisTLSAuth(t *testing.T) {
 		}
 		defer c.Close()
 		br := bufio.NewReader(c)
-		if cmd := readCommand(t, br); cmd != "AUTH" {
+		if cmd, _ := readCommand(t, br); cmd != "AUTH" {
 			t.Errorf("cmd %s, want AUTH", cmd)
 			return
 		}
 		c.Write([]byte("+OK\r\n"))
-		if cmd := readCommand(t, br); cmd != "INCR" {
+		if cmd, _ := readCommand(t, br); cmd != "INCR" {
 			t.Errorf("cmd %s, want INCR", cmd)
 		}
 		c.Write([]byte(":1\r\n"))
-		if cmd := readCommand(t, br); cmd != "EXPIRE" {
+		if cmd, _ := readCommand(t, br); cmd != "EXPIRE" {
 			t.Errorf("cmd %s, want EXPIRE", cmd)
 		}
 		c.Write([]byte(":1\r\n"))
@@ -198,16 +247,16 @@ func TestRateLimiterRedisTLSVerify(t *testing.T) {
 		}
 		defer c.Close()
 		br := bufio.NewReader(c)
-		if cmd := readCommand(t, br); cmd != "AUTH" {
+		if cmd, _ := readCommand(t, br); cmd != "AUTH" {
 			t.Errorf("cmd %s, want AUTH", cmd)
 			return
 		}
 		c.Write([]byte("+OK\r\n"))
-		if cmd := readCommand(t, br); cmd != "INCR" {
+		if cmd, _ := readCommand(t, br); cmd != "INCR" {
 			t.Errorf("cmd %s, want INCR", cmd)
 		}
 		c.Write([]byte(":1\r\n"))
-		if cmd := readCommand(t, br); cmd != "EXPIRE" {
+		if cmd, _ := readCommand(t, br); cmd != "EXPIRE" {
 			t.Errorf("cmd %s, want EXPIRE", cmd)
 		}
 		c.Write([]byte(":1\r\n"))
