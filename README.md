@@ -39,6 +39,7 @@ The project exists to make it trivial to translate one type of authentication in
 - **Extensible Plugins**: Add new auth, secret and integration plugins to cover different systems.
 - **Rate Limiting**: Limits the number of requests per caller and per host within a rolling window (default `1m` but configurable per integration via `rate_limit_window`). A value of `0` disables limiting.
 - **Redis Support**: Provide `-redis-addr` to use Redis for rate limit counters instead of in-memory tracking. If Redis is unavailable the limiter falls back to memory and logs an error.
+- **Request Body Limit**: The maximum buffered request body can be adjusted with `-max_body_size` (default 10MB).
 - **Allowlist**: Integrations can restrict specific callers to particular paths, methods and required parameters.
 - **Configuration Driven**: Behavior is controlled via a JSON configuration file.
 - **Validated Startup**: The configuration is checked at startup and errors are reported before serving traffic.
@@ -176,6 +177,7 @@ The project exists to make it trivial to translate one type of authentication in
    - `-x_at_int_host` – only respect `X-AT-Int` when this host is requested
    - `-tls-cert` and `-tls-key` – TLS certificate and key to serve HTTPS
    - `-redis-addr` – Redis address for rate limit counters
+   - `-max_body_size` – maximum bytes buffered from request bodies
    - `-log-level` – log verbosity (`DEBUG`, `INFO`, `WARN`, `ERROR`)
    - `-log-format` – log output format (`text` or `json`)
    - `-debug` – expose the `/integrations` endpoint for the CLI

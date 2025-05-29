@@ -57,3 +57,22 @@ func TestGetBodyReadError(t *testing.T) {
 		t.Fatal("expected error reading body")
 	}
 }
+
+func TestGetBodyTooLarge(t *testing.T) {
+	large := make([]byte, MaxBodySize+1)
+	r := httptest.NewRequest(http.MethodPost, "http://example.com", bytes.NewBuffer(large))
+	if _, err := GetBody(r); err == nil {
+		t.Fatal("expected error for large body")
+	}
+}
+
+func TestGetBodyCustomLimit(t *testing.T) {
+	old := MaxBodySize
+	MaxBodySize = 5
+	defer func() { MaxBodySize = old }()
+
+	r := httptest.NewRequest(http.MethodPost, "http://example.com", bytes.NewBufferString("abcdef"))
+	if _, err := GetBody(r); !errors.Is(err, ErrBodyTooLarge) {
+		t.Fatalf("expected ErrBodyTooLarge, got %v", err)
+	}
+}
