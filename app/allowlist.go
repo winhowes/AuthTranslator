@@ -52,6 +52,7 @@ func validateAllowlist(name string, callers []CallerConfig) error {
 // SetAllowlist registers the caller allowlist for an integration. It returns an
 // error if duplicate caller IDs or rules are detected.
 func SetAllowlist(name string, callers []CallerConfig) error {
+	name = strings.ToLower(name)
 	callers = integrationplugins.ExpandCapabilities(name, callers)
 	if err := validateAllowlist(name, callers); err != nil {
 		return err
