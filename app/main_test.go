@@ -219,6 +219,60 @@ func TestAllowRedisErrorResponse(t *testing.T) {
 	}
 }
 
+func TestAllowRedisSuccess(t *testing.T) {
+	old := *redisAddr
+	*redisAddr = "dummy"
+	rl := NewRateLimiter(1, time.Second)
+	t.Cleanup(func() {
+		*redisAddr = old
+		rl.Stop()
+	})
+
+	srv, cli := net.Pipe()
+	rl.conns <- cli
+	done := make(chan struct{})
+	errCh := make(chan error, 1)
+	go func() {
+		defer srv.Close()
+		br := bufio.NewReader(srv)
+		// INCR command
+		if err := readRedisRequest(br); err != nil {
+			errCh <- err
+			return
+		}
+		srv.Write([]byte(":1\r\n"))
+		// TTL command
+		if err := readRedisRequest(br); err != nil {
+			errCh <- err
+			return
+		}
+		srv.Write([]byte(":1\r\n"))
+		close(done)
+	}()
+
+	ok, err := rl.allowRedis("k")
+	if err != nil {
+		t.Fatalf("allowRedis returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("expected allowRedis to return true")
+	}
+	select {
+	case c := <-rl.conns:
+		if c != cli {
+			t.Fatal("unexpected connection returned")
+		}
+	default:
+		t.Fatal("connection was not returned to pool")
+	}
+	<-done
+	select {
+	case err := <-errCh:
+		t.Fatalf("goroutine error: %v", err)
+	default:
+	}
+}
+
 // Helper process used for testing main().
 func TestMainHelper(t *testing.T) {
 	if os.Getenv("GO_WANT_MAIN_HELPER") != "1" {
