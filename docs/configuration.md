@@ -105,13 +105,16 @@ apiVersion: v1alpha1
           methods:                             # per-method constraints
             POST:
               query:
-                channel: ["^C[0-9A-Z]{8}$"]   # workspace channel IDs
+                channel: [C12345678]           # workspace channel IDs (exact match)
               body:
-                text: "^.+"              # any non‑empty string
+                text: "Hello world"            # match the whole value exactly
                 # format detection uses Content-Type; other types skip body matching
               headers:
                 X-Custom-Trace: [abc123]
 ```
+
+Values for `query`, `headers`, and `body` are compared using **exact string equality**.
+Regular expressions are not supported.
 
 ### Top‑level keys
 
