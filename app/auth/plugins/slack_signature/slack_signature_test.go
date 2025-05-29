@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -101,5 +102,45 @@ func TestSlackSignatureOptionalParams(t *testing.T) {
 	p := SlackSignatureAuth{}
 	if got := p.OptionalParams(); len(got) != 4 || got[0] != "version" {
 		t.Fatalf("unexpected optional params: %v", got)
+	}
+}
+
+func TestSlackSignatureCustomParams(t *testing.T) {
+	body := "abc"
+	ts := strconv.FormatInt(time.Now().Unix(), 10)
+	base := fmt.Sprintf("v1:%s:%s", ts, body)
+	mac := hmac.New(sha256.New, []byte("good"))
+	mac.Write([]byte(base))
+	sig := "v1=" + hex.EncodeToString(mac.Sum(nil))
+
+	hdr := http.Header{}
+	hdr.Set("TS", ts)
+	hdr.Set("SIGN", sig)
+	r := &http.Request{Header: hdr, Body: io.NopCloser(strings.NewReader(body))}
+
+	p := SlackSignatureAuth{}
+	t.Setenv("BAD", "bad")
+	t.Setenv("GOOD", "good")
+	cfg, err := p.ParseParams(map[string]interface{}{
+		"secrets":    []string{"env:BAD", "env:GOOD"},
+		"version":    "v1",
+		"sig_header": "SIGN",
+		"ts_header":  "TS",
+		"tolerance":  int64(60),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !p.Authenticate(context.Background(), r, cfg) {
+		t.Fatal("expected authentication to succeed with custom params")
+	}
+}
+
+func TestAbs(t *testing.T) {
+	if abs(5) != 5 || abs(-5) != 5 || abs(0) != 0 {
+		t.Fatalf("abs basic cases failed")
+	}
+	if abs(math.MinInt64) != math.MaxInt64 {
+		t.Fatalf("abs MinInt64 mismatch")
 	}
 }
