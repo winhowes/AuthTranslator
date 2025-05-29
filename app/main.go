@@ -373,14 +373,14 @@ func watchFiles(ctx context.Context, files []string, out chan<- struct{}) {
 			}
 			if ev.Op&(fsnotify.Rename|fsnotify.Remove) != 0 {
 				go func(name string) {
-					for i := 0; i < 5; i++ {
+					for i := 0; i < 50; i++ {
 						if err := w.Add(name); err == nil {
 							return
 						} else if !os.IsNotExist(err) {
 							logger.Error("watch re-add failed", "file", name, "error", err)
 							return
 						}
-						time.Sleep(100 * time.Millisecond)
+						time.Sleep(10 * time.Millisecond)
 					}
 				}(ev.Name)
 			} else if ev.Op&fsnotify.Create != 0 {
