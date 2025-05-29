@@ -9,7 +9,7 @@ type secretCfg struct {
 	Secrets   []string
 	Extra     []string `json:"SeCrEtS"`
 	NotSlice  string   `json:"secrets"`
-	NotString []int    `json:"secrets"`
+	NotString []int    `json:"sEcReTs"`
 }
 
 func TestCollectSecretRefs(t *testing.T) {
