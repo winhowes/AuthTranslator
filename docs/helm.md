@@ -35,7 +35,7 @@ This:
 | `image.tag`        | `latest`                          | Image tag or digest.                                               |
 | `replicaCount`     | `1`                               | Horizontal scaling factor.                                         |
 | `service.type`     | `ClusterIP`                       | `LoadBalancer` or `NodePort` as needed.                            |
-| `redisAddress`     | `""`                              | Connection string passed to `-redis-addr`. |
+| `redisAddress`     | `""`                              | Address passed to `-redis-addr` – either `host:port` or a `redis://`/`rediss://` URL. |
 | `redisCA`          | `""`                              | CA file verifying Redis TLS passed to `-redis-ca`. |
 | `configYaml`       | *(string)*                        | Raw YAML for `config.yaml`.                                        |
 | `allowlistYaml`    | *(string)*                        | Raw YAML for `allowlist.yaml`.                                     |
