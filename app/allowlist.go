@@ -91,11 +91,11 @@ func SetAllowlist(name string, callers []CallerConfig) error {
 func GetAllowlist(name string) []CallerConfig {
 	allowlists.RLock()
 	m := allowlists.m[name]
-	allowlists.RUnlock()
 	res := make([]CallerConfig, 0, len(m))
 	for _, c := range m {
 		res = append(res, c)
 	}
+	allowlists.RUnlock()
 	return res
 }
 
