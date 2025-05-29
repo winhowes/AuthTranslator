@@ -46,6 +46,11 @@ type stubServer struct{ tls bool }
 func (s *stubServer) ListenAndServe() error                    { return nil }
 func (s *stubServer) ListenAndServeTLS(cert, key string) error { s.tls = true; return nil }
 
+type plainServer struct{ tls, plain bool }
+
+func (s *plainServer) ListenAndServe() error                    { s.plain = true; return nil }
+func (s *plainServer) ListenAndServeTLS(cert, key string) error { s.tls = true; return nil }
+
 func TestServeUsesTLS(t *testing.T) {
 	srv := &stubServer{}
 	if err := serve(srv, "c", "k"); err != nil {
@@ -72,5 +77,18 @@ func TestServeMissingTLSArgs(t *testing.T) {
 		if srv.tls {
 			t.Fatalf("case %d: unexpected TLS start", i)
 		}
+	}
+}
+
+func TestServeNoTLS(t *testing.T) {
+	srv := &plainServer{}
+	if err := serve(srv, "", ""); err != nil {
+		t.Fatal(err)
+	}
+	if !srv.plain {
+		t.Fatal("expected ListenAndServe to be called")
+	}
+	if srv.tls {
+		t.Fatal("unexpected TLS start")
 	}
 }
