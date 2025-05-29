@@ -160,21 +160,15 @@ callers:
 
 ```bash
 yq eval -o=json config.yaml | \
-  jsonschema -i - docs/schema/config‑v1alpha1.json
-```
-
-### With CUE
-
-```bash
-cue vet config.yaml docs/schema/config.cue
+  jsonschema -i - schemas/config.schema.json
 ```
 
 A sample `Makefile` target:
 
 ```make
 validate:
-	@cue vet config.yaml docs/schema/config.cue
-	@cue vet allowlist.yaml docs/schema/allowlist.cue
+        @yq eval -o=json config.yaml | jsonschema -i - schemas/config.schema.json
+        @yq eval -o=json allowlist.yaml | jsonschema -i - schemas/allowlist.schema.json
 ```
 
 CI fails fast on typos so you never ship an invalid proxy.

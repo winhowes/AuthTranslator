@@ -74,6 +74,31 @@ func TestGoogleOIDCDefaults(t *testing.T) {
 	}
 }
 
+func TestGoogleOIDCAddAuthFailure(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer ts.Close()
+
+	oldHost := MetadataHost
+	MetadataHost = ts.URL
+	defer func() { MetadataHost = oldHost }()
+	oldClient := HTTPClient
+	HTTPClient = ts.Client()
+	defer func() { HTTPClient = oldClient }()
+
+	p := GoogleOIDC{}
+	cfg, err := p.ParseParams(map[string]interface{}{"audience": "failaud"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := &http.Request{Header: http.Header{}}
+	p.AddAuth(context.Background(), r, cfg)
+	if got := r.Header.Get("Authorization"); got != "" {
+		t.Fatalf("expected empty header, got %s", got)
+	}
+}
+
 func makeToken(aud, sub string, exp int64, key *rsa.PrivateKey, kid string) string {
 	headerBytes, _ := json.Marshal(map[string]string{"alg": "RS256", "kid": kid})
 	header := base64.RawURLEncoding.EncodeToString(headerBytes)

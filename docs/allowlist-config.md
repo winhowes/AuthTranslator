@@ -103,26 +103,7 @@ This lets you allow a bursty webhook while keeping other calls throttled.
 
 ---
 
-## 4  Validating the file
-
-Run the helper:
-
-```bash
-go run ./cmd/allowlist validate --file allowlist.yaml
-```
-
-Fails on unknown fields or YAML parse errors.
-
-Include it in CI so typos don’t ship:
-
-```yaml
-- name: Lint allowlist
-  run: go run ./cmd/allowlist validate --file allowlist.yaml
-```
-
----
-
-## 5  Tips & conventions
+## 4  Tips & conventions
 
 * **One capability ≈ one business use‑case** (e.g. `slack.chat.write.public`).
 * Prefer **uppercase** HTTP methods (`GET`, `POST`) for consistency.
