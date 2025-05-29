@@ -87,6 +87,33 @@ func SetAllowlist(name string, callers []CallerConfig) error {
 	return nil
 }
 
+// buildAllowlistMap converts allowlist entries into the internal map format.
+// It performs the same validation as SetAllowlist but does not mutate any
+// global state.
+func buildAllowlistMap(entries []AllowlistEntry) (map[string]map[string]CallerConfig, error) {
+	res := make(map[string]map[string]CallerConfig)
+	for _, al := range entries {
+		name := strings.ToLower(al.Integration)
+		callers := integrationplugins.ExpandCapabilities(name, al.Callers)
+		if err := validateAllowlist(name, callers); err != nil {
+			return nil, fmt.Errorf("failed to load allowlist for %s: %w", al.Integration, err)
+		}
+		m := make(map[string]CallerConfig, len(callers))
+		for _, c := range callers {
+			for ri := range c.Rules {
+				c.Rules[ri].Segments = splitPath(c.Rules[ri].Path)
+			}
+			id := c.ID
+			if id == "" {
+				id = "*"
+			}
+			m[id] = c
+		}
+		res[name] = m
+	}
+	return res, nil
+}
+
 // GetAllowlist retrieves the allowlist for an integration.
 func GetAllowlist(name string) []CallerConfig {
 	allowlists.RLock()

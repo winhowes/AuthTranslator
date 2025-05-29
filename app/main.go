@@ -169,6 +169,31 @@ func reload() error {
 		newMap[integ.Name] = &integ
 	}
 
+	entries, err := loadAllowlists(*allowlistFile)
+	var newAllow map[string]map[string]CallerConfig
+	if err != nil {
+		if os.IsNotExist(err) {
+			logger.Warn("allowlist file missing; keeping existing entries", "file", *allowlistFile)
+		} else {
+			logger.Error("failed to load allowlist; keeping existing entries", "error", err)
+		}
+	} else {
+		if err := validateAllowlistEntries(entries); err != nil {
+			for _, ni := range newMap {
+				ni.inLimiter.Stop()
+				ni.outLimiter.Stop()
+			}
+			return fmt.Errorf("invalid allowlist: %w", err)
+		}
+		if newAllow, err = buildAllowlistMap(entries); err != nil {
+			for _, ni := range newMap {
+				ni.inLimiter.Stop()
+				ni.outLimiter.Stop()
+			}
+			return err
+		}
+	}
+
 	// Replace integrations and stop the old ones after success.
 	integrations.Lock()
 	integrations.m = newMap
@@ -182,36 +207,10 @@ func reload() error {
 	// Clear secret cache so reloaded integrations use fresh values.
 	secrets.ClearCache()
 
-	entries, err := loadAllowlists(*allowlistFile)
-	allowlists.RLock()
-	old := allowlists.m
-	allowlists.RUnlock()
-	if err != nil {
-		if os.IsNotExist(err) {
-			logger.Warn("allowlist file missing; keeping existing entries", "file", *allowlistFile)
-		} else {
-			logger.Error("failed to load allowlist; keeping existing entries", "error", err)
-		}
-	} else {
-		if err := validateAllowlistEntries(entries); err != nil {
-			allowlists.Lock()
-			allowlists.m = old
-			allowlists.Unlock()
-			return fmt.Errorf("invalid allowlist: %w", err)
-		}
-
+	if newAllow != nil {
 		allowlists.Lock()
-		allowlists.m = make(map[string]map[string]CallerConfig)
+		allowlists.m = newAllow
 		allowlists.Unlock()
-
-		for _, al := range entries {
-			if err := SetAllowlist(al.Integration, al.Callers); err != nil {
-				allowlists.Lock()
-				allowlists.m = old
-				allowlists.Unlock()
-				return fmt.Errorf("failed to load allowlist for %s: %w", al.Integration, err)
-			}
-		}
 	}
 
 	lastReloadTime.Set(time.Now().Format(time.RFC3339))

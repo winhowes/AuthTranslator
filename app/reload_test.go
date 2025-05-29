@@ -294,3 +294,65 @@ func TestReloadAllowlistMissing(t *testing.T) {
 		t.Fatal("allowlist entry lost after missing file reload")
 	}
 }
+
+func TestReloadInvalidAllowlistRollback(t *testing.T) {
+	integrations.Lock()
+	integrations.m = make(map[string]*Integration)
+	integrations.Unlock()
+	allowlists.Lock()
+	allowlists.m = make(map[string]map[string]CallerConfig)
+	allowlists.Unlock()
+
+	cfgFile, err := os.CreateTemp("", "cfg*.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(cfgFile.Name())
+	cfg := `{"integrations":[{"name":"good","destination":"http://example.com"}]}`
+	if _, err := cfgFile.WriteString(cfg); err != nil {
+		t.Fatal(err)
+	}
+	cfgFile.Close()
+
+	alFile, err := os.CreateTemp("", "al*.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(alFile.Name())
+	al := `[{"integration":"good","callers":[{"id":"*","rules":[{"path":"/","methods":{"GET":{}}}]}]}]`
+	if _, err := alFile.WriteString(al); err != nil {
+		t.Fatal(err)
+	}
+	alFile.Close()
+
+	flag.Set("config", cfgFile.Name())
+	flag.Set("allowlist", alFile.Name())
+	if err := reload(); err != nil {
+		t.Fatalf("initial reload failed: %v", err)
+	}
+
+	// modify files with new integration and invalid allowlist
+	if err := os.WriteFile(cfgFile.Name(), []byte(`{"integrations":[{"name":"new","destination":"http://example.org"}]}`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(alFile.Name(), []byte(`[{"integration":"new","callers":[{"id":"a"},{"id":"a"}]}]`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := reload(); err == nil {
+		t.Fatal("expected allowlist error")
+	}
+
+	if _, ok := GetIntegration("good"); !ok {
+		t.Fatal("existing integration lost")
+	}
+	if _, ok := GetIntegration("new"); ok {
+		t.Fatal("new integration applied despite error")
+	}
+	allowlists.RLock()
+	_, ok := allowlists.m["good"]
+	allowlists.RUnlock()
+	if !ok {
+		t.Fatal("allowlist removed after failed reload")
+	}
+}
