@@ -1,0 +1,9 @@
+- integration: example
+  callers:
+    - id: sample
+      rules:
+        - path: /search
+          methods:
+            GET:
+              query:
+                q: ["example"]
