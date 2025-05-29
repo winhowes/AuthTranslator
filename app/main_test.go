@@ -1,8 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"flag"
+	"fmt"
+	"net"
+	"strings"
 	"testing"
+	"time"
 )
 
 func TestAddrFlagDefault(t *testing.T) {
@@ -90,5 +95,51 @@ func TestServeNoTLS(t *testing.T) {
 	}
 	if srv.tls {
 		t.Fatal("unexpected TLS start")
+	}
+}
+
+func captureUsage() string {
+	var buf bytes.Buffer
+	old := flag.CommandLine.Output()
+	flag.CommandLine.SetOutput(&buf)
+	defer flag.CommandLine.SetOutput(old)
+	usage()
+	return buf.String()
+}
+
+func TestUsageOutput(t *testing.T) {
+	out := captureUsage()
+	if !strings.Contains(out, "Usage: authtranslator") || !strings.Contains(out, "Options:") {
+		t.Fatalf("unexpected usage output: %s", out)
+	}
+}
+
+type errServer struct{}
+
+func (e *errServer) ListenAndServe() error                    { return fmt.Errorf("plain err") }
+func (e *errServer) ListenAndServeTLS(cert, key string) error { return fmt.Errorf("tls err") }
+
+func TestServeError(t *testing.T) {
+	srv := &errServer{}
+	if err := serve(srv, "c", "k"); err == nil || err.Error() != "tls err" {
+		t.Fatalf("expected tls error, got %v", err)
+	}
+	if err := serve(srv, "", ""); err == nil || err.Error() != "plain err" {
+		t.Fatalf("expected plain error, got %v", err)
+	}
+}
+
+func TestRateLimiterStopClosesConnections(t *testing.T) {
+	old := *redisAddr
+	*redisAddr = "dummy"
+	rl := NewRateLimiter(1, time.Hour)
+	defer func() { *redisAddr = old }()
+
+	c1, c2 := net.Pipe()
+	rl.conns <- c1
+	rl.Stop()
+
+	if _, err := c2.Write([]byte("x")); err == nil {
+		t.Fatal("expected closed connection")
 	}
 }
