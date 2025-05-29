@@ -84,8 +84,22 @@ rules:
 | Method       | Case‑insensitive string compare.                                                                    |
 | Query params | Each `key=value` must exist & match **first** value. Extra params allowed.                          |
 | Headers      | Each `key=[values]` must exist with those values; an empty list only checks for presence. |
-| Body JSON    | The specified object must be a recursive subset of the request body. |
+| Body JSON    | The specified object must be a recursive subset of the request body. Arrays are matched unordered. |
 | Body form    | Same as JSON but for `application/x-www-form-urlencoded`. |
+
+A rule like:
+
+```yaml
+  body:
+    json:
+      obj:
+        inner:
+          more_inner: x
+        arr: [2, 1]
+```
+
+matches a request body
+`{"obj": {"inner": {"more_inner": "x", "extra_more_inner": "y"}, "arr": [1, 2, 3], "extra": true}}`.
 
 A request passes if **any** rule (or capability‑expanded rule) matches.
 
