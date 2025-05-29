@@ -27,6 +27,31 @@ outgoing_auth:
 
 > **Not exhaustive** — you can add more with \~50 LoC (see below).
 
+### Back-end environment variables
+
+Some schemes rely on environment variables for authentication or decryption:
+
+| Prefix | Environment Variables | Description | Example |
+| ------ | -------------------- | ----------- | ------- |
+| `env`  | Names referenced in the configuration (e.g. `env:IN_TOKEN`) | Secrets are read directly from those variables. | `env:IN_TOKEN` resolves to `$IN_TOKEN` |
+| `file` | _none_ | Reads file contents from disk for `file:` secrets. | `file:/etc/token` reads `/etc/token` |
+| `aws-secret` | `AWS_KMS_KEY` | Base64 encoded 32 byte key for decrypting `aws:` secrets. | `aws:prod/token` decrypts the stored value |
+| `azure-keyvault` | `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET` | Credentials for fetching `azure:` secrets from Key Vault. | `azure:/kv/token` fetches `token` from Key Vault |
+| `gcp-secret` | _none_ | Uses the GCP metadata service when resolving `gcp:` secrets. | `gcp:/projects/p/secrets/token` from Secret Manager |
+| `vault` | `VAULT_ADDR`, `VAULT_TOKEN` | Fetches secrets from HashiCorp Vault via its HTTP API. | `vault:secret/data/api` reads from Vault |
+
+```bash
+export IN_TOKEN=secret-in            # env:IN_TOKEN
+echo "out" > /tmp/out.token         # file:/tmp/out.token
+export AWS_KMS_KEY=$(cat kms.b64)    # decrypts aws:prod/token
+export AZURE_TENANT_ID=xxxxx
+export AZURE_CLIENT_ID=yyyyy
+export AZURE_CLIENT_SECRET=zzzzz
+# gcp-secret relies on metadata service
+export VAULT_ADDR=https://vault.example.com
+export VAULT_TOKEN=s.myroot
+```
+
 ---
 
 ## URI grammar
