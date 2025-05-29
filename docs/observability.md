@@ -21,11 +21,11 @@ Both endpoints are always available; no extra flag is required.
 
 | Metric                                     | Type      | Labels                     | Description                                                          |
 | ------------------------------------------ | --------- | -------------------------- | -------------------------------------------------------------------- |
-| `authtranslator_requests_total`            | counter   | `integration`, `code`      | Total proxied requests by upstream integration and HTTP status code. |
-| `authtranslator_request_duration_seconds`  | histogram | `integration`              | Latency for upstream round‑trip (includes auth injection).           |
-| `authtranslator_rate_limit_exceeded_total` | counter   | `integration`, `caller_id` | Incremented when a request is rejected with 429.                     |
-| `authtranslator_auth_plugin_errors_total`  | counter   | `plugin`, `direction`      | Errors thrown by incoming/outgoing auth plugins.                     |
-| `go_…`                                     | various   | –                          | Standard Go runtime metrics (GC, goroutines, heap).                  |
+| `authtranslator_requests_total`            | counter   | `integration`               | Total requests processed per integration. |
+| `authtranslator_upstream_responses_total`  | counter   | `integration`, `code`       | HTTP status codes returned by upstreams. |
+| `authtranslator_request_duration_seconds`  | histogram | `integration`               | Histogram of upstream request latency. |
+| `authtranslator_rate_limit_events_total`   | counter   | `integration`               | Incremented when a request is rejected with 429. |
+| `authtranslator_auth_failures_total`       | counter   | `integration`               | Authentication plugin failures. |
 
 Missing a metric? Open an issue or PR—new counters are easy to wire in.
 

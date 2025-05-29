@@ -14,50 +14,53 @@ AuthTranslator’s behaviour is extended by **plugins** – small Go packages th
 
 ## Built‑in plugins
 
-| Direction | Plugin            | Use when…                                      | Key params                       | Credential shape                                  |
-| --------- | ----------------- | ---------------------------------------------- | -------------------------------- | ------------------------------------------------- |
-| Inbound   | `bearer_token`    | Calls carry a short‑lived OAuth/JWT bearer     | `issuer`, `audience`, `jwks_url` | `Authorization: Bearer <jwt>`                     |
-| Inbound   | `basic_auth`      | Legacy scripts send Basic HTTP auth            | `user`, `pass` (regex)           | `Authorization: Basic …`                          |
-| Inbound   | `hmac_signature`  | Webhook with shared‑secret HMAC (GitHub‑style) | `header`, `algo`, `secret`       | `X-Hub-Signature-256: sha256=…`                   |
-| Inbound   | `mtls`            | Client authenticates via X.509 cert            | `ca_file`, `allowed_sans`        | TLS mutual auth                                   |
-| Inbound   | `path_token`      | Token lives in a URL path seg (Grafana, etc.)  | `segment_index`                  | `/:token/api/...`                                 |
-| Inbound   | `slack_signing`   | Slack slash‑command/webhook                    | `signing_secret`                 | `X-Slack-Signature` / `X-Slack-Request-Timestamp` |
-| Outbound  | `slack_app_token` | Upstream is Slack REST API                     | `token` (secret URI)             | Adds `Authorization: Bearer xoxb…`                |
-| Outbound  | `bearer_static`   | Any service expecting Bearer                   | `token`                          | Same as above                                     |
-| Outbound  | `basic_static`    | Upstream needs Basic auth                      | `user`, `pass`                   | Encodes header                                    |
-| Outbound  | `header_static`   | Custom header key/value                        | `header`, `value`                | Sets arbitrary header                             |
-| Outbound  | `query_static`    | API key must sit in query                      | `key`, `value`                   | Appends `?key=value`                              |
-
-*(More are in **************************`plugins/`************************** – the table shows the most commonly used set.)*
-
+| Direction | Plugin             | Notes |
+|-----------|-------------------|---------------------------------------------------------------|
+| Inbound   | `basic`            | HTTP Basic authentication. Caller ID is the username. |
+| Inbound   | `github_signature` | Validates GitHub webhook signatures using a shared secret. |
+| Inbound   | `google_oidc`      | Validates Google ID tokens. |
+| Inbound   | `hmac_signature`   | Generic HMAC validation using a shared secret. |
+| Inbound   | `jwt`              | Verifies JWTs with provided keys. |
+| Inbound   | `mtls`             | Requires a trusted client certificate. |
+| Inbound   | `slack_signature`  | Validates Slack request signatures. |
+| Inbound   | `token`            | Compares a shared token header. |
+| Inbound   | `url_path`         | Checks a token embedded in the request path. |
+| Outbound  | `basic`            | Adds HTTP Basic credentials to the upstream request. |
+| Outbound  | `google_oidc`      | Attaches a Google identity token from the metadata service. |
+| Outbound  | `hmac_signature`   | Computes an HMAC for the request. |
+| Outbound  | `jwt`              | Adds a signed JWT to the request. |
+| Outbound  | `mtls`             | Sends a client certificate and exposes the CN via header. |
+| Outbound  | `token`            | Adds a token header on outgoing requests. |
+| Outbound  | `url_path`         | Appends a secret segment to the request path. |
 ---
 
 ## Detailed examples
 
-### Inbound `bearer_token`
+### Inbound `jwt`
 
 ```yaml
 incoming_auth:
-  - type: bearer_token
+  - type: jwt
     params:
       issuer:   https://auth.example.com
       audience: slack-proxy
       jwks_url: https://auth.example.com/.well-known/jwks.json
 ```
 
-*Verifies* the JWT’s signature and standard claims, then sets `callerID = sub` claim.
+*Verifies* the JWT’s signature and sets `callerID` to the token's `sub` claim.
 
-### Outbound `header_static`
+### Outbound `token`
 
 ```yaml
 outgoing_auth:
-  type: header_static
+  type: token
   params:
+    secrets:
+      - env:API_TOKEN
     header: X-Api-Key
-    value:  env:MAILGUN_KEY  # secret URI
 ```
 
-Adds `X-Api-Key: <resolved-secret>` to every proxied request.
+Adds the configured token to the `X-Api-Key` header on each request.
 
 ---
 

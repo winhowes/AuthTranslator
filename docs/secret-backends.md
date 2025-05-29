@@ -4,9 +4,12 @@ AuthTranslator never expects you to paste raw API keys into a YAML file. Inste
 
 ```yaml
 outgoing_auth:
-  type: slack_app_token
+  type: token
   params:
-    token: gcp-secret://projects/acme/secrets/slackToken/latest
+    secrets:
+      - gcp-secret://projects/acme/secrets/slackToken/latest
+    header: Authorization
+    prefix: "Bearer "
 ```
 
 ---

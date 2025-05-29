@@ -93,4 +93,4 @@ docker compose down -v   # removes containers and named volume
 
 ---
 
-*Last updated*: {{date}}
+*Last updated*: 2024-05-01

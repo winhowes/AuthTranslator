@@ -6,19 +6,19 @@ fmt:
 	gofmt -w $(GOFILES)
 
 vet:
-        go vet ./...
+	go vet ./...
+
 
 lint:
-@if command -v golangci-lint >/dev/null 2>&1; then \
-golangci-lint run; \
-else \
-echo "golangci-lint not installed, skipping"; \
-fi
-
+	@if command -v golangci-lint >/dev/null 2>&1; then \
+		golangci-lint run; \
+	else \
+		echo "golangci-lint not installed, skipping"; \
+	fi
 test:
 	go test ./...
 
 docker:
-        docker build -t authtranslator .
+	docker build -t authtranslator .
 
 precommit: fmt vet lint
