@@ -57,7 +57,7 @@ redisAddress: "redis://redis:6379/0"
 configYaml: |
   apiVersion: v1alpha1
   integrations:
-    slack:
+    - name: slack
       destination: https://slack.com
       outgoing_auth:
         - type: token

@@ -19,7 +19,7 @@ This approximates a smooth sliding window while touching Redis once per request.
 
 ```yaml
 integrations:
-  slack:
+  - name: slack
     in_rate_limit:  100
     out_rate_limit: 800
     rate_limit_window: 1m

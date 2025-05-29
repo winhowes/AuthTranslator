@@ -89,7 +89,7 @@ Generated YAML lands under the key you choose:
 
 ```yaml
 integrations:
-  slack:
+  - name: slack
     << generated block >>
 ```
 

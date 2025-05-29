@@ -4,7 +4,7 @@ Each **integration** block tells AuthTranslator where to send traffic and how to
 
 ```yaml
 integrations:
-  slack:
+  - name: slack
     destination: https://slack.com
     incoming_auth:
       - type: token
