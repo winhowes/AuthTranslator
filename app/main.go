@@ -366,7 +366,24 @@ func watchFiles(files []string, out chan<- struct{}) {
 			if !ok {
 				return
 			}
-			if ev.Op&(fsnotify.Write|fsnotify.Rename) != 0 {
+			if ev.Op&(fsnotify.Rename|fsnotify.Remove) != 0 {
+				go func(name string) {
+					for i := 0; i < 5; i++ {
+						if err := w.Add(name); err == nil {
+							return
+						} else if !os.IsNotExist(err) {
+							logger.Error("watch re-add failed", "file", name, "error", err)
+							return
+						}
+						time.Sleep(100 * time.Millisecond)
+					}
+				}(ev.Name)
+			} else if ev.Op&fsnotify.Create != 0 {
+				if err := w.Add(ev.Name); err != nil && !os.IsNotExist(err) {
+					logger.Error("watch re-add failed", "file", ev.Name, "error", err)
+				}
+			}
+			if ev.Op&(fsnotify.Write|fsnotify.Create|fsnotify.Rename) != 0 {
 				select {
 				case out <- struct{}{}:
 				default:
