@@ -212,3 +212,73 @@ func TestMTLSOutgoingTransport(t *testing.T) {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
 }
+
+func TestMTLSAuthNoSubjects(t *testing.T) {
+	cert := &x509.Certificate{Subject: pkix.Name{CommonName: "any"}}
+	r := &http.Request{TLS: &tls.ConnectionState{VerifiedChains: [][]*x509.Certificate{{cert}}}}
+	p := MTLSAuth{}
+	cfg, err := p.ParseParams(map[string]interface{}{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !p.Authenticate(context.Background(), r, cfg) {
+		t.Fatal("expected authentication to succeed without subject filter")
+	}
+	if id, ok := p.Identify(r, cfg); ok || id != "" {
+		t.Fatalf("unexpected identifier %q", id)
+	}
+}
+
+func TestMTLSAuthMissingPeerCert(t *testing.T) {
+	cert := &x509.Certificate{Subject: pkix.Name{CommonName: "foo"}}
+	r := &http.Request{TLS: &tls.ConnectionState{VerifiedChains: [][]*x509.Certificate{{cert}}}}
+	p := MTLSAuth{}
+	cfg, err := p.ParseParams(map[string]interface{}{"subjects": []string{"foo"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Authenticate(context.Background(), r, cfg) {
+		t.Fatal("expected authentication to fail without peer certs")
+	}
+	if id, ok := p.Identify(r, cfg); ok || id != "" {
+		t.Fatalf("unexpected identifier %q", id)
+	}
+}
+
+func TestMTLSParseParamsErrors(t *testing.T) {
+	p := MTLSAuth{}
+	if _, err := p.ParseParams(map[string]interface{}{"subjects": "bad"}); err == nil {
+		t.Fatal("expected type mismatch error")
+	}
+	if _, err := p.ParseParams(map[string]interface{}{"unknown": true}); err == nil {
+		t.Fatal("expected error for unknown field")
+	}
+}
+
+func TestMTLSOutgoingParseMissingFields(t *testing.T) {
+	p := MTLSAuthOut{}
+	t.Setenv("CERT", "dummy")
+	if _, err := p.ParseParams(map[string]interface{}{"cert": "env:CERT"}); err == nil {
+		t.Fatal("expected error for missing cert or key")
+	}
+}
+
+func TestMTLSOutgoingAddAuthInvalidCfg(t *testing.T) {
+	r := &http.Request{Header: http.Header{}}
+	p := MTLSAuthOut{}
+	p.AddAuth(context.Background(), r, nil)
+	if got := r.Header.Get("X-TLS-Client-CN"); got != "" {
+		t.Fatalf("expected empty header, got %s", got)
+	}
+	p.AddAuth(context.Background(), r, &outParams{})
+	if got := r.Header.Get("X-TLS-Client-CN"); got != "" {
+		t.Fatalf("expected empty header, got %s", got)
+	}
+}
+
+func TestMTLSOutgoingTransportInvalid(t *testing.T) {
+	p := MTLSAuthOut{}
+	if tr := p.Transport(nil); tr != nil {
+		t.Fatal("expected nil transport for invalid config")
+	}
+}
