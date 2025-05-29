@@ -21,8 +21,7 @@ integrations:
         secrets:
           - env:APP_TOKEN_1
           - env:APP_TOKEN_2
-    transport:
-      timeout: 10s
+    idle_conn_timeout: 10s
     in_rate_limit:  100
     out_rate_limit: 800
     rate_limit_window: 1m
