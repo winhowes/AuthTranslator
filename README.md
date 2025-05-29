@@ -68,7 +68,7 @@ AuthTranslator eats **YAML** (or pure JSON) for two files:
 | `config.yaml`    | Declares **integrations** – upstream URL, outgoing auth plug‑in, transport tweaks, rate‑limit window. |
 | `allowlist.yaml` | Grants each **caller ID** specific HTTP paths/methods **or** named **capabilities**.                  |
 
-Example snippets live under [`examples/`](examples/) and a full JSON‑Schema is in [`docs/schema`](docs/schema) – CI fails if you drift.
+Example snippets live under [`examples/`](examples/) and a full JSON‑Schema is in [`schemas/`](schemas/) – CI fails if you drift.
 
 ### Secret back‑ends
 
@@ -121,7 +121,8 @@ Also see [`cmd/allowlist`](cmd/allowlist) for CRUD operations on the allow‑lis
 ## 🛠️ Development
 
 ```bash
-make            # fmt + vet + tests
+make precommit  # fmt + vet + lint
+make test       # run unit tests
 make docker     # build container
 ```
 
