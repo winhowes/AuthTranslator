@@ -25,12 +25,14 @@ AuthTranslator’s behaviour is extended by **plugins** – small Go packages th
 | Inbound   | `slack_signature`  | Validates Slack request signatures. |
 | Inbound   | `token`            | Compares a shared token header. |
 | Inbound   | `url_path`         | Checks a token embedded in the request path. |
+| Inbound   | `passthrough`      | Accepts every request with no authentication. |
 | Outbound  | `basic`            | Adds HTTP Basic credentials to the upstream request. |
 | Outbound  | `google_oidc`      | Attaches a Google identity token from the metadata service. |
 | Outbound  | `hmac_signature`   | Computes an HMAC for the request. |
 | Outbound  | `jwt`              | Adds a signed JWT to the request. |
 | Outbound  | `mtls`             | Sends a client certificate and exposes the CN via header. |
 | Outbound  | `token`            | Adds a token header on outgoing requests. |
+| Outbound  | `passthrough`      | Does nothing; useful when upstream handles auth. |
 | Outbound  | `url_path`         | Appends a secret segment to the request path. |
 ---
 
