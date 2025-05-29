@@ -415,3 +415,26 @@ func TestJWTParseParamsUnknownField(t *testing.T) {
 		t.Fatal("expected error for unknown field")
 	}
 }
+
+func TestJWTAuthenticateInvalidParams(t *testing.T) {
+	r := &http.Request{Header: http.Header{"Authorization": []string{"tok"}}}
+	p := JWTAuth{}
+	if p.Authenticate(context.Background(), r, struct{}{}) {
+		t.Fatal("expected failure for wrong params")
+	}
+}
+
+func TestJWTIdentifyWrongParams(t *testing.T) {
+	r := &http.Request{Header: http.Header{"Authorization": []string{"tok"}}}
+	p := JWTAuth{}
+	if id, ok := p.Identify(r, 5); ok || id != "" {
+		t.Fatalf("unexpected id %s", id)
+	}
+}
+
+func TestJWTOutgoingParseParamsUnknownField(t *testing.T) {
+	p := JWTAuthOut{}
+	if _, err := p.ParseParams(map[string]interface{}{"secrets": []string{"env:X"}, "extra": true}); err == nil {
+		t.Fatal("expected error")
+	}
+}

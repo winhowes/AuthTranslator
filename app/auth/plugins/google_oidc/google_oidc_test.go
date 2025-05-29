@@ -636,3 +636,91 @@ func TestGetKeyFetchError(t *testing.T) {
 		t.Fatal("expected error")
 	}
 }
+
+func TestParseTokenBranches(t *testing.T) {
+	if _, _, _, ok := parseToken("a.b"); ok {
+		t.Fatal("expected parts error")
+	}
+	badH := base64.RawURLEncoding.EncodeToString([]byte("{"))
+	if _, _, _, ok := parseToken(badH + ".b.c"); ok {
+		t.Fatal("expected header unmarshal fail")
+	}
+	h := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"RS256"}`))
+	if _, _, _, ok := parseToken(h + ".??.sig"); ok {
+		t.Fatal("expected payload decode fail")
+	}
+	badP := base64.RawURLEncoding.EncodeToString([]byte("{"))
+	if _, _, _, ok := parseToken(h + "." + badP + ".sig"); ok {
+		t.Fatal("expected payload unmarshal fail")
+	}
+}
+
+func TestFetchKeysInvalidJSON(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, "notjson")
+	}))
+	defer ts.Close()
+	oldURL := CertsURL
+	CertsURL = ts.URL
+	defer func() { CertsURL = oldURL }()
+	oldClient := HTTPClient
+	HTTPClient = ts.Client()
+	defer func() { HTTPClient = oldClient }()
+	if err := fetchKeys(); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestParseAndVerifyGetKeyError(t *testing.T) {
+	key, _ := rsa.GenerateKey(rand.Reader, 1024)
+	tok := makeToken("a", "u", time.Now().Add(time.Hour).Unix(), key, "kid")
+	keyCache.mu.Lock()
+	keyCache.keys = nil
+	keyCache.expiry = time.Now().Add(-time.Hour)
+	keyCache.mu.Unlock()
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, `{"keys":[]}`)
+	}))
+	defer ts.Close()
+	oldURL := CertsURL
+	CertsURL = ts.URL
+	defer func() { CertsURL = oldURL }()
+	oldClient := HTTPClient
+	HTTPClient = ts.Client()
+	defer func() { HTTPClient = oldClient }()
+	if _, ok := parseAndVerify(tok); ok {
+		t.Fatal("expected failure")
+	}
+}
+
+func TestGoogleOIDCAuthenticateInvalidParams(t *testing.T) {
+	r := &http.Request{}
+	g := GoogleOIDCAuth{}
+	if g.Authenticate(context.Background(), r, struct{}{}) {
+		t.Fatal("expected failure")
+	}
+}
+
+func TestGoogleOIDCIdentifyWrongParams(t *testing.T) {
+	r := &http.Request{}
+	g := GoogleOIDCAuth{}
+	if id, ok := g.Identify(r, 5); ok || id != "" {
+		t.Fatalf("unexpected id %s", id)
+	}
+}
+
+func TestParseExpiryValues(t *testing.T) {
+	if d := parseExpiry("bad"); time.Until(d) <= 0 {
+		t.Fatalf("unexpected expiry %v", d)
+	}
+	part := base64.RawURLEncoding.EncodeToString([]byte("{"))
+	if d := parseExpiry("h." + part); time.Until(d) <= 0 {
+		t.Fatalf("unexpected expiry %v", d)
+	}
+	expTime := time.Now().Add(time.Hour).Unix()
+	payload := base64.RawURLEncoding.EncodeToString([]byte(fmt.Sprintf(`{"exp":%d}`, expTime)))
+	d := parseExpiry("h." + payload)
+	if d.Unix() != expTime {
+		t.Fatalf("unexpected expiry %v", d)
+	}
+}

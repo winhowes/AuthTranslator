@@ -272,3 +272,38 @@ func TestBasicOutParseParamsMissingSecrets(t *testing.T) {
 		t.Fatal("expected error for missing secrets")
 	}
 }
+func TestBasicPluginNamesAndRequiredParams(t *testing.T) {
+	in := BasicAuth{}
+	out := BasicAuthOut{}
+	if in.Name() != "basic" || out.Name() != "basic" {
+		t.Fatalf("unexpected names %s %s", in.Name(), out.Name())
+	}
+	if req := in.RequiredParams(); len(req) != 1 || req[0] != "secrets" {
+		t.Fatalf("unexpected required params %v", req)
+	}
+	if req := out.RequiredParams(); len(req) != 1 || req[0] != "secrets" {
+		t.Fatalf("unexpected required params %v", req)
+	}
+}
+
+func TestBasicParseParamsUnknownFieldExtra(t *testing.T) {
+	in := BasicAuth{}
+	if _, err := in.ParseParams(map[string]interface{}{"secrets": []string{"env:S"}, "extra": true}); err == nil {
+		t.Fatal("expected error for unknown field")
+	}
+	out := BasicAuthOut{}
+	if _, err := out.ParseParams(map[string]interface{}{"secrets": []string{"env:S"}, "extra": true}); err == nil {
+		t.Fatal("expected error for unknown field")
+	}
+}
+
+func TestBasicAuthenticateSecretError(t *testing.T) {
+	secrets.Register(failPlugin{})
+	cred := base64.StdEncoding.EncodeToString([]byte("u:p"))
+	r := &http.Request{Header: http.Header{"Authorization": []string{"Basic " + cred}}}
+	p := BasicAuth{}
+	cfg := &inParams{Secrets: []string{"fail:o"}, Header: "Authorization", Prefix: "Basic "}
+	if p.Authenticate(context.Background(), r, cfg) {
+		t.Fatal("expected authentication to fail")
+	}
+}

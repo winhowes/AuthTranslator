@@ -266,3 +266,29 @@ func TestHMACParseParamsMissingSecrets(t *testing.T) {
 		t.Fatal("expected error for missing secrets")
 	}
 }
+
+func TestHMACParseParamsUnknownField(t *testing.T) {
+	in := HMACSignatureAuth{}
+	if _, err := in.ParseParams(map[string]interface{}{"secrets": []string{"env:S"}, "extra": true}); err == nil {
+		t.Fatal("expected error")
+	}
+	out := HMACSignature{}
+	if _, err := out.ParseParams(map[string]interface{}{"secrets": []string{"env:S"}, "extra": true}); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestHMACNames(t *testing.T) {
+	in := HMACSignatureAuth{}
+	out := HMACSignature{}
+	if in.Name() != "hmac_signature" || out.Name() != "hmac_signature" {
+		t.Fatalf("unexpected names %s %s", in.Name(), out.Name())
+	}
+}
+
+func TestHMACParseParamsTypeMismatch(t *testing.T) {
+	out := HMACSignature{}
+	if _, err := out.ParseParams(map[string]interface{}{"secrets": "bad"}); err == nil {
+		t.Fatal("expected error")
+	}
+}
