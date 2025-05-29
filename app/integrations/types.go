@@ -2,8 +2,9 @@ package integrationplugins
 
 // CallRule ties a path pattern to method-specific constraints.
 type CallRule struct {
-	Path    string                       `json:"path"`
-	Methods map[string]RequestConstraint `json:"methods"`
+	Path     string                       `json:"path"`
+	Methods  map[string]RequestConstraint `json:"methods"`
+	Segments []string                     `json:"-"`
 }
 
 // RequestConstraint lists required headers and body parameters.
