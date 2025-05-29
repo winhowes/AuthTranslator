@@ -1,0 +1,189 @@
+# Configuration Reference
+
+AuthTranslator loads **two** YAML (or pure‑JSON) documents at runtime:
+
+| File             | Required? | Hot‑reload? | Purpose                                                                            |
+| ---------------- | --------- | ----------- | ---------------------------------------------------------------------------------- |
+| `config.yaml`    | ✅         | ✅           | Declares *integrations* – where to proxy traffic and how to authenticate outwards. |
+| `allowlist.yaml` | ✅         | ✅           | Grants each *caller ID* a set of capabilities **or** low‑level request filters.    |
+
+The proxy currently infers its schema directly from Go structs. A top‑level `apiVersion` key is **optional** and ignored at runtime (reserved for future compatibility).
+
+> **Tip** The Go YAML parser accepts JSON too, so curl pipes / CI steps can build your config in whichever syntax is easier to template.
+
+---
+
+## 1  `config.yaml` – integrations
+
+```yaml
+apiVersion: v1alpha1
+integrations:
+  slack:
+    destination: https://slack.com
+    outgoing_auth:
+      type: slack_app_token
+      params:
+        token: env:SLACK_TOKEN          # secret URI – see docs/secret-backends.md
+    transport:
+      timeout: 10s
+      tls_skip_verify: false
+    rate_limit:
+      window: 1m
+      requests: 800
+    tags: [chat, team‑comm]
+```
+
+### Top‑level keys
+
+| Field          | Type                    | Default | Notes                                                    |   |
+| -------------- | ----------------------- | ------- | -------------------------------------------------------- | - |
+| `apiVersion`   | string                  | –       | Optional; reserved for future versions.                  |   |
+| `integrations` | map\[string]Integration | –       | Keys are user‑friendly names used in logs and allowlist. |   |
+
+### `Integration` object
+
+| Field           | Type           | Default      | Description                                                                  |
+| --------------- | -------------- | ------------ | ---------------------------------------------------------------------------- |
+| `destination`   | URL            | **required** | Base URL; path from client is appended as‑is.                                |
+| `outgoing_auth` | `PluginSpec`   | –            | Injects long‑lived credential **before** forwarding.                         |
+| `incoming_auth` | `[]PluginSpec` | `[]`         | Zero or more validators that run **in order**; the first that succeeds wins. |
+| `rate_limit`    | `RateLimit`    | `{}`         | Sliding‑window limiter keyed per caller ID.                                  |
+| `transport`     | `Transport`    | `{}`         | Fine‑tune timeouts, TLS, proxy settings.                                     |
+| `tags`          | `[]string`     | `[]`         | Arbitrary labels for dashboards / CLI queries.                               |
+
+#### `PluginSpec`
+
+```yaml
+ type: bearer_token
+ params:
+   issuer: https://auth.example.com
+   audience: slack-proxy
+```
+
+| Field    | Type            | Notes                                |
+| -------- | --------------- | ------------------------------------ |
+| `type`   | string          | Name registered by a plugin package. |
+| `params` | map\[string]any | Free‑form; validated by the plugin.  |
+
+#### `RateLimit`
+
+| Field      | Type     | Default        | Meaning                                                       |
+| ---------- | -------- | -------------- | ------------------------------------------------------------- |
+| `window`   | duration | `0` (disabled) | Sliding window length, e.g. `1m`.                             |
+| `requests` | int      | `0`            | Max number within the window.                                 |
+| `backend`  | string   | `memory`       | `memory` or `redis`. If `redis`, env `REDIS_URL` must be set. |
+
+See [rate‑limiting guide](rate-limiting.md) for tuning advice.
+
+#### `Transport`
+
+| Field             | Type     | Default | Description                                          |
+| ----------------- | -------- | ------- | ---------------------------------------------------- |
+| `timeout`         | duration | `30s`   | End‑to‑end timeout for upstream call.                |
+| `tls_skip_verify` | bool     | `false` | Disable server certificate verification (dev only!). |
+| `proxy_url`       | URL      | –       | Forward through an HTTP proxy.                       |
+
+---
+
+## 2  `allowlist.yaml` – caller permissions
+
+Two ways to authorise a caller:
+
+1. **High‑level capability** – human‑readable label that expands into many fine‑grained rules.
+2. **Low‑level filter** – match on HTTP path, method, query, headers, JSON‑body or form‑data.
+
+```yaml
+apiVersion: v1alpha1
+callers:
+  demo-user:
+    slack:
+      # easiest: assign a capability
+      capabilities: [slack.chat.write.public]
+
+  service‑42:
+    slack:
+      # granular example
+      rules:
+        - path:   /api/chat.postMessage
+          method: POST
+          query:
+            - channel=^C[0-9A-Z]{8}$   # workspace channel IDs
+          body:
+            json:
+              text: "^.+"              # any non‑empty string
+            form: {}
+          headers:
+            - X-Custom-Trace
+          rate_limit:
+            window: 1m
+            requests: 100
+```
+
+### Top‑level keys
+
+| Field        | Type               | Notes                                          |   |
+| ------------ | ------------------ | ---------------------------------------------- | - |
+| `apiVersion` | string             | Optional; reserved for future versions.        |   |
+| `callers`    | map\[string]Caller | Caller ID comes from the incoming‑auth plugin. |   |
+
+### `Caller` object
+
+`<integration‑name>` sub‑keys match those in `config.yaml`.
+
+| Field          | Type       | Notes                                                   |
+| -------------- | ---------- | ------------------------------------------------------- |
+| `capabilities` | `[]string` | Shortcut labels → expand to rules.                      |
+| `rules`        | `[]Rule`   | Evaluated in order; first match authorises the request. |
+
+#### `Rule`
+
+| Field        | Type                 | Notes                                                  |
+| ------------ | -------------------- | ------------------------------------------------------ |
+| `path`       | regex                | Anchored to the upstream path.                         |
+| `method`     | string or `[string]` | `GET`, `POST`, …                                       |
+| `query`      | `[string]`           | Each element `key=regex`. All must match.              |
+| `headers`    | `[string]`           | Header names that **must be present** (value ignored). |
+| `body.json`  | map\[string]regex    | JSON pointer‑like top‑level keys.                      |
+| `body.form`  | map\[string]regex    | For `application/x-www-form-urlencoded`.               |
+| `rate_limit` | `RateLimit`          | Optional per‑caller‑per‑rule override.                 |
+
+> **Performance note** Low‑level matching adds negligible latency (<50 µs at 10 rules). Tune rule ordering so the most frequent match comes first.
+
+---
+
+## 3  Validating configs in CI
+
+### With JSON‑Schema
+
+```bash
+yq eval -o=json config.yaml | \
+  jsonschema -i - docs/schema/config‑v1alpha1.json
+```
+
+### With CUE
+
+```bash
+cue vet config.yaml docs/schema/config.cue
+```
+
+A sample `Makefile` target:
+
+```make
+validate:
+	@cue vet config.yaml docs/schema/config.cue
+	@cue vet allowlist.yaml docs/schema/allowlist.cue
+```
+
+CI fails fast on typos so you never ship an invalid proxy.
+
+---
+
+## 4  Further reading
+
+* [Auth Plugins](auth-plugins.md)
+* [Secret Back-Ends](secret-backends.md)
+* [Rate-Limiting](rate-limiting.md)
+
+---
+
+*Last updated*: {{date}}
