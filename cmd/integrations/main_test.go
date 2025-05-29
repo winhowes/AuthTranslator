@@ -1,10 +1,11 @@
 package main
 
 import (
+	"flag"
 	"io"
 	"os"
 	"os/exec"
-  "path/filepath"
+  	"path/filepath"
 	"strings"
 	"testing"
 
