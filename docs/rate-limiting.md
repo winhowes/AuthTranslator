@@ -66,7 +66,7 @@ Example: If a caller peaks at 12 RPS and you choose a 60 s window → `12 × 
   ```
 * Prometheus: `authtranslator_rate_limit_events_total{integration="slack"}`
 
-Grafana sample dashboard lives in `docs/ops/grafana-rate-limits.json`.
+Grafana sample dashboard lives in [`docs/ops/grafana-rate-limits.json`](ops/grafana-rate-limits.json).
 
 ---
 

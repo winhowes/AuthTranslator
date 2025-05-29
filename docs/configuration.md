@@ -36,6 +36,8 @@ integrations:
     tags: [chat, team‑comm]
 ```
 
+See [Secret Back-Ends](secret-backends.md) for all supported URI schemes.
+
 ### Top‑level keys
 
 | Field          | Type                    | Default | Notes                                                    |   |
