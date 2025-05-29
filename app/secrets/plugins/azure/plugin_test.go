@@ -3,6 +3,7 @@ package plugins
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -19,6 +20,19 @@ type errorRoundTripper struct{}
 
 func (errorRoundTripper) RoundTrip(*http.Request) (*http.Response, error) {
 	return nil, fmt.Errorf("network error")
+}
+
+type tokenThenError struct{ done bool }
+
+func (t *tokenThenError) RoundTrip(r *http.Request) (*http.Response, error) {
+	if !t.done {
+		t.done = true
+		rec := httptest.NewRecorder()
+		rec.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(rec, `{"access_token":"tok"}`)
+		return rec.Result(), nil
+	}
+	return nil, fmt.Errorf("net err")
 }
 
 func (t *azureRewriteTransport) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -80,6 +94,29 @@ func TestAzureKMSLoad(t *testing.T) {
 func TestAzureKMSLoadError(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "fail", http.StatusInternalServerError)
+	}))
+	defer ts.Close()
+	restore := setAzureTestClient(ts)
+	defer restore()
+
+	t.Setenv("AZURE_TENANT_ID", "tenant")
+	t.Setenv("AZURE_CLIENT_ID", "id")
+	t.Setenv("AZURE_CLIENT_SECRET", "sec")
+
+	p := azureKMSPlugin{}
+	if _, err := p.Load(context.Background(), "https://vault.example.com/secrets/foo"); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestAzureKMSSecretStatusError(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "POST" {
+			w.Header().Set("Content-Type", "application/json")
+			fmt.Fprint(w, `{"access_token":"tok"}`)
+			return
+		}
+		http.Error(w, "bad", http.StatusInternalServerError)
 	}))
 	defer ts.Close()
 	restore := setAzureTestClient(ts)
@@ -169,6 +206,12 @@ func TestAzureKMSTokenRequestFailure(t *testing.T) {
 }
 
 func TestAzureKMSBadURL(t *testing.T) {
+	var rt tokenThenError
+	c := &http.Client{Transport: &rt}
+	old := HTTPClient
+	HTTPClient = c
+	defer func() { HTTPClient = old }()
+
 	t.Setenv("AZURE_TENANT_ID", "tenant")
 	t.Setenv("AZURE_CLIENT_ID", "id")
 	t.Setenv("AZURE_CLIENT_SECRET", "sec")
@@ -176,5 +219,52 @@ func TestAzureKMSBadURL(t *testing.T) {
 	p := azureKMSPlugin{}
 	if _, err := p.Load(context.Background(), "http://[::1"); err == nil {
 		t.Fatal("expected error for bad url")
+	}
+}
+
+func TestAzureKMSTokenRequestNetworkError(t *testing.T) {
+	old := HTTPClient
+	HTTPClient = &http.Client{Transport: errorRoundTripper{}}
+	defer func() { HTTPClient = old }()
+
+	t.Setenv("AZURE_TENANT_ID", "tenant")
+	t.Setenv("AZURE_CLIENT_ID", "id")
+	t.Setenv("AZURE_CLIENT_SECRET", "sec")
+
+	p := azureKMSPlugin{}
+	if _, err := p.Load(context.Background(), "https://vault.example.com/secrets/foo"); err == nil {
+		t.Fatal("expected network error")
+	}
+}
+
+func TestAzureKMSSecretNetworkError(t *testing.T) {
+	var rt tokenThenError
+	c := &http.Client{Transport: &rt}
+	old := HTTPClient
+	HTTPClient = c
+	defer func() { HTTPClient = old }()
+
+	t.Setenv("AZURE_TENANT_ID", "tenant")
+	t.Setenv("AZURE_CLIENT_ID", "id")
+	t.Setenv("AZURE_CLIENT_SECRET", "sec")
+
+	p := azureKMSPlugin{}
+	if _, err := p.Load(context.Background(), "https://vault.example.com/secrets/foo"); err == nil {
+		t.Fatal("expected network error")
+	}
+}
+
+func TestAzureKMSTokenRequestBadNewRequest(t *testing.T) {
+	oldReq := newRequest
+	newRequest = func(string, string, io.Reader) (*http.Request, error) { return nil, fmt.Errorf("bad req") }
+	defer func() { newRequest = oldReq }()
+
+	t.Setenv("AZURE_TENANT_ID", "tenant")
+	t.Setenv("AZURE_CLIENT_ID", "id")
+	t.Setenv("AZURE_CLIENT_SECRET", "sec")
+
+	p := azureKMSPlugin{}
+	if _, err := p.Load(context.Background(), "https://vault.example.com/secrets/foo"); err == nil {
+		t.Fatal("expected request error")
 	}
 }

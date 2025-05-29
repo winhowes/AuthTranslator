@@ -23,6 +23,9 @@ type vaultPlugin struct{}
 // HTTPClient is used for requests to Vault and can be overridden in tests.
 var HTTPClient = &http.Client{Timeout: 5 * time.Second}
 
+// helper to stub request creation in tests
+var newRequest = http.NewRequest
+
 func (vaultPlugin) Prefix() string { return "vault" }
 
 func (vaultPlugin) Load(ctx context.Context, id string) (string, error) {
@@ -38,7 +41,7 @@ func (vaultPlugin) Load(ctx context.Context, id string) (string, error) {
 	}
 	path := strings.TrimLeft(id, "/")
 	base.Path = "/v1/" + path
-	req, err := http.NewRequest("GET", base.String(), nil)
+	req, err := newRequest("GET", base.String(), nil)
 	if err != nil {
 		return "", err
 	}

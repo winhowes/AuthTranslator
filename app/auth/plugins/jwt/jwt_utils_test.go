@@ -2,6 +2,8 @@ package jwt
 
 import (
 	"crypto"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
@@ -109,5 +111,34 @@ func TestVerifyRS256InvalidPem(t *testing.T) {
 	_, parts := makeRS256Token(t, key)
 	if verifyRS256(parts, []byte("not pem")) {
 		t.Fatal("expected verifyRS256 to fail with bad pem")
+	}
+}
+
+func TestParseHeaderPayloadMoreErrors(t *testing.T) {
+	h := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"HS256"}`))
+	if _, _, _, ok := parseHeaderPayload(h + ".???.sig"); ok {
+		t.Fatal("expected payload decode error")
+	}
+	badPayload := base64.RawURLEncoding.EncodeToString([]byte("{"))
+	if _, _, _, ok := parseHeaderPayload(h + "." + badPayload + ".sig"); ok {
+		t.Fatal("expected payload unmarshal error")
+	}
+}
+
+func TestVerifyRS256ErrorPaths(t *testing.T) {
+	pemBytes := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: []byte("bad")})
+	if verifyRS256([]string{"a", "b", "c"}, pemBytes) {
+		t.Fatal("expected parse error")
+	}
+	ecdsaKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	der, _ := x509.MarshalPKIXPublicKey(&ecdsaKey.PublicKey)
+	pemEC := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: der})
+	if verifyRS256([]string{"a", "b", "c"}, pemEC) {
+		t.Fatal("expected non RSA key failure")
+	}
+	key, _ := rsa.GenerateKey(rand.Reader, 1024)
+	_, parts := makeRS256Token(t, key)
+	if verifyRS256([]string{parts[0], parts[1], "!!"}, pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: x509.MarshalPKCS1PublicKey(&key.PublicKey)})) {
+		t.Fatal("expected signature decode failure")
 	}
 }

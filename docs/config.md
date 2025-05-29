@@ -14,13 +14,13 @@ integrations:
             - vault:/old/token
             - vault:/new/token
     outgoing_auth:
-      type: token
-      params:
-        header: Authorization
-        prefix: "Bearer "
-        secrets:
-          - env:APP_TOKEN_1
-          - env:APP_TOKEN_2
+      - type: token
+        params:
+          header: Authorization
+          prefix: "Bearer "
+          secrets:
+            - env:APP_TOKEN_1
+            - env:APP_TOKEN_2
     idle_conn_timeout: 10s
     in_rate_limit:  100
     out_rate_limit: 800

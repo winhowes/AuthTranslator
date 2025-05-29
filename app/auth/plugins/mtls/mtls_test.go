@@ -385,3 +385,18 @@ func TestMTLSOutgoingParseSecretErrors(t *testing.T) {
 		t.Fatal("expected error for failing key secret")
 	}
 }
+
+func TestMTLSAuthenticateWrongParams(t *testing.T) {
+	r := &http.Request{}
+	p := MTLSAuth{}
+	if p.Authenticate(context.Background(), r, struct{}{}) {
+		t.Fatal("expected failure")
+	}
+}
+
+func TestMTLSOutgoingParseUnknownField(t *testing.T) {
+	p := MTLSAuthOut{}
+	if _, err := p.ParseParams(map[string]interface{}{"cert": "env:C", "key": "env:K", "extra": true}); err == nil {
+		t.Fatal("expected error")
+	}
+}

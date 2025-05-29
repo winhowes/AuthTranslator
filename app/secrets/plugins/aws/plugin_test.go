@@ -5,6 +5,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"encoding/base64"
+	"fmt"
 	"testing"
 )
 
@@ -108,5 +109,43 @@ func TestAWSKMSPluginDecryptFailure(t *testing.T) {
 	p := &awsKMSPlugin{}
 	if _, err := p.Load(context.Background(), ct); err == nil {
 		t.Fatal("expected decrypt error")
+	}
+}
+
+func TestAWSKMSPluginCipherError(t *testing.T) {
+	key := make([]byte, 32)
+	t.Setenv("AWS_KMS_KEY", base64.StdEncoding.EncodeToString(key))
+	id := encryptAWS(t, key, "secret")
+	p := &awsKMSPlugin{}
+	if _, err := p.Load(context.Background(), id); err != nil {
+		t.Fatalf("unexpected init error: %v", err)
+	}
+	old := newAESCipher
+	newAESCipher = func([]byte) (cipher.Block, error) { return nil, fmt.Errorf("cipher err") }
+	defer func() { newAESCipher = old }()
+	if _, err := p.Load(context.Background(), id); err == nil {
+		t.Fatal("expected cipher error")
+	}
+}
+
+type badBlock struct{}
+
+func (badBlock) BlockSize() int          { return 1 }
+func (badBlock) Encrypt(dst, src []byte) {}
+func (badBlock) Decrypt(dst, src []byte) {}
+
+func TestAWSKMSPluginGCMError(t *testing.T) {
+	key := make([]byte, 32)
+	t.Setenv("AWS_KMS_KEY", base64.StdEncoding.EncodeToString(key))
+	id := encryptAWS(t, key, "secret")
+	p := &awsKMSPlugin{}
+	if _, err := p.Load(context.Background(), id); err != nil {
+		t.Fatalf("unexpected init error: %v", err)
+	}
+	old := newAESCipher
+	newAESCipher = func([]byte) (cipher.Block, error) { return badBlock{}, nil }
+	defer func() { newAESCipher = old }()
+	if _, err := p.Load(context.Background(), id); err == nil {
+		t.Fatal("expected gcm error")
 	}
 }

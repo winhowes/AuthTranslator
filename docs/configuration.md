@@ -24,12 +24,12 @@ integrations:
   slack:
     destination: https://slack.com
     outgoing_auth:
-      type: token
-      params:
-        secrets:
-          - env:SLACK_TOKEN            # secret URI – see docs/secret-backends.md
-        header: Authorization
-        prefix: "Bearer "
+      - type: token
+        params:
+          secrets:
+            - env:SLACK_TOKEN            # secret URI – see docs/secret-backends.md
+          header: Authorization
+          prefix: "Bearer "
     idle_conn_timeout: 10s
     tls_insecure_skip_verify: false
     in_rate_limit:  100
@@ -51,7 +51,7 @@ See [Secret Back-Ends](secret-backends.md) for all supported URI schemes.
 | Field           | Type           | Default      | Description                                                                  |
 | --------------- | -------------- | ------------ | ---------------------------------------------------------------------------- |
 | `destination`   | URL            | **required** | Base URL; path from client is appended as‑is.                                |
-| `outgoing_auth` | `PluginSpec`   | –            | Injects long‑lived credential **before** forwarding.                         |
+| `outgoing_auth` | `[]PluginSpec` | `[]`         | Injects credential **before** forwarding.                         |
 | `incoming_auth` | `[]PluginSpec` | `[]`         | Zero or more validators that run **in order**; the first that succeeds wins. |
 | `in_rate_limit` | int            | `0`          | Max inbound requests per caller within the window. |
 | `out_rate_limit` | int           | `0`          | Max outbound requests per caller within the window. |
