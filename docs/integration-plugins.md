@@ -50,7 +50,7 @@ func New(opts Options) (*config.Integration, error) {
     return &config.Integration{
         Destination:   "https://example.com",
         OutgoingAuth:  config.PluginSpec{Type: "token", Params: map[string]any{"header": "X-Api-Key", "secrets": []string{"env:EXAMPLE_KEY"}}},
-        Transport:     config.Transport{Timeout: 10 * time.Second},
+        IdleConnTimeout: 10 * time.Second,
         InRateLimit:   100,
         OutRateLimit:  1000,
         RateLimitWindow: time.Minute,

@@ -30,9 +30,8 @@ integrations:
           - env:SLACK_TOKEN            # secret URI – see docs/secret-backends.md
         header: Authorization
         prefix: "Bearer "
-    transport:
-      timeout: 10s
-      tls_insecure_skip_verify: false
+    idle_conn_timeout: 10s
+    tls_insecure_skip_verify: false
     in_rate_limit:  100
     out_rate_limit: 800
     rate_limit_window: 1m
@@ -55,10 +54,16 @@ See [Secret Back-Ends](secret-backends.md) for all supported URI schemes.
 | `destination`   | URL            | **required** | Base URL; path from client is appended as‑is.                                |
 | `outgoing_auth` | `PluginSpec`   | –            | Injects long‑lived credential **before** forwarding.                         |
 | `incoming_auth` | `[]PluginSpec` | `[]`         | Zero or more validators that run **in order**; the first that succeeds wins. |
-| `in_rate_limit` | int           | `0`         | Max inbound requests per caller within the window. |
-| `out_rate_limit` | int          | `0`         | Max outbound requests per caller within the window. |
-| `rate_limit_window` | duration   | `1m`        | Rolling window length for rate limiting. |
-| `transport`     | `Transport`    | `{}`         | Fine‑tune timeouts, TLS, proxy settings.                                     |
+| `in_rate_limit` | int            | `0`          | Max inbound requests per caller within the window. |
+| `out_rate_limit` | int           | `0`          | Max outbound requests per caller within the window. |
+| `rate_limit_window` | duration    | `1m`         | Rolling window length for rate limiting. |
+| `idle_conn_timeout` | duration    | `0`          | How long idle connections stay pooled. |
+| `tls_handshake_timeout` | duration | `0`          | Maximum time to wait for TLS handshakes. |
+| `response_header_timeout` | duration | `0`        | Time to wait for the first response header. |
+| `tls_insecure_skip_verify` | bool   | `false`     | Disable server certificate verification (dev only!). |
+| `disable_keep_alives` | bool       | `false`      | Disable HTTP keep‑alive connections. |
+| `max_idle_conns` | int            | `0`          | Total idle connections to keep open. |
+| `max_idle_conns_per_host` | int     | `0`          | Idle connection limit per upstream host. |
 | `tags`          | `[]string`     | `[]`         | Arbitrary labels for dashboards / CLI queries.                               |
 
 #### `PluginSpec`
@@ -74,19 +79,6 @@ See [Secret Back-Ends](secret-backends.md) for all supported URI schemes.
 | -------- | --------------- | ------------------------------------ |
 | `type`   | string          | Name registered by a plugin package. |
 | `params` | map\[string]any | Free‑form; validated by the plugin.  |
-#### `Transport`
-| Field             | Type     | Default | Description                                          |
-| ----------------- | -------- | ------- | ---------------------------------------------------- |
-| `timeout`                 | duration | `30s`   | End‑to‑end timeout for upstream call. |
-| `tls_insecure_skip_verify` | bool     | `false` | Disable server certificate verification (dev only!). |
-| `proxy_url`               | URL      | –       | Forward through an HTTP proxy. |
-| `idle_conn_timeout`       | duration | `0`     | How long idle connections stay pooled. |
-| `tls_handshake_timeout`   | duration | `0`     | Maximum time to wait for TLS handshakes. |
-| `response_header_timeout` | duration | `0`     | Time to wait for the first response header. |
-| `disable_keep_alives`     | bool     | `false` | Disable HTTP keep‑alive connections. |
-| `max_idle_conns`          | int      | `0`     | Total idle connections to keep open. |
-| `max_idle_conns_per_host` | int      | `0`     | Idle connection limit per upstream host. |
-
 ---
 
 ## 2  `allowlist.yaml` – caller permissions
