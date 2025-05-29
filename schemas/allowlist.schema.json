@@ -1,0 +1,73 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "array",
+  "items": { "$ref": "#/definitions/entry" },
+  "definitions": {
+    "entry": {
+      "type": "object",
+      "required": ["integration", "callers"],
+      "properties": {
+        "integration": { "type": "string" },
+        "callers": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/caller" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "caller": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "capabilities": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/capability" }
+        },
+        "rules": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/rule" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "capability": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string" },
+        "params": { "type": "object" }
+      },
+      "additionalProperties": false
+    },
+    "rule": {
+      "type": "object",
+      "required": ["path", "methods"],
+      "properties": {
+        "path": { "type": "string" },
+        "methods": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/definitions/requestConstraint" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "requestConstraint": {
+      "type": "object",
+      "properties": {
+        "headers": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "query": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "body": { "type": "object" }
+      },
+      "additionalProperties": false
+    }
+  }
+}
