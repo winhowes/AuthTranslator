@@ -6,6 +6,7 @@ import (
 	yaml "gopkg.in/yaml.v3"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -27,6 +28,18 @@ func captureOutput(f func()) string {
 	os.Stdout = old
 	out, _ := io.ReadAll(r)
 	return string(out)
+}
+
+// helper to capture stderr from f
+func captureStderr(f func()) string {
+	r, w, _ := os.Pipe()
+	old := os.Stderr
+	os.Stderr = w
+	f()
+	w.Close()
+	os.Stderr = old
+	data, _ := io.ReadAll(r)
+	return string(data)
 }
 
 func TestAddEntryNewFile(t *testing.T) {
@@ -389,5 +402,103 @@ func TestMainListCommand(t *testing.T) {
 	out := captureOutput(main)
 	if !strings.Contains(out, "slack:") {
 		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+// Helper process for exercising main() in a separate process
+func TestAllowlistMainHelper(t *testing.T) {
+	if os.Getenv("GO_WANT_ALLOWLIST_HELPER") != "1" {
+		return
+	}
+	for i, a := range os.Args {
+		if a == "--" {
+			os.Args = append([]string{os.Args[0]}, os.Args[i+1:]...)
+			break
+		}
+	}
+	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+	file = flag.CommandLine.String("file", "allowlist.yaml", "allowlist file")
+	main()
+	os.Exit(0)
+}
+
+func TestMainUnknownCommand(t *testing.T) {
+	cmd := exec.Command(os.Args[0], "-test.run=TestAllowlistMainHelper", "--", "badcmd")
+	cmd.Env = append(os.Environ(), "GO_WANT_ALLOWLIST_HELPER=1")
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("expected error")
+	}
+	if !strings.Contains(string(out), "Usage: allowlist") {
+		t.Fatalf("unexpected output: %s", out)
+	}
+}
+
+func TestAddEntryInvalidYAML(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "allow.yaml")
+	os.WriteFile(path, []byte(":"), 0644)
+	old := *file
+	*file = path
+	t.Cleanup(func() { *file = old })
+
+	out := captureStderr(func() {
+		addEntry([]string{"-integration", "foo", "-caller", "u1", "-capability", "c"})
+	})
+	if out == "" {
+		t.Fatalf("expected error output")
+	}
+	data, _ := os.ReadFile(path)
+	if string(data) != ":" {
+		t.Fatalf("file changed")
+	}
+}
+
+func TestAddEntryReadFileError(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "dir")
+	os.Mkdir(path, 0755)
+	old := *file
+	*file = path
+	t.Cleanup(func() { *file = old })
+
+	out := captureStderr(func() {
+		addEntry([]string{"-integration", "foo", "-caller", "u1", "-capability", "c"})
+	})
+	if out == "" {
+		t.Fatalf("expected error output")
+	}
+}
+
+func TestRemoveEntryMissingArgs(t *testing.T) {
+	out := captureOutput(func() { removeEntry([]string{}) })
+	if !strings.Contains(out, "-integration, -caller and -capability required") {
+		t.Fatalf("missing error message")
+	}
+}
+
+func TestMainAddRemoveCommands(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "allow.yaml")
+
+	oldFS := flag.CommandLine
+	oldFile := file
+	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+	flag.CommandLine.SetOutput(os.Stdout)
+	file = flag.CommandLine.String("file", path, "allowlist file")
+	t.Cleanup(func() { flag.CommandLine = oldFS; file = oldFile })
+
+	origArgs := os.Args
+	os.Args = []string{"allowlist", "add", "-integration", "foo", "-caller", "u1", "-capability", "cap"}
+	main()
+	os.Args = []string{"allowlist", "remove", "-integration", "foo", "-caller", "u1", "-capability", "cap"}
+	main()
+	os.Args = origArgs
+
+	data, _ := os.ReadFile(path)
+	var entries []plugins.AllowlistEntry
+	yaml.Unmarshal(data, &entries)
+	if len(entries) != 0 {
+		t.Fatalf("expected no entries, got %v", entries)
 	}
 }
