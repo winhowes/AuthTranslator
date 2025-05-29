@@ -25,6 +25,10 @@ spec:
             - "-redis-addr"
             - {{ .Values.redisAddress | quote }}
             {{- end }}
+            {{- if .Values.redisCA }}
+            - "-redis-ca"
+            - {{ .Values.redisCA | quote }}
+            {{- end }}
           volumeMounts:
             - name: config
               mountPath: /app/config.yaml

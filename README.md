@@ -38,7 +38,7 @@ The project exists to make it trivial to translate one type of authentication in
 - **Pluggable Authentication**: Supports "basic", "token", `hmac_signature`, `jwt`, `mtls`, `url_path`, `github_signature` and `slack_signature` authentication types for both incoming and outgoing requests including Google OIDC with room for extension.
 - **Extensible Plugins**: Add new auth, secret and integration plugins to cover different systems.
 - **Rate Limiting**: Limits the number of requests per caller and per host within a rolling window (default `1m` but configurable per integration via `rate_limit_window`). A value of `0` disables limiting.
-- **Redis Support**: Provide `-redis-addr` as a Redis URL (e.g. `redis://host:6379` or `rediss://:password@host:6379`) to use Redis for rate limit counters instead of in-memory tracking. Use the `rediss` scheme to enable TLS. Include the password in the URL (`:password@`) to authenticate with Redis; the username portion is ignored. If Redis is unavailable the limiter falls back to memory and logs an error.
+- **Redis Support**: Provide `-redis-addr` as a Redis URL (e.g. `redis://host:6379` or `rediss://:password@host:6379`) to use Redis for rate limit counters instead of in-memory tracking. Use the `rediss` scheme to enable TLS. Include the password in the URL (`:password@`) to authenticate with Redis; the username portion is ignored. Certificate verification is skipped unless a CA file is supplied with `-redis-ca`. If Redis is unavailable the limiter falls back to memory and logs an error.
 - **Request Body Limit**: The maximum buffered request body can be adjusted with `-max_body_size` (default 10MB). Set the flag to `0` to disable the limit entirely.
 - **Allowlist**: Integrations can restrict specific callers to particular paths, methods and required parameters.
 - **Configuration Driven**: Behavior is controlled via a YAML configuration file.
@@ -171,6 +171,7 @@ The project exists to make it trivial to translate one type of authentication in
    - `-x_at_int_host` – only respect `X-AT-Int` when this host is requested
    - `-tls-cert` and `-tls-key` – TLS certificate and key to serve HTTPS
    - `-redis-addr` – Redis URL for rate limit counters. Use `rediss://` for TLS and include `:password@` before the host to authenticate.
+   - `-redis-ca` – CA certificate for verifying Redis TLS
    - `-redis-timeout` – timeout for dialing Redis (default `5s`)
   - `-max_body_size` – maximum bytes buffered from request bodies; use `0` to disable
    - `-log-level` – log verbosity (`DEBUG`, `INFO`, `WARN`, `ERROR`)
@@ -602,7 +603,7 @@ Example Terraform files are provided in the `terraform` directory for AWS, GCP a
 - [`terraform/azure`](terraform/azure/README.md) contains a configuration for deploying to Azure Container Instances.
 
 Set the required variables for your environment and run `terraform apply` inside the desired folder to create the service.
-All modules accept optional `redis_address` and `redis_timeout` variables to pass the `-redis-addr` and `-redis-timeout` flags to the container if you have a Redis instance. Each README lists the required variables along with example commands for initialization and deployment.
+All modules accept optional `redis_address`, `redis_timeout` and `redis_ca` variables to pass the `-redis-addr`, `-redis-timeout` and `-redis-ca` flags to the container if you have a Redis instance. Each README lists the required variables along with example commands for initialization and deployment.
 
 ## Development
 

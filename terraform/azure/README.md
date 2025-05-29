@@ -15,6 +15,7 @@ Required:
 Optional:
 
 - `redis_address` – address for distributed rate limiting
+- `redis_ca` – CA file for verifying Redis TLS
 
 ## Example
 

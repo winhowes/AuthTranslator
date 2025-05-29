@@ -4,6 +4,7 @@ image:
   pullPolicy: IfNotPresent
 
 redisAddress: ""
+redisCA: ""
 
 config: |
   integrations:

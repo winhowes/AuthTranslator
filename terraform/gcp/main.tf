@@ -26,7 +26,10 @@ resource "google_cloud_run_service" "this" {
             name          = "http1"
             container_port = 8080
           }]
-          args = var.redis_address != "" ? ["-redis-addr", var.redis_address] : []
+          args = concat(
+            var.redis_address != "" ? ["-redis-addr", var.redis_address] : [],
+            var.redis_ca != "" ? ["-redis-ca", var.redis_ca] : []
+          )
         }
       ]
     }
