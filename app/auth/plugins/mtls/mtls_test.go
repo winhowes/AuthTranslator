@@ -51,6 +51,7 @@ func TestMTLSOutgoingParse(t *testing.T) {
 	key, _ := rsa.GenerateKey(rand.Reader, 1024)
 	tmpl := &x509.Certificate{
 		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "client"},
 		NotBefore:    time.Now().Add(-time.Hour),
 		NotAfter:     time.Now().Add(time.Hour),
 	}
@@ -70,8 +71,34 @@ func TestMTLSOutgoingParse(t *testing.T) {
 	}
 	r := &http.Request{Header: http.Header{}}
 	p.AddAuth(context.Background(), r, cfg)
-	if len(r.Header) != 0 {
-		t.Fatalf("expected no headers set, got %v", r.Header)
+	if got := r.Header.Get("X-TLS-Client-CN"); got != "client" {
+		t.Fatalf("expected client CN header, got %s", got)
+	}
+}
+
+func TestMTLSOutgoingAddAuth(t *testing.T) {
+	key, _ := rsa.GenerateKey(rand.Reader, 1024)
+	tmpl := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "client"},
+		NotBefore:    time.Now().Add(-time.Hour),
+		NotAfter:     time.Now().Add(time.Hour),
+	}
+	der, _ := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
+	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})
+	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)})
+
+	p := MTLSAuthOut{}
+	t.Setenv("CERT", string(certPEM))
+	t.Setenv("KEY", string(keyPEM))
+	cfg, err := p.ParseParams(map[string]interface{}{"cert": "env:CERT", "key": "env:KEY"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := &http.Request{Header: http.Header{}}
+	p.AddAuth(context.Background(), r, cfg)
+	if got := r.Header.Get("X-TLS-Client-CN"); got != "client" {
+		t.Fatalf("expected client CN header, got %s", got)
 	}
 }
 
