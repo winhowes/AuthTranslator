@@ -47,3 +47,14 @@ func TestPassThruPluginParams(t *testing.T) {
 		t.Fatalf("unexpected optional params: %v", out.OptionalParams())
 	}
 }
+
+func TestPassThruParseParamsError(t *testing.T) {
+	in := PassThruAuth{}
+	if _, err := in.ParseParams(map[string]interface{}{"foo": true}); err == nil {
+		t.Fatal("expected error for unknown field in incoming parse")
+	}
+	out := PassThruAuthOut{}
+	if _, err := out.ParseParams(map[string]interface{}{"bar": 1}); err == nil {
+		t.Fatal("expected error for unknown field in outgoing parse")
+	}
+}
