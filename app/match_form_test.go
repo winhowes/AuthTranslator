@@ -7,7 +7,7 @@ import (
 
 func TestMatchForm(t *testing.T) {
 	vals := url.Values{"a": {"1", "2"}, "b": {"x"}}
-	rule := map[string]interface{}{"a": []interface{}{"1"}, "b": "ignored"}
+	rule := map[string]interface{}{"a": []interface{}{"1"}, "b": "x"}
 	if !matchForm(vals, rule) {
 		t.Fatal("expected match")
 	}
@@ -34,5 +34,25 @@ func TestMatchFormNonString(t *testing.T) {
 	rule := map[string]interface{}{"a": []interface{}{1}}
 	if matchForm(vals, rule) {
 		t.Fatal("expected non-string to fail")
+	}
+}
+
+func TestMatchFormStringValue(t *testing.T) {
+	vals := url.Values{"a": {"1"}}
+	rule := map[string]interface{}{"a": "1"}
+	if !matchForm(vals, rule) {
+		t.Fatal("expected string value match")
+	}
+	rule = map[string]interface{}{"a": "2"}
+	if matchForm(vals, rule) {
+		t.Fatal("expected string value mismatch to fail")
+	}
+}
+
+func TestMatchFormInvalidType(t *testing.T) {
+	vals := url.Values{"a": {"1"}}
+	rule := map[string]interface{}{"a": 1}
+	if matchForm(vals, rule) {
+		t.Fatal("expected invalid type to fail")
 	}
 }

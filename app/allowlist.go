@@ -169,19 +169,31 @@ func validateRequest(r *http.Request, c RequestConstraint) bool {
 
 func matchForm(vals url.Values, rule map[string]interface{}) bool {
 	for k, v := range rule {
-		if !vals.Has(k) {
+		present, ok := vals[k]
+		if !ok {
 			return false
 		}
-		if arr, ok := v.([]interface{}); ok {
-			present := vals[k]
-			for _, want := range arr {
-				s, ok := want.(string)
+		switch want := v.(type) {
+		case string:
+			found := false
+			for _, got := range present {
+				if got == want {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return false
+			}
+		case []interface{}:
+			for _, elem := range want {
+				s, ok := elem.(string)
 				if !ok {
 					return false
 				}
 				found := false
-				for _, p := range present {
-					if p == s {
+				for _, got := range present {
+					if got == s {
 						found = true
 						break
 					}
@@ -190,6 +202,8 @@ func matchForm(vals url.Values, rule map[string]interface{}) bool {
 					return false
 				}
 			}
+		default:
+			return false
 		}
 	}
 	return true
