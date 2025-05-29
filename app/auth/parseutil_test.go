@@ -32,3 +32,13 @@ func TestParseParamsTypeMismatch(t *testing.T) {
 		t.Fatal("expected type error")
 	}
 }
+
+func TestParseParamsMarshalError(t *testing.T) {
+	m := map[string]interface{}{"bad": func() {}}
+	type badStruct struct {
+		Bad string `json:"bad"`
+	}
+	if _, err := ParseParams[badStruct](m); err == nil {
+		t.Fatal("expected marshal error")
+	}
+}
