@@ -86,6 +86,7 @@ Two ways to authorise a caller:
 1. **High‑level capability** – human‑readable label that expands into many fine‑grained rules.
 2. **Low‑level filter** – match on HTTP path, method, query, headers, JSON‑body or form‑data.
 
+
 ```yaml
 apiVersion: v1alpha1
 - integration: slack
@@ -98,17 +99,17 @@ apiVersion: v1alpha1
       # granular example
       rules:
         - path:   /api/chat.postMessage
-          method: POST
-          query:
-            - channel=^C[0-9A-Z]{8}$   # workspace channel IDs
-          body:
-            json:
-              text: "^.+"              # any non‑empty string
-            form: {}
-          headers:
-            X-Custom-Trace: [abc123]
+          methods:
+            POST:
+              query:
+                channel: ["^C[0-9A-Z]{8}$"]   # workspace channel IDs
+              body:
+                json:
+                  text: "^.+"              # any non-empty string
+                form: {}
+              headers:
+                X-Custom-Trace: [abc123]
 ```
-
 ### Top‑level keys
 
 | Field        | Type               | Notes                                          |   |
@@ -129,13 +130,9 @@ apiVersion: v1alpha1
 
 | Field        | Type                 | Notes                                                  |
 | ------------ | -------------------- | ------------------------------------------------------ |
-| `path`       | string               | Anchored to the upstream path. Supports `*` and `**` wildcards. |
-| `method`     | string or `[string]` | `GET`, `POST`, …                                       |
-| `query`      | `[string]`           | Each element `key=value`. All must match.              |
-| `headers`    | map\[string][]string | Header names and required values. Empty list checks only presence. |
-| `body.json`  | map\[string]interface{} | Object matched recursively; must be a subset of the request. |
-| `body.form`  | map\[string]interface{} | Same subset matching for `application/x-www-form-urlencoded`. |
 
+| `path`    | string | Anchored to the upstream path. Supports `*` and `**` wildcards. |
+| `methods` | object | Map of HTTP method → filters (`headers`, `query`, `body`). |
 > **Performance note** Low‑level matching adds negligible latency (<50 µs at 10 rules). Tune rule ordering so the most frequent match comes first.
 
 ---
