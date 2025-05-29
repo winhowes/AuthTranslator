@@ -254,11 +254,11 @@ path: /search
 methods:
   GET:
     query:
-      q: ["example", "foo"]
+      q: ["foo", "bar"]
       lang: []
 ```
 
-The above rule requires that `q` include both `example` and `foo` among its
+The above rule requires that `q` include both `foo` and `bar` among its
 values and that a `lang` parameter is present with any value.
 
 #### Body Matching
