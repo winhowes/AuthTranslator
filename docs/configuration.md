@@ -102,7 +102,7 @@ apiVersion: v1alpha1
             GET: {}                     # allow simple health checks
 
         - path:   /api/chat.postMessage
-          methods:
+          methods:                             # per-method constraints
             POST:
               query:
                 channel: ["^C[0-9A-Z]{8}$"]   # workspace channel IDs

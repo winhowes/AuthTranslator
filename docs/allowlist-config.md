@@ -89,11 +89,11 @@ which requests are permitted.
 | Request part | Matching logic                                                                                      |
 | ------------ | --------------------------------------------------------------------------------------------------- |
 | Path         | Must match the pattern **entirely**. `*` matches one segment; `**` matches the rest.                 |
-| Method       | Case‑insensitive string compare.                                                                    |
-| Query params | Each `key=value` must exist & match **first** value. Extra params allowed.                          |
-| Headers      | Each `key=[values]` must exist with those values; an empty list only checks for presence. |
-| Body JSON    | The specified object must be a recursive subset of the request body. Arrays are matched unordered. |
-| Body form    | Same as JSON but for `application/x-www-form-urlencoded`. |
+| Method       | Case‑insensitive string compare. Each method key contains its own constraints. |
+| Query params | In `methods.<HTTP_METHOD>.query`, each key maps to allowed value list. Extra params allowed.
+| Headers      | In `methods.<HTTP_METHOD>.headers`, each key has required values; an empty list only checks for presence.
+| Body JSON    | `methods.<HTTP_METHOD>.body.json` must be a recursive subset of the request. Arrays matched unordered.
+| Body form    | `methods.<HTTP_METHOD>.body.form` applies the same subset logic for `application/x-www-form-urlencoded`.
 
 A rule like:
 
