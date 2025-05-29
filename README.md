@@ -50,19 +50,28 @@ The project exists to make it trivial to translate one type of authentication in
 
 ## Getting Started
 
-1. **Build or Run**
-   
+1. **Download or Build**
+
+   Grab a pre-built binary from the latest release:
+
+   ```bash
+   curl -L https://github.com/winhowes/AuthTranslator/releases/latest/download/authtranslator_$(uname -s)_$(uname -m).tar.gz | tar -xz
+   ./authtranslator -config app/config.yaml
+   ```
+
+   Or run from source:
+
    ```bash
    go run ./app -config app/config.yaml
    ```
 
-   Run `go run ./app --help` to see all available flags.
-   Provide `-tls-cert` and `-tls-key` together to serve HTTPS using the
+   Run `go run ./app --help` to see all available flags. Provide
+   `-tls-cert` and `-tls-key` together to serve HTTPS using the
    specified certificate and key. Supplying only one of these options
    results in an error.
-   
+
    Or build an executable:
-   
+
    ```bash
    go build -o authtranslator ./app
    ./authtranslator -config app/config.yaml
