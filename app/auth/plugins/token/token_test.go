@@ -166,3 +166,30 @@ func TestTokenAuthenticateMultipleSecrets(t *testing.T) {
 		t.Fatal("expected authentication to succeed with second secret")
 	}
 }
+
+func TestTokenAuthenticateNoHeader(t *testing.T) {
+	p := TokenAuth{}
+	t.Setenv("TOK", "tok")
+	cfg, _ := p.ParseParams(map[string]interface{}{"secrets": []string{"env:TOK"}, "header": "H"})
+	r := &http.Request{Header: http.Header{}}
+	if p.Authenticate(context.Background(), r, cfg) {
+		t.Fatal("expected failure with missing header")
+	}
+}
+
+func TestTokenParseParamsMissingHeader(t *testing.T) {
+	p := TokenAuth{}
+	if _, err := p.ParseParams(map[string]interface{}{"secrets": []string{"env:T"}}); err == nil {
+		t.Fatal("expected error when header missing")
+	}
+}
+
+func TestTokenAuthenticateBadToken(t *testing.T) {
+	p := TokenAuth{}
+	t.Setenv("TOK", "good")
+	cfg, _ := p.ParseParams(map[string]interface{}{"secrets": []string{"env:TOK"}, "header": "H"})
+	r := &http.Request{Header: http.Header{"H": []string{"bad"}}}
+	if p.Authenticate(context.Background(), r, cfg) {
+		t.Fatal("expected auth to fail with wrong token")
+	}
+}

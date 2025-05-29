@@ -311,3 +311,27 @@ func TestMTLSOutgoingAddAuthBadCert(t *testing.T) {
 		t.Fatalf("expected empty header, got %s", got)
 	}
 }
+
+func TestMTLSOutgoingAddAuthNoCerts(t *testing.T) {
+	cfg := &outParams{transport: &http.Transport{TLSClientConfig: &tls.Config{}}}
+	r := &http.Request{Header: http.Header{}}
+	p := MTLSAuthOut{}
+	p.AddAuth(context.Background(), r, cfg)
+	if got := r.Header.Get("X-TLS-Client-CN"); got != "" {
+		t.Fatalf("expected empty header, got %s", got)
+	}
+}
+
+func TestMTLSIdentifyPeerOnly(t *testing.T) {
+	cert := &x509.Certificate{Subject: pkix.Name{CommonName: "cn"}}
+	r := &http.Request{TLS: &tls.ConnectionState{PeerCertificates: []*x509.Certificate{cert}}}
+	p := MTLSAuth{}
+	cfg, err := p.ParseParams(map[string]interface{}{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	id, ok := p.Identify(r, cfg)
+	if !ok || id != "cn" {
+		t.Fatalf("expected id 'cn', got %s", id)
+	}
+}

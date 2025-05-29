@@ -249,3 +249,65 @@ func TestJWTOutgoingParseParams(t *testing.T) {
 		t.Fatalf("unexpected optional params: %v", opt)
 	}
 }
+
+func makeHS256ClaimsToken(key string, claims map[string]interface{}) string {
+	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"HS256"}`))
+	payloadBytes, _ := json.Marshal(claims)
+	payload := base64.RawURLEncoding.EncodeToString(payloadBytes)
+	signingInput := header + "." + payload
+	h := hmac.New(sha256.New, []byte(key))
+	h.Write([]byte(signingInput))
+	sig := base64.RawURLEncoding.EncodeToString(h.Sum(nil))
+	return signingInput + "." + sig
+}
+
+func TestJWTAuthAudienceIssuerMismatch(t *testing.T) {
+	key := "secret"
+	claims := map[string]interface{}{
+		"aud": "aud1",
+		"iss": "iss1",
+		"sub": "sub",
+		"exp": time.Now().Add(time.Hour).Unix(),
+	}
+	tok := makeHS256ClaimsToken(key, claims)
+	r := &http.Request{Header: http.Header{"Authorization": []string{"Bearer " + tok}}}
+	p := JWTAuth{}
+	t.Setenv("K", key)
+	cfgGood, _ := p.ParseParams(map[string]interface{}{"secrets": []string{"env:K"}, "audience": "aud1", "issuer": "iss1"})
+	if !p.Authenticate(context.Background(), r, cfgGood) {
+		t.Fatal("expected success")
+	}
+	cfgAud, _ := p.ParseParams(map[string]interface{}{"secrets": []string{"env:K"}, "audience": "other"})
+	if p.Authenticate(context.Background(), r, cfgAud) {
+		t.Fatal("audience mismatch should fail")
+	}
+	cfgIss, _ := p.ParseParams(map[string]interface{}{"secrets": []string{"env:K"}, "issuer": "other"})
+	if p.Authenticate(context.Background(), r, cfgIss) {
+		t.Fatal("issuer mismatch should fail")
+	}
+}
+
+func TestJWTAuthSecretLoadFail(t *testing.T) {
+	secrets.ClearCache()
+	secrets.Register(failPlugin{})
+	tok := makeHS256Token("aud", "u", "key", time.Now().Add(time.Hour).Unix())
+	r := &http.Request{Header: http.Header{"Authorization": []string{"Bearer " + tok}}}
+	p := JWTAuth{}
+	cfg := &inParams{Secrets: []string{"fail:oops"}, Header: "Authorization", Prefix: "Bearer "}
+	if p.Authenticate(context.Background(), r, cfg) {
+		t.Fatal("expected failure when secret load fails")
+	}
+}
+
+func TestJWTIdentifyBadInput(t *testing.T) {
+	p := JWTAuth{}
+	cfg := &inParams{Header: "Authorization", Prefix: "Bearer "}
+	r := &http.Request{Header: http.Header{"Authorization": []string{"tok"}}}
+	if id, ok := p.Identify(r, cfg); ok || id != "" {
+		t.Fatalf("expected empty id for missing prefix, got %s", id)
+	}
+	r = &http.Request{Header: http.Header{"Authorization": []string{"Bearer bad"}}}
+	if id, ok := p.Identify(r, cfg); ok || id != "" {
+		t.Fatalf("expected empty id for malformed token, got %s", id)
+	}
+}
