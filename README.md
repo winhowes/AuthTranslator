@@ -10,7 +10,6 @@ The project exists to make it trivial to translate one type of authentication in
 
 - [Goals](#goals)
 - [Features](#features)
-- [Development Requirements](#development-requirements)
 - [Getting Started](#getting-started)
 - [Allowlist Rules](#allowlist-rules)
 - [Built-in Authentication Plugins](#built-in-authentication-plugins)
@@ -24,6 +23,7 @@ The project exists to make it trivial to translate one type of authentication in
 - [Logging](#logging)
 - [Health Checks and Metrics](#health-checks-and-metrics)
 - [Deploying with Terraform](#deploying-with-terraform)
+- [Development](#development)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -47,10 +47,6 @@ The project exists to make it trivial to translate one type of authentication in
 - **Hot Reload**: Send `SIGHUP` to reload the configuration and allowlist without restarting.
 - **File Watching**: Use `-watch` to automatically reload when configuration or allowlist files change.
 
-## Development Requirements
-
-- [Go](https://golang.org/doc/install) 1.24 or newer.
-- [`golangci-lint`](https://github.com/golangci/golangci-lint) (optional) for running lint checks.
 
 ## Getting Started
 
@@ -525,12 +521,14 @@ The CLI updates the file in place (default `allowlist.json`, overridable with `-
 
 ## Running Tests
 
-Use the Go toolchain to vet and test the code:
+Use the Makefile or the Go toolchain to vet and test the code:
 
 ```bash
-go vet ./...
-go test ./...
+make vet
+make test
 ```
+
+These run `go vet ./...` and `go test ./...` respectively.
 
 If you have [`golangci-lint`](https://github.com/golangci/golangci-lint) installed you can also run:
 
@@ -597,6 +595,24 @@ Example Terraform files are provided in the `terraform` directory for AWS, GCP a
 
 Set the required variables for your environment and run `terraform apply` inside the desired folder to create the service.
 All modules accept optional `redis_address` and `redis_timeout` variables to pass the `-redis-addr` and `-redis-timeout` flags to the container if you have a Redis instance. Each README lists the required variables along with example commands for initialization and deployment.
+
+## Development
+
+### Requirements
+
+- [Go](https://golang.org/doc/install) 1.24 or newer.
+- [`golangci-lint`](https://github.com/golangci/golangci-lint) (optional) for running lint checks.
+
+### Makefile Targets
+
+A Makefile is provided to simplify formatting, vetting, testing and building the Docker image.
+
+```bash
+make fmt    # run gofmt on all Go files
+make vet    # run go vet ./...
+make test   # run go test ./...
+make docker # build the container image
+```
 
 ## Contributing
 
