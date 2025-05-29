@@ -42,7 +42,7 @@ Yes. For **rate‑limiting** accuracy you should point the pods at a shared Redi
 
 ### 6 How do I disable rate‑limiting entirely?
 
-Set `window: 0` or omit the `rate_limit:` block in the integration. (It’s disabled by default.)
+Set `in_rate_limit: 0` and `out_rate_limit: 0` (or omit the fields entirely). Rate limits are disabled by default.
 
 ---
 

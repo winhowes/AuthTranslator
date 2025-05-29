@@ -17,7 +17,7 @@ Think of it as a *cookie‑cutter* that stamps out a ready‑to‑run block in y
 | `github` | `https://api.github.com` | `token`               | Sets `User‑Agent: authtranslator` and bumps Go's idle connection limit. |
 | `stripe` | `https://api.stripe.com` | `basic`               | Forces HTTP/1.1 per Stripe docs.                                   |
 
-*(Full list lives under ******[`plugins/integration/`](../plugins/integration/)******)*
+*(Full list lives under ******[`app/integrations/plugins/`](../app/integrations/plugins/)******)*
 
 ---
 
@@ -27,9 +27,7 @@ Think of it as a *cookie‑cutter* that stamps out a ready‑to‑run block in y
 # Generate a skeleton block for Slack into stdout
 go run ./cmd/integrations slack > my-config.yaml
 
-# Same, but override the window + requests
-go run ./cmd/integrations slack \
-  -rate-window 1m -rate-requests 800 > my-config.yaml
+# Edit the generated YAML to adjust rate limits or timeouts
 ```
 
 The CLI simply templates YAML using the plugin’s defaults—feel free to edit afterwards.
@@ -38,13 +36,13 @@ The CLI simply templates YAML using the plugin’s defaults—feel free to edit 
 
 ## Anatomy of an integration plugin
 
-1. **Package location**: `plugins/integration/<name>`.
+1. **Package location**: `app/integrations/plugins/<name>`.
 2. **Registration** in `init()`:
 
    ```go
    func init() { integration.Register("slack", New) }
    ```
-3. **Options parsed from flags** (`--rate-window`, `--timeout`, etc.).
+3. **Options parsed from flags** (`--timeout`, etc.).
 4. **Return** a fully‑formed `config.Integration` struct—callers can marshal it to YAML.
 
 Minimal template:
@@ -55,7 +53,9 @@ func New(opts Options) (*config.Integration, error) {
         Destination:   "https://example.com",
         OutgoingAuth:  config.PluginSpec{Type: "token", Params: map[string]any{"header": "X-Api-Key", "secrets": []string{"env:EXAMPLE_KEY"}}},
         Transport:     config.Transport{Timeout: 10 * time.Second},
-        RateLimit:     config.RateLimit{Window: time.Minute, Requests: 1000},
+        InRateLimit:   100,
+        OutRateLimit:  1000,
+        RateLimitWindow: time.Minute,
     }, nil
 }
 ```
