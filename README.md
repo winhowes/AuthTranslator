@@ -2,33 +2,140 @@
 
 # AuthTranslator
 
-AuthTranslator is a Go-based reverse proxy that translates authentication tokens and enforces per-host and per-caller rate limits. It is configured through a YAML file and supports a plug-in architecture for authentication methods.
 
-## Documentation
+> **AuthTranslator** is a lightweight, pluggable **reverse‑proxy** that swaps **short‑lived caller credentials** for the **long‑lived tokens** third‑party APIs expect – and it can do the opposite on the way back in.
+> *“Stop sprinkling API keys around; translate auth at the edge instead.”*
 
-Extensive guides covering features, configuration and plugin development live in the [docs](docs/) directory.
+---
 
-## Examples
+## ✨ Key ideas
 
-Sample configuration files are provided in the [examples](examples/) folder.
+|                                              |                                                                                                                                                                                                |
+| -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Centralised secret custody**               | Only the proxy stores integration secrets; developers never see them.                                                                                                                          |
+| **Plug‑in everything**                       | Auth types, secret back‑ends and integration templates are Go plug‑ins.                                                                                                                        |
+| **Per‑caller / per‑integration rate‑limits** | Backed by Redis or in‑memory.                                                                                                                                                                  |
+| **Granular request authorization**           | Grant callers either high‑level **capabilities** (e.g. `slack.chat.write.public`) *or* low‑level filters on path, method, query params, headers — even specific JSON‑body or form‑data fields. |
+| **Hot‑reload**                               | `SIGHUP` or `-watch` picks up new configs without dropping connections.                                                                                                                        |
 
-## Quick Start
+---
 
-Download a pre-built binary and run using the example configuration:
+## 🚀 30‑second quick‑start
 
 ```bash
-curl -L https://github.com/winhowes/AuthTranslator/releases/latest/download/authtranslator_$(uname -s)_$(uname -m).tar.gz | tar -xz
-./authtranslator -config examples/config.yaml
-```
+# 1. Run the proxy (Docker)
+docker run --rm -p 8080:8080 \
+  -e SLACK_TOKEN=xxxxx -e SLACK_SIGNING=yyyyy \
+  -v $(pwd)/examples:/conf \
+  ghcr.io/winhowes/authtranslator:latest \
+    -config /conf/config.yaml -allowlist /conf/allowlist.yaml
 
-Or run from source:
+# 2. Curl through the proxy
+curl -H "Host: slack" -H "X-Auth: <short‑lived>" \
+     http://localhost:8080/api/chat.postMessage
+```
 
 ```bash
-go run ./app -config examples/config.yaml
+go run ./app -config examples/config.yaml -allowlist examples/allowlist.yaml
 ```
 
-See [docs/guide.md](docs/guide.md) for complete usage details.
+---
 
-## License
+## 🗺️ How it fits together
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+```mermaid
+graph LR
+  subgraph Your VPC
+    Caller([Caller])
+    AuthT[AuthTranslator]
+  end
+  Caller -->|short‑lived token| AuthT
+  AuthT -->|long‑lived API key| Slack(Slack API)
+```
+
+1. **Incoming plug‑in** validates + strips caller credential → produces **caller ID**.
+2. Allow‑list enforces either capability‑based rules or precise filters on path, method, query params, headers, and JSON‑body or form‑data keys.
+
+---
+
+## 📄 Configuration overview
+
+AuthTranslator eats **YAML** (or pure JSON) for two files:
+
+| File             | Purpose                                                                                               |
+| ---------------- | ----------------------------------------------------------------------------------------------------- |
+| `config.yaml`    | Declares **integrations** – upstream URL, outgoing auth plug‑in, transport tweaks, rate‑limit window. |
+| `allowlist.yaml` | Grants each **caller ID** specific HTTP paths/methods **or** named **capabilities**.                  |
+
+Example snippets live under [`examples/`](examples/) and a full JSON‑Schema is in [`docs/schema`](docs/schema) – CI fails if you drift.
+
+### Secret back‑ends
+
+Secrets can be pulled from several providers:
+
+* **env:** `SLACK_TOKEN=…`
+* **file:** path to an on‑disk file
+* **gcp‑secret:** Google Secret Manager
+* **aws‑secret:** AWS Secrets Manager
+* **azure‑keyvault:** Azure Key Vault
+* **vault:** HashiCorp Vault
+
+Need another store? Writing a plug‑in takes \~50 LoC – see [`plugins/secret/env`](plugins/secret/env).
+
+---
+
+## 🔧 CLI helpers
+
+```bash
+# List loaded integrations
+go run ./cmd/integrations list
+
+# Add a Slack integration from env vars
+go run ./cmd/integrations slack \
+  -token env:SLACK_TOKEN -signing-secret env:SLACK_SIGNING
+```
+
+Also see [`cmd/allowlist`](cmd/allowlist) for CRUD operations on the allow‑list.
+
+---
+
+## 📊 Observability & ops
+
+| Endpoint                | Purpose                                                                |
+| ----------------------- | ---------------------------------------------------------------------- |
+| `/_at_internal/healthz` | Liveness probe – returns **200 OK** when the proxy is running.         |
+| `/_at_internal/metrics` | Prometheus metrics (Go runtime + per‑integration rate‑limit counters). |
+| Structured logs         | JSON via `slog` (includes `integration`, `caller_id`, `request_id`).   |
+
+---
+
+## 📚 Documentation map
+
+* **Docs home** – [`/docs`](docs/) – deep dives, secret back‑ends, Terraform, plug‑in guides.
+* **Examples** – [`/examples`](examples/) – minimal runnable configs.
+* **Helm chart** – [`charts/authtranslator`](charts/authtranslator) – `helm install authtranslator charts/authtranslator` in one line.
+
+---
+
+## 🛠️ Development
+
+```bash
+make            # fmt + vet + tests
+make docker     # build container
+```
+
+* Requires **Go 1.24+**.
+* Run `golangci‑lint run` to match CI.
+
+---
+
+## 🤝 Contributing & security
+
+Found a bug? Have an auth plug‑in idea? Open an issue or PR – but please read [`CONTRIBUTING.md`](CONTRIBUTING.md) first.
+Security issues? Email **[security@authtranslator.dev](mailto:security@authtranslator.dev)** – see [`SECURITY.md`](SECURITY.md).
+
+---
+
+## 📝 License
+
+MIT © Winston Howes & contributors.
