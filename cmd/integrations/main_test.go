@@ -3,8 +3,6 @@ package main
 import (
 	"flag"
 	"io"
-	"net/http"
-	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -13,8 +11,6 @@ import (
 
 	"github.com/winhowes/AuthTranslator/cmd/integrations/plugins"
 )
-
-var server = flag.String("server", "http://localhost:8080/integrations", "integration endpoint")
 
 func TestAddUpdateDeleteList(t *testing.T) {
 	dir := t.TempDir()
@@ -78,9 +74,8 @@ func TestMainHelper(t *testing.T) {
 			break
 		}
 	}
-	// Recreate flag set and server flag so we can parse arguments.
+	// Recreate flag set so we can parse arguments.
 	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
-	server = flag.CommandLine.String("server", *server, "integration endpoint")
 	main()
 	os.Exit(0)
 }
@@ -93,41 +88,6 @@ func TestMainUnknownPlugin(t *testing.T) {
 		t.Fatalf("expected error, got nil")
 	}
 	if !strings.Contains(string(out), "unknown plugin unknown") {
-		t.Fatalf("unexpected output: %s", out)
-	}
-}
-
-func TestMainServerError(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, "boom", http.StatusInternalServerError)
-	}))
-	defer srv.Close()
-
-	cmd := exec.Command(os.Args[0], "-test.run=TestMainHelper", "--", "-server", srv.URL+"/integrations", "update", "slack", "-token", "t", "-signing-secret", "s")
-	cmd.Env = append(os.Environ(), "GO_WANT_INTEGRATIONS_HELPER=1")
-	out, err := cmd.CombinedOutput()
-	if err == nil {
-		t.Fatalf("expected error, got nil")
-	}
-	if !strings.Contains(string(out), "server error") {
-		t.Fatalf("unexpected output: %s", out)
-	}
-}
-
-func TestMainListInvalidJSON(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("notjson"))
-	}))
-	defer srv.Close()
-
-	cmd := exec.Command(os.Args[0], "-test.run=TestMainHelper", "--", "-server", srv.URL+"/integrations", "list")
-	cmd.Env = append(os.Environ(), "GO_WANT_INTEGRATIONS_HELPER=1")
-	out, err := cmd.CombinedOutput()
-	if err == nil {
-		t.Fatalf("expected error, got nil")
-	}
-	if !strings.Contains(string(out), "invalid character") {
 		t.Fatalf("unexpected output: %s", out)
 	}
 }

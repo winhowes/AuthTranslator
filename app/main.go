@@ -6,7 +6,6 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/json"
 	"flag"
 	"fmt"
 	yaml "gopkg.in/yaml.v3"
@@ -63,7 +62,6 @@ func loadAllowlists(filename string) ([]AllowlistEntry, error) {
 	return entries, nil
 }
 
-var debug = flag.Bool("debug", false, "enable debug mode")
 var disableXATInt = flag.Bool("disable_x_at_int", false, "ignore X-AT-Int header for routing")
 var xAtIntHost = flag.String("x_at_int_host", "", "only respect X-AT-Int header when request Host matches this value")
 var addr = flag.String("addr", ":8080", "listen address")
@@ -509,49 +507,6 @@ func watchFiles(ctx context.Context, files []string, out chan<- struct{}) {
 	}
 }
 
-// integrationsHandler manages creation and listing of integrations.
-func integrationsHandler(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case http.MethodPost:
-		var i Integration
-		if err := json.NewDecoder(r.Body).Decode(&i); err != nil {
-			http.Error(w, "bad request", http.StatusBadRequest)
-			return
-		}
-		if err := AddIntegration(&i); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		w.WriteHeader(http.StatusCreated)
-	case http.MethodPut:
-		var i Integration
-		if err := json.NewDecoder(r.Body).Decode(&i); err != nil {
-			http.Error(w, "bad request", http.StatusBadRequest)
-			return
-		}
-		if err := UpdateIntegration(&i); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		w.WriteHeader(http.StatusOK)
-	case http.MethodDelete:
-		var req struct {
-			Name string `json:"name"`
-		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Name == "" {
-			http.Error(w, "bad request", http.StatusBadRequest)
-			return
-		}
-		DeleteIntegration(req.Name)
-		w.WriteHeader(http.StatusNoContent)
-	case http.MethodGet:
-		list := ListIntegrations()
-		json.NewEncoder(w).Encode(list)
-	default:
-		w.WriteHeader(http.StatusMethodNotAllowed)
-	}
-}
-
 // healthzHandler reports server readiness.
 func healthzHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Last-Reload", lastReloadTime.Value())
@@ -690,10 +645,6 @@ func main() {
 
 	if err := reload(); err != nil {
 		log.Fatal(err)
-	}
-
-	if *debug {
-		http.HandleFunc("/integrations", integrationsHandler)
 	}
 
 	http.HandleFunc("/_at_internal/healthz", healthzHandler)
