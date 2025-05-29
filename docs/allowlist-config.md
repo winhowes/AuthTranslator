@@ -6,11 +6,11 @@ The **allow‑list** answers a single question:
 
 It lives in `allowlist.yaml` and is hot‑reloaded just like `config.yaml`.
 
-```text
+```yaml
 apiVersion: v1alpha1  # optional, ignored today
-callers:
-  <callerID>:
-    <integration-name>:
+- integration: <integration-name>
+  callers:
+    - id: <callerID>
       [capabilities: [ ... ] | rules: [ ... ]]
 ```
 
@@ -44,9 +44,9 @@ Capabilities serve two goals:
 Capabilities are defined **next to each integration plugin**. They expand into one or more granular rules that match that integration’s API surface.
 
 ```yaml
-callers:
-  bot-123:
-    slack:
+- integration: slack
+  callers:
+    - id: bot-123
       capabilities: [slack.chat.write.public]
 ```
 

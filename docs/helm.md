@@ -68,9 +68,9 @@ configYaml: |
           prefix: "Bearer "
 
 allowlistYaml: |
-  callers:
-    demo:
-      slack:
+  - integration: slack
+    callers:
+      - id: demo
         capabilities: [slack.chat.write.public]
 
 extraEnv:
