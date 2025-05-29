@@ -106,7 +106,7 @@ callers:
               text: "^.+"              # any non‑empty string
             form: {}
           headers:
-            - X-Custom-Trace
+            X-Custom-Trace: [abc123]
 ```
 
 ### Top‑level keys
@@ -132,9 +132,9 @@ callers:
 | `path`       | string               | Anchored to the upstream path. Supports `*` and `**` wildcards. |
 | `method`     | string or `[string]` | `GET`, `POST`, …                                       |
 | `query`      | `[string]`           | Each element `key=value`. All must match.              |
-| `headers`    | `[string]`           | Header names that **must be present** (value ignored). |
-| `body.json`  | map\[string]interface{} | JSON pointer‑like top‑level keys; values must match exactly. |
-| `body.form`  | map\[string]interface{} | For `application/x-www-form-urlencoded`; values must match exactly. |
+| `headers`    | map\[string][]string | Header names and required values. Empty list checks only presence. |
+| `body.json`  | map\[string]interface{} | Object matched recursively; must be a subset of the request. |
+| `body.form`  | map\[string]interface{} | Same subset matching for `application/x-www-form-urlencoded`. |
 
 > **Performance note** Low‑level matching adds negligible latency (<50 µs at 10 rules). Tune rule ordering so the most frequent match comes first.
 

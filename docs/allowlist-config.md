@@ -68,11 +68,11 @@ rules:
     method: POST                          # string or [string]
     query:                                # list of key=value pairs (ANDed)
       - channel=C12345678
-    headers:                              # must all be present (values optional)
-      - X-Custom-Trace
+    headers:                              # header=value list; empty list checks only presence
+      X-Custom-Trace: [abc123]
     body:                                 # optional JSON *or* form filters
       json:
-        text: "Hello world"               # exact match on top-level key
+        text: "Hello world"               # matched recursively
       form: {}
 ```
 
@@ -83,9 +83,9 @@ rules:
 | Path         | Must match the pattern **entirely**. `*` matches one segment; `**` matches the rest.                 |
 | Method       | Case‑insensitive string compare.                                                                    |
 | Query params | Each `key=value` must exist & match **first** value. Extra params allowed.                          |
-| Headers      | Header names must exist (value not checked).                                                        |
-| Body JSON    | The top‑level key must exist and its string value match exactly. Non‑string/absent keys → reject.   |
-| Body form    | Same as JSON but for `application/x-www-form-urlencoded`.                                           |
+| Headers      | Each `key=[values]` must exist with those values; an empty list only checks for presence. |
+| Body JSON    | The specified object must be a recursive subset of the request body. |
+| Body form    | Same as JSON but for `application/x-www-form-urlencoded`. |
 
 A request passes if **any** rule (or capability‑expanded rule) matches.
 

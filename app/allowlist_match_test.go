@@ -43,11 +43,11 @@ func newRequest(method, urlStr, ct string, body []byte) *http.Request {
 func TestValidateRequestHeaders(t *testing.T) {
 	r := httptest.NewRequest(http.MethodGet, "http://x", nil)
 	r.Header.Set("X-Test", "val")
-	if !validateRequest(r, RequestConstraint{Headers: []string{"X-Test"}}) {
+	if !validateRequest(r, RequestConstraint{Headers: map[string][]string{"X-Test": {"val"}}}) {
 		t.Fatal("expected header match")
 	}
 	r2 := httptest.NewRequest(http.MethodGet, "http://x", nil)
-	if validateRequest(r2, RequestConstraint{Headers: []string{"X-Test"}}) {
+	if validateRequest(r2, RequestConstraint{Headers: map[string][]string{"X-Test": {"val"}}}) {
 		t.Fatal("expected failure without header")
 	}
 }
