@@ -20,3 +20,22 @@ func TestListReturnsAllRegisteredNames(t *testing.T) {
 		}
 	}
 }
+
+func TestRegisterAndGet(t *testing.T) {
+	dummy := func(args []string) (Integration, error) { return Integration{Name: "dummy"}, nil }
+	Register("dummy", dummy)
+	if Get("dummy") == nil {
+		t.Fatalf("registered builder not found")
+	}
+	found := false
+	for _, n := range List() {
+		if n == "dummy" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("dummy not listed")
+	}
+	delete(registry, "dummy")
+}

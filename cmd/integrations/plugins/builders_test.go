@@ -60,6 +60,11 @@ func TestBuilderErrors(t *testing.T) {
 		{"slack", []string{"-token", "t"}},
 		{"twilio", []string{}},
 		{"workday", []string{"-token", "t"}},
+		{"github", []string{"-token", "t"}},
+		{"openai", []string{}},
+		{"sendgrid", []string{}},
+		{"monday", []string{}},
+		{"okta", []string{"-token", "t"}},
 	}
 	for _, tt := range tests {
 		b := Get(tt.name)
@@ -68,6 +73,8 @@ func TestBuilderErrors(t *testing.T) {
 		}
 		if _, err := b(tt.args); err == nil {
 			t.Errorf("%s: expected error for args %v", tt.name, tt.args)
+		} else if tt.name == "slack" && err.Error() != "-token and -signing-secret are required" {
+			t.Errorf("unexpected slack error: %v", err)
 		}
 	}
 
@@ -77,11 +84,13 @@ func TestBuilderErrors(t *testing.T) {
 }
 
 func TestBuilderParseError(t *testing.T) {
-	b := Get("asana")
-	if b == nil {
-		t.Fatalf("asana builder missing")
-	}
-	if _, err := b([]string{"-bogus"}); err == nil {
-		t.Fatalf("expected parse error")
+	for _, name := range []string{"asana", "openai"} {
+		b := Get(name)
+		if b == nil {
+			t.Fatalf("%s builder missing", name)
+		}
+		if _, err := b([]string{"-bogus"}); err == nil {
+			t.Fatalf("%s: expected parse error", name)
+		}
 	}
 }
