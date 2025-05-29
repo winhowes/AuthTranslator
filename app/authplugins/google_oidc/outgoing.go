@@ -1,7 +1,7 @@
 package googleoidc
 
 import (
-        "context"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
