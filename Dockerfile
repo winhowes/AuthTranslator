@@ -14,7 +14,7 @@ FROM alpine:3.19
 RUN addgroup -S app && adduser -S -G app app
 WORKDIR /app
 COPY --from=build /src/authtranslator .
-COPY app/config.json ./config.json
+COPY app/config.yaml ./config.yaml
 # ensure the runtime directory is owned by the app user
 RUN chown -R app:app /app
 USER app

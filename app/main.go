@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	yaml "gopkg.in/yaml.v3"
 	"log"
 	"log/slog"
 	"net"
@@ -48,8 +49,8 @@ func loadAllowlists(filename string) ([]AllowlistEntry, error) {
 	}
 	defer f.Close()
 
-	dec := json.NewDecoder(f)
-	dec.DisallowUnknownFields()
+	dec := yaml.NewDecoder(f)
+	dec.KnownFields(true)
 
 	var entries []AllowlistEntry
 	if err := dec.Decode(&entries); err != nil {
@@ -63,8 +64,8 @@ var debug = flag.Bool("debug", false, "enable debug mode")
 var disableXATInt = flag.Bool("disable_x_at_int", false, "ignore X-AT-Int header for routing")
 var xAtIntHost = flag.String("x_at_int_host", "", "only respect X-AT-Int header when request Host matches this value")
 var addr = flag.String("addr", ":8080", "listen address")
-var allowlistFile = flag.String("allowlist", "allowlist.json", "path to allowlist configuration")
-var configFile = flag.String("config", "config.json", "path to configuration file")
+var allowlistFile = flag.String("allowlist", "allowlist.yaml", "path to allowlist configuration")
+var configFile = flag.String("config", "config.yaml", "path to configuration file")
 var tlsCert = flag.String("tls-cert", "", "path to TLS certificate")
 var tlsKey = flag.String("tls-key", "", "path to TLS key")
 var logLevel = flag.String("log-level", "INFO", "log level: DEBUG, INFO, WARN, ERROR")
@@ -89,8 +90,8 @@ func loadConfig(filename string) (*Config, error) {
 	}
 	defer f.Close()
 
-	dec := json.NewDecoder(f)
-	dec.DisallowUnknownFields()
+	dec := yaml.NewDecoder(f)
+	dec.KnownFields(true)
 
 	var config Config
 	if err := dec.Decode(&config); err != nil {

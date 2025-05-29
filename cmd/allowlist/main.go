@@ -1,16 +1,16 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
+	yaml "gopkg.in/yaml.v3"
 	"os"
 	"strings"
 
 	"github.com/winhowes/AuthTranslator/cmd/allowlist/plugins"
 )
 
-var file = flag.String("file", "allowlist.json", "allowlist file")
+var file = flag.String("file", "allowlist.yaml", "allowlist file")
 
 func usage() {
 	fmt.Fprintf(flag.CommandLine.Output(), `Usage: allowlist [options] <command>\n\n`)
@@ -80,7 +80,7 @@ func addEntry(args []string) {
 	}
 	var entries []plugins.AllowlistEntry
 	if len(data) > 0 {
-		if err := json.Unmarshal(data, &entries); err != nil {
+		if err := yaml.Unmarshal(data, &entries); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			return
 		}
@@ -111,7 +111,7 @@ func addEntry(args []string) {
 	}
 	callerCfg.Capabilities = append(callerCfg.Capabilities, plugins.CapabilityConfig{Name: *capName, Params: params})
 
-	out, _ := json.MarshalIndent(entries, "", "    ")
+	out, _ := yaml.Marshal(entries)
 	if err := os.WriteFile(*file, out, 0644); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -140,7 +140,7 @@ func removeEntry(args []string) {
 		return
 	}
 	var entries []plugins.AllowlistEntry
-	if err := json.Unmarshal(data, &entries); err != nil {
+	if err := yaml.Unmarshal(data, &entries); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return
 	}
@@ -172,7 +172,7 @@ func removeEntry(args []string) {
 		break
 	}
 
-	out, _ := json.MarshalIndent(entries, "", "    ")
+	out, _ := yaml.Marshal(entries)
 	if err := os.WriteFile(*file, out, 0644); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

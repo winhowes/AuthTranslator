@@ -57,7 +57,7 @@ The project exists to make it trivial to translate one type of authentication in
 1. **Build or Run**
    
    ```bash
-   go run ./app -config app/config.json
+   go run ./app -config app/config.yaml
    ```
 
    Run `go run ./app --help` to see all available flags.
@@ -69,33 +69,34 @@ The project exists to make it trivial to translate one type of authentication in
    
    ```bash
    go build -o authtranslator ./app
-   ./authtranslator -config app/config.json
+   ./authtranslator -config app/config.yaml
    ```
 
 2. **Configuration File**
    
-   Edit `app/config.json` to define auth plugins and route targets:
+   Edit `app/config.yaml` to define auth plugins and route targets:
    
-   ```json
-   {
-     "integrations": [
-       {
-         "name": "example",
-         "destination": "http://backend.example.com",
-         "in_rate_limit": 100,
-         "out_rate_limit": 1000,
-         "rate_limit_window": "1m",
-         "max_idle_conns": 100,
-         "max_idle_conns_per_host": 20,
-         "incoming_auth": [
-           {"type": "token", "params": {"secrets": ["env:IN_TOKEN"], "header": "X-Auth"}}
-         ],
-         "outgoing_auth": [
-           {"type": "token", "params": {"secrets": ["env:OUT_TOKEN"], "header": "X-Auth"}}
-         ]
-       }
-     ]
-   }
+   ```yaml
+   integrations:
+     - name: example
+       destination: http://backend.example.com
+       in_rate_limit: 100
+       out_rate_limit: 1000
+       rate_limit_window: 1m
+       max_idle_conns: 100
+       max_idle_conns_per_host: 20
+       incoming_auth:
+         - type: token
+           params:
+             secrets:
+               - env:IN_TOKEN
+             header: X-Auth
+       outgoing_auth:
+         - type: token
+           params:
+             secrets:
+               - env:OUT_TOKEN
+             header: X-Auth
    ```
 
    Use `0` (or a negative number) for `in_rate_limit` or `out_rate_limit` to disable rate limiting for that direction.
@@ -110,22 +111,16 @@ The project exists to make it trivial to translate one type of authentication in
    - `max_idle_conns` – total idle connections to keep pooled.
    - `max_idle_conns_per_host` – idle connections per upstream host.
 
-   The allowlist configuration lives in a separate `allowlist.json` file:
+   The allowlist configuration lives in a separate `allowlist.yaml` file:
 
-  ```json
-  [
-    {
-      "integration": "example",
-      "callers": [
-        {
-          "id": "user-token",
-          "rules": [
-            {"path": "/allowed", "methods": {"GET": {}}}
-          ]
-        }
-      ]
-   }
-  ]
+  ```yaml
+  - integration: example
+    callers:
+      - id: user-token
+        rules:
+          - path: /allowed
+            methods:
+              GET: {}
   ```
 
    Caller IDs are derived by the incoming auth plugins. Plugins that
@@ -145,25 +140,19 @@ The project exists to make it trivial to translate one type of authentication in
   to one or more rules when loaded, making it easy to audit access by name and
   easier for folks to add new entries to the allowlist:
 
-  ```json
-  [
-    {
-      "integration": "slack",
-      "callers": [
-        {
-          "id": "ci-bot-token",
-          "capabilities": [
-            {"name": "post_public_as", "params": {"username": "ci-bot"}}
-          ]
-        }
-      ]
-    }
-  ]
+  ```yaml
+  - integration: slack
+    callers:
+      - id: ci-bot-token
+        capabilities:
+          - name: post_public_as
+            params:
+              username: ci-bot
   ```
 
 3. **Running**
 
-   The listen address can be configured with the `-addr` flag. By default the server listens on `:8080`. Incoming requests are matched against the `X-AT-Int` header, if present, or otherwise the host header to determine the route and associated authentication plugin. Use `-disable_x_at_int` to ignore the header entirely or `-x_at_int_host` to only respect the header when a specific host is requested. The configuration file is chosen with `-config` (default `config.json`). The allowlist file can be specified with `-allowlist`; it defaults to `allowlist.json`. Set `-redis-addr` to persist rate limits in Redis; failures fall back to memory with an error log. Use `-redis-timeout` to control how long dialing Redis can take.
+   The listen address can be configured with the `-addr` flag. By default the server listens on `:8080`. Incoming requests are matched against the `X-AT-Int` header, if present, or otherwise the host header to determine the route and associated authentication plugin. Use `-disable_x_at_int` to ignore the header entirely or `-x_at_int_host` to only respect the header when a specific host is requested. The configuration file is chosen with `-config` (default `config.yaml`). The allowlist file can be specified with `-allowlist`; it defaults to `allowlist.yaml`. Set `-redis-addr` to persist rate limits in Redis; failures fall back to memory with an error log. Use `-redis-timeout` to control how long dialing Redis can take.
    Send `SIGHUP` or run with `-watch` to reload these files automatically without
    restarting. If the allowlist fails to load during reload, the previously loaded
    entries remain in effect.
@@ -171,8 +160,8 @@ The project exists to make it trivial to translate one type of authentication in
    **Service flags**
 
    - `-addr` – listen address (default `:8080`)
-   - `-config` – path to the configuration file (`config.json` by default)
-   - `-allowlist` – path to the allowlist file (`allowlist.json` by default)
+   - `-config` – path to the configuration file (`config.yaml` by default)
+   - `-allowlist` – path to the allowlist file (`allowlist.yaml` by default)
    - `-disable_x_at_int` – ignore the `X-AT-Int` header
    - `-x_at_int_host` – only respect `X-AT-Int` when this host is requested
    - `-tls-cert` and `-tls-key` – TLS certificate and key to serve HTTPS
@@ -194,26 +183,27 @@ The project exists to make it trivial to translate one type of authentication in
    python3 -m http.server 9000
    ```
 
-   Edit `app/config.json` so the integration forwards to the local backend:
+   Edit `app/config.yaml` so the integration forwards to the local backend:
 
-   ```json
-   {
-       "integrations": [
-         {
-           "name": "example",
-           "destination": "http://localhost:9000",
-           "in_rate_limit": 100,
-           "out_rate_limit": 1000,
-           "rate_limit_window": "1m",
-           "incoming_auth": [
-             {"type": "token", "params": {"secrets": ["env:IN_TOKEN"], "header": "X-Auth"}}
-           ],
-           "outgoing_auth": [
-             {"type": "token", "params": {"secrets": ["env:OUT_TOKEN"], "header": "X-Auth"}}
-           ]
-         }
-       ]
-   }
+   ```yaml
+   integrations:
+     - name: example
+       destination: http://localhost:9000
+       in_rate_limit: 100
+       out_rate_limit: 1000
+       rate_limit_window: 1m
+       incoming_auth:
+         - type: token
+           params:
+             secrets:
+               - env:IN_TOKEN
+             header: X-Auth
+       outgoing_auth:
+         - type: token
+           params:
+             secrets:
+               - env:OUT_TOKEN
+             header: X-Auth
    ```
 
    Provide the environment variables referenced by the auth configuration and start the proxy:
@@ -221,7 +211,7 @@ The project exists to make it trivial to translate one type of authentication in
    ```bash
    export IN_TOKEN=secret-in
    export OUT_TOKEN=secret-out
-   go run ./app -config app/config.json -allowlist app/allowlist.json
+   go run ./app -config app/config.yaml -allowlist app/allowlist.yaml
    ```
 
    In another terminal, call the proxy using the integration name as the Host header:
@@ -237,30 +227,25 @@ listed under `headers` and required body fields under `body`.
 
 Example rule requiring an `X-Token` header and a JSON field:
 
-```json
-{
-  "path": "/api/**",
-  "methods": {
-    "POST": {
-      "headers": ["X-Token"],
-      "body": {"action": "create"}
-    }
-  }
-}
+```yaml
+path: /api/**
+methods:
+  POST:
+    headers:
+      - X-Token
+    body:
+      action: create
 ```
 
 For `application/x-www-form-urlencoded` requests the `body` keys refer to form
 fields and may list required values:
 
-```json
-{
-  "path": "/submit",
-  "methods": {
-    "POST": {
-      "body": {"tag": ["a", "b"]}
-    }
-  }
-}
+```yaml
+path: /submit
+methods:
+  POST:
+    body:
+      tag: ["a", "b"]
 ```
 
 #### Body Matching
@@ -474,7 +459,7 @@ go run ./cmd/integrations delete slack
 
 Run `go run ./cmd/allowlist --help` to view commands and flags.
 
-The `allowlist` command helps maintain the `allowlist.json` file. Run `allowlist list` to view every capability defined by the integration plugins:
+The `allowlist` command helps maintain the `allowlist.yaml` file. Run `allowlist list` to view every capability defined by the integration plugins:
 
 ```bash
 go run ./cmd/allowlist list
@@ -495,7 +480,7 @@ go run ./cmd/allowlist remove -integration slack \
     -caller user-token -capability post_public_as
 ```
 
-The CLI updates the file in place (default `allowlist.json`, overridable with `-file`).
+The CLI updates the file in place (default `allowlist.yaml`, overridable with `-file`).
 
 ## Running Tests
 
