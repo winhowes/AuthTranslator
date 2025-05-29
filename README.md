@@ -341,17 +341,18 @@ an `init()` function using `authplugins.RegisterIncoming` or
 configuration. See
 [app/auth/plugins/example/README.md](app/auth/plugins/example/README.md) for a
 minimal template, which shows how to exclude example code from normal builds
-with a `//go:build` tag.
-
-Secret plugins implement the `secrets.Plugin` interface in subdirectories of
-`app/secrets/plugins` and register themselves with `secrets.Register`. The prefix
-they register becomes the identifier for secret references such as `env:` or
-`vault:`.
-
-Integration plugins reside in `cmd/integrations/plugins`. Each plugin provides a
-`plugins.Builder` that parses CLI arguments and returns an `Integration`.
-Register the builder in an `init()` function using `plugins.Register` so the CLI
-automatically discovers new plugins.
+with a `//go:build` tag. Secret plugins implement the `secrets.Plugin`
+interface in subdirectories of `app/secrets/plugins` and register themselves
+with `secrets.Register`. The prefix they register becomes the identifier for
+secret references such as `env:` or `vault:`. See
+[app/secrets/plugins/example/README.md](app/secrets/plugins/example/README.md)
+for a minimal secret plugin example. Integration plugins reside in
+`cmd/integrations/plugins`. Each plugin provides a `plugins.Builder` that parses
+CLI arguments and returns an `Integration`. Register the builder in an
+`init()` function using `plugins.Register` so the CLI automatically discovers
+new plugins. See
+[cmd/integrations/plugins/example/README.md](cmd/integrations/plugins/example/README.md)
+for a minimal integration plugin.
 
 ## Integration CLI
 
