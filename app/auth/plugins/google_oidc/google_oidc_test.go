@@ -100,6 +100,45 @@ func TestGoogleOIDCAddAuthFailure(t *testing.T) {
 	}
 }
 
+type failTransport struct{ called bool }
+
+func (ft *failTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	ft.called = true
+	return nil, fmt.Errorf("called")
+}
+
+func TestGoogleOIDCAddAuthCache(t *testing.T) {
+	tokenCache.Lock()
+	tokenCache.m = make(map[string]cachedToken)
+	tokenCache.Unlock()
+	defer func() {
+		tokenCache.Lock()
+		tokenCache.m = make(map[string]cachedToken)
+		tokenCache.Unlock()
+	}()
+
+	setCachedToken("aud", "cachedtok", time.Now().Add(time.Hour))
+
+	ft := &failTransport{}
+	oldClient := HTTPClient
+	HTTPClient = &http.Client{Transport: ft}
+	defer func() { HTTPClient = oldClient }()
+
+	p := GoogleOIDC{}
+	cfg, err := p.ParseParams(map[string]interface{}{"audience": "aud"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := &http.Request{Header: http.Header{}}
+	p.AddAuth(context.Background(), r, cfg)
+	if got := r.Header.Get("Authorization"); got != "Bearer cachedtok" {
+		t.Fatalf("unexpected header %s", got)
+	}
+	if ft.called {
+		t.Fatalf("HTTP client should not have been called")
+	}
+}
+
 func makeToken(aud, sub string, exp int64, key *rsa.PrivateKey, kid string) string {
 	headerBytes, _ := json.Marshal(map[string]string{"alg": "RS256", "kid": kid})
 	header := base64.RawURLEncoding.EncodeToString(headerBytes)
@@ -203,5 +242,96 @@ func TestVerifyRS256AndParseAndVerify(t *testing.T) {
 	}
 	if _, ok := parseAndVerify(parts[0] + "." + parts[1] + ".bad"); ok {
 		t.Fatal("expected parseAndVerify failure")
+	}
+}
+
+func TestFetchKeysCacheControl(t *testing.T) {
+	key, _ := rsa.GenerateKey(rand.Reader, 1024)
+	kid := "kc"
+	jwks := jwksForKey(&key.PublicKey, kid)
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "max-age=60")
+		fmt.Fprint(w, jwks)
+	}))
+	defer ts.Close()
+
+	oldURL := CertsURL
+	CertsURL = ts.URL
+	defer func() { CertsURL = oldURL }()
+	oldClient := HTTPClient
+	HTTPClient = ts.Client()
+	defer func() { HTTPClient = oldClient }()
+
+	keyCache.mu.Lock()
+	keyCache.keys = nil
+	keyCache.mu.Unlock()
+	defer func() {
+		keyCache.mu.Lock()
+		keyCache.keys = nil
+		keyCache.mu.Unlock()
+	}()
+
+	if err := fetchKeys(); err != nil {
+		t.Fatal(err)
+	}
+	keyCache.mu.RLock()
+	_, ok := keyCache.keys[kid]
+	exp := keyCache.expiry
+	keyCache.mu.RUnlock()
+	if !ok {
+		t.Fatalf("expected key %s to be cached", kid)
+	}
+	if exp.Before(time.Now().Add(55*time.Second)) || exp.After(time.Now().Add(65*time.Second)) {
+		t.Fatalf("unexpected expiry %v", exp)
+	}
+}
+
+func TestParseAndVerifyBadHeaders(t *testing.T) {
+	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"HS256","kid":"k"}`))
+	payload := base64.RawURLEncoding.EncodeToString([]byte(`{"aud":"a"}`))
+	tok := header + "." + payload + ".sig"
+	if _, ok := parseAndVerify(tok); ok {
+		t.Fatal("expected failure for bad alg")
+	}
+
+	header2 := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"RS256"}`))
+	tok2 := header2 + "." + payload + ".sig"
+	keyCache.mu.Lock()
+	oldKeys := keyCache.keys
+	oldExp := keyCache.expiry
+	keyCache.keys = map[string]*rsa.PublicKey{"k": nil}
+	keyCache.expiry = time.Now().Add(time.Hour)
+	keyCache.mu.Unlock()
+	defer func() {
+		keyCache.mu.Lock()
+		keyCache.keys = oldKeys
+		keyCache.expiry = oldExp
+		keyCache.mu.Unlock()
+	}()
+	if _, ok := parseAndVerify(tok2); ok {
+		t.Fatal("expected failure for missing kid")
+	}
+
+	header3 := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"RS256","kid":"missing"}`))
+	tok3 := header3 + "." + payload + ".sig"
+	if _, ok := parseAndVerify(tok3); ok {
+		t.Fatal("expected failure for unknown kid")
+	}
+}
+
+func TestGoogleOIDCParamMethods(t *testing.T) {
+	p := GoogleOIDC{}
+	if got := p.RequiredParams(); len(got) != 1 || got[0] != "audience" {
+		t.Fatalf("unexpected required params %v", got)
+	}
+	if got := p.OptionalParams(); len(got) != 2 || got[0] != "header" || got[1] != "prefix" {
+		t.Fatalf("unexpected optional params %v", got)
+	}
+	a := GoogleOIDCAuth{}
+	if got := a.RequiredParams(); len(got) != 1 || got[0] != "audience" {
+		t.Fatalf("unexpected required params %v", got)
+	}
+	if got := a.OptionalParams(); len(got) != 2 || got[0] != "header" || got[1] != "prefix" {
+		t.Fatalf("unexpected optional params %v", got)
 	}
 }
