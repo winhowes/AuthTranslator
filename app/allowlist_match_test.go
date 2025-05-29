@@ -70,6 +70,18 @@ func TestValidateRequestFormBody(t *testing.T) {
 	}
 }
 
+func TestValidateRequestQuery(t *testing.T) {
+	r := httptest.NewRequest(http.MethodGet, "http://x?a=1&a=2&b=3", nil)
+	cons := RequestConstraint{Query: map[string][]string{"a": {"1"}, "b": {"3"}}}
+	if !validateRequest(r, cons) {
+		t.Fatal("expected query match")
+	}
+	r2 := httptest.NewRequest(http.MethodGet, "http://x?a=1", nil)
+	if validateRequest(r2, cons) {
+		t.Fatal("expected missing query to fail")
+	}
+}
+
 func TestValidateRequestBodyMismatch(t *testing.T) {
 	body := []byte(`{"a":"x"}`)
 	r := newRequest(http.MethodPost, "http://x", "application/json", body)
