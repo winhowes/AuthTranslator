@@ -21,4 +21,4 @@ curl http://localhost:8080/_at_internal/healthz
 curl http://localhost:8080/_at_internal/metrics
 ```
 
-Need a full walkthrough? Head over to **docs/getting-started.md**.
+Need a full walkthrough? Head over to [**docs/getting-started.md**](../docs/getting-started.md).

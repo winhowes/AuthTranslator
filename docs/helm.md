@@ -42,7 +42,7 @@ This:
 | `extraEnv`         | `{}`                              | Map of extra env vars (e.g., `STRIPE_TOKEN`).                      |
 | `resources`        | `{}`                              | Pod CPU/memory requests & limits.                                  |
 
-Full schema lives in `charts/authtranslator/values.yaml`.
+Full schema lives in [`charts/authtranslator/values.yaml`](../charts/authtranslator/values.yaml).
 
 ### Example `values.yaml`
 
@@ -133,12 +133,12 @@ helm install authtranslator oci://ghcr.io/winhowes/charts/authtranslator --versi
 
 ## 6  Deploying with Terraform
 
-Example Terraform configurations live in the `terraform/` directory:
+Example Terraform configurations live in the [`terraform/`](../terraform/) directory:
 
-- `terraform/quickstart` – minimal Docker provider example.
-- `terraform/aws` – deploys to AWS ECS Fargate.
-- `terraform/gcp` – deploys to Google Cloud Run.
-- `terraform/azure` – deploys to Azure Container Instances.
+- [`terraform/quickstart`](../terraform/quickstart) – minimal Docker provider example.
+- [`terraform/aws`](../terraform/aws) – deploys to AWS ECS Fargate.
+- [`terraform/gcp`](../terraform/gcp) – deploys to Google Cloud Run.
+- [`terraform/azure`](../terraform/azure) – deploys to Azure Container Instances.
 
 Set the variables for your environment and run `terraform apply` inside the
 chosen folder to create the service. The modules accept optional
