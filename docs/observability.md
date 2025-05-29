@@ -74,7 +74,7 @@ Sample line (wrapped for readability):
 ### Log level
 
 * Default: **INFO**
-* Override: `AUTH_TRANSLATOR_LOG_LEVEL=debug` (adds request/response headers—secrets redacted)
+* Override: run the proxy with `-log-level DEBUG` (adds request/response headers—secrets redacted)
 
 ---
 
