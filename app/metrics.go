@@ -7,18 +7,21 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
 
 var (
-	requestCounts    = expvar.NewMap("authtranslator_requests_total")
-	rateLimitCounts  = expvar.NewMap("authtranslator_rate_limit_events_total")
-	requestDurations = expvar.NewMap("authtranslator_request_duration_seconds")
-	lastReloadTime   = expvar.NewString("authtranslator_last_reload")
-	durationHistsMu  sync.Mutex
-	durationHists    = make(map[string]*histogram)
-	durationBuckets  = []float64{0.1, 0.25, 0.5, 1, 2.5, 5, 10}
+	requestCounts        = expvar.NewMap("authtranslator_requests_total")
+	rateLimitCounts      = expvar.NewMap("authtranslator_rate_limit_events_total")
+	authFailureCounts    = expvar.NewMap("authtranslator_auth_failures_total")
+	upstreamStatusCounts = expvar.NewMap("authtranslator_upstream_responses_total")
+	requestDurations     = expvar.NewMap("authtranslator_request_duration_seconds")
+	lastReloadTime       = expvar.NewString("authtranslator_last_reload")
+	durationHistsMu      sync.Mutex
+	durationHists        = make(map[string]*histogram)
+	durationBuckets      = []float64{0.1, 0.25, 0.5, 1, 2.5, 5, 10}
 )
 
 type histogram struct {
@@ -100,6 +103,15 @@ func incRateLimit(integration string) {
 	rateLimitCounts.Add(integration, 1)
 }
 
+func incAuthFailure(integration string) {
+	authFailureCounts.Add(integration, 1)
+}
+
+func recordStatus(integration string, status int) {
+	key := fmt.Sprintf("%s_%d", integration, status)
+	upstreamStatusCounts.Add(key, 1)
+}
+
 func recordDuration(integration string, d time.Duration) {
 	durationHistsMu.Lock()
 	h, ok := durationHists[integration]
@@ -124,5 +136,16 @@ func metricsHandler(w http.ResponseWriter, _ *http.Request) {
 	durationHistsMu.Unlock()
 	rateLimitCounts.Do(func(kv expvar.KeyValue) {
 		fmt.Fprintf(w, "authtranslator_rate_limit_events_total{integration=%q} %s\n", kv.Key, kv.Value.String())
+	})
+	authFailureCounts.Do(func(kv expvar.KeyValue) {
+		fmt.Fprintf(w, "authtranslator_auth_failures_total{integration=%q} %s\n", kv.Key, kv.Value.String())
+	})
+	upstreamStatusCounts.Do(func(kv expvar.KeyValue) {
+		parts := strings.SplitN(kv.Key, "_", 2)
+		if len(parts) != 2 {
+			return
+		}
+		integ, code := parts[0], parts[1]
+		fmt.Fprintf(w, "authtranslator_upstream_responses_total{integration=%q,code=%q} %s\n", integ, code, kv.Value.String())
 	})
 }

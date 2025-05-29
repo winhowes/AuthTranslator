@@ -11,6 +11,8 @@ import (
 func resetMetrics() {
 	requestCounts.Init()
 	rateLimitCounts.Init()
+	authFailureCounts.Init()
+	upstreamStatusCounts.Init()
 	durationHistsMu.Lock()
 	durationHists = make(map[string]*histogram)
 	durationHistsMu.Unlock()
@@ -36,6 +38,9 @@ func TestMetricsHandlerOutput(t *testing.T) {
 	incRequest("foo")
 	incRequest("foo")
 	incRateLimit("foo")
+	incAuthFailure("foo")
+	recordStatus("foo", http.StatusOK)
+	recordStatus("bar", http.StatusTeapot)
 	incRequest("bar")
 	recordDuration("foo", 100*time.Millisecond)
 	recordDuration("foo", 200*time.Millisecond)
@@ -51,8 +56,8 @@ func TestMetricsHandlerOutput(t *testing.T) {
 
 	body := rr.Body.String()
 	lines := strings.Split(strings.TrimSpace(body), "\n")
-	if len(lines) < 23 {
-		t.Fatalf("expected at least 23 metrics lines, got %d", len(lines))
+	if len(lines) < 26 {
+		t.Fatalf("expected at least 26 metrics lines, got %d", len(lines))
 	}
 	if !strings.Contains(body, `authtranslator_requests_total{integration="foo"} 2`) {
 		t.Fatal("missing foo request metric")
@@ -62,6 +67,15 @@ func TestMetricsHandlerOutput(t *testing.T) {
 	}
 	if !strings.Contains(body, `authtranslator_requests_total{integration="bar"} 1`) {
 		t.Fatal("missing bar request metric")
+	}
+	if !strings.Contains(body, `authtranslator_auth_failures_total{integration="foo"} 1`) {
+		t.Fatal("missing foo auth failure metric")
+	}
+	if !strings.Contains(body, `authtranslator_upstream_responses_total{integration="foo",code="200"} 1`) {
+		t.Fatal("missing foo status metric")
+	}
+	if !strings.Contains(body, `authtranslator_upstream_responses_total{integration="bar",code="418"} 1`) {
+		t.Fatal("missing bar status metric")
 	}
 	if !strings.Contains(body, `authtranslator_request_duration_seconds_sum{integration="foo"}`) {
 		t.Fatal("missing foo duration histogram")
