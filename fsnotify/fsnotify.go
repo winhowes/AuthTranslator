@@ -55,6 +55,8 @@ func (w *Watcher) loop() {
 					case w.Events <- Event{Name: name, Op: Rename}:
 					default:
 					}
+					// remove missing file so event doesn't repeat
+					delete(w.files, name)
 					continue
 				}
 				if fi.ModTime().After(mod) {
