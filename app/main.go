@@ -70,6 +70,7 @@ var tlsKey = flag.String("tls-key", "", "path to TLS key")
 var logLevel = flag.String("log-level", "INFO", "log level: DEBUG, INFO, WARN, ERROR")
 var logFormat = flag.String("log-format", "text", "log output format: text or json")
 var redisAddr = flag.String("redis-addr", "", "redis address for rate limits (host:port)")
+var maxBodySizeFlag = flag.Int64("max_body_size", authplugins.MaxBodySize, "maximum bytes buffered from request bodies")
 var showVersion = flag.Bool("version", false, "print version and exit")
 var watch = flag.Bool("watch", false, "watch config and allowlist files for changes")
 var logger = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
@@ -544,6 +545,8 @@ func serve(s server, cert, key string) error {
 func main() {
 	flag.Usage = usage
 	flag.Parse()
+
+	authplugins.MaxBodySize = *maxBodySizeFlag
 
 	if *showVersion {
 		fmt.Println(version)
