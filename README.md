@@ -81,7 +81,7 @@ Secrets can be pulled from several providers:
 * **azure‑keyvault:** Azure Key Vault
 * **vault:** HashiCorp Vault
 
-Need another store? Writing a plug‑in takes \~50 LoC – see [`plugins/secret/env`](plugins/secret/env).
+Need another store? Writing a plug‑in takes \~50 LoC – see [`app/secrets/plugins/env`](app/secrets/plugins/env).
 
 ---
 

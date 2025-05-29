@@ -80,7 +80,7 @@ The proxy treats the entire value as opaque until the chosen back‑end returns 
 
 ## Writing a new back‑end
 
-1. **New package** under `plugins/secret/<name>`.
+1. **New package** under `app/secrets/plugins/<name>`.
 2. Implement:
 
    ```go
@@ -115,7 +115,7 @@ func fetch(ctx context.Context, uri *url.URL) ([]byte, error) {
 }
 ```
 
-A working GCP implementation is in [`plugins/secret/gcp`](../plugins/secret/gcp).
+A working GCP implementation is in [`app/secrets/plugins/gcp`](../app/secrets/plugins/gcp).
 
 ---
 
