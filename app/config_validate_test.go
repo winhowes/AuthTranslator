@@ -13,3 +13,10 @@ func TestValidateConfig(t *testing.T) {
 		t.Fatalf("expected error for missing name")
 	}
 }
+
+func TestValidateConfigBadTimeout(t *testing.T) {
+	c := Config{Integrations: []Integration{{Name: "a", Destination: "http://ex", IdleConnTimeout: "not"}}}
+	if err := validateConfig(&c); err == nil {
+		t.Fatalf("expected error for invalid timeout")
+	}
+}
