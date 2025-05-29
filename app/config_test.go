@@ -7,14 +7,14 @@ import (
 )
 
 func TestLoadConfigInvalidFile(t *testing.T) {
-	_, err := loadConfig("nonexistent.json")
+	_, err := loadConfig("nonexistent.yaml")
 	if err == nil {
 		t.Fatal("expected error for missing file")
 	}
 }
 
-func TestLoadConfigInvalidJSON(t *testing.T) {
-	tmp, err := ioutil.TempFile("", "bad*.json")
+func TestLoadConfigInvalidYAML(t *testing.T) {
+	tmp, err := ioutil.TempFile("", "bad*.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -27,12 +27,12 @@ func TestLoadConfigInvalidJSON(t *testing.T) {
 
 	_, err = loadConfig(tmp.Name())
 	if err == nil {
-		t.Fatal("expected JSON unmarshal error")
+		t.Fatal("expected YAML unmarshal error")
 	}
 }
 
 func TestLoadConfigUnknownField(t *testing.T) {
-	tmp, err := ioutil.TempFile("", "unknown*.json")
+	tmp, err := ioutil.TempFile("", "unknown*.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}

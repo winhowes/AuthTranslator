@@ -2,7 +2,7 @@
 
 # AuthTranslator
 
-AuthTranslator is a simple Go-based reverse proxy that injects authentication tokens and enforces per-host and per-caller rate limits. It is configured through a JSON file and demonstrates a plug-in style architecture for authentication methods.
+AuthTranslator is a simple Go-based reverse proxy that injects authentication tokens and enforces per-host and per-caller rate limits. It is configured through a YAML file and demonstrates a plug-in style architecture for authentication methods.
 
 The project exists to make it trivial to translate one type of authentication into another. By running AuthTranslator as a centralized proxy, a small group of administrators can manage the secrets for each integration while developers simply reference those integrations. Ideally, this project allows short‑lived credentials provided by your organization to be exchanged for the long‑lived tokens required by third‑party services, and inbound requests bearing long‑lived credentials transformed back into short‑lived secrets. This keeps sensitive keys out of day‑to‑day workflows while still allowing seamless access.
 
@@ -41,7 +41,7 @@ The project exists to make it trivial to translate one type of authentication in
 - **Redis Support**: Provide `-redis-addr` to use Redis for rate limit counters instead of in-memory tracking. If Redis is unavailable the limiter falls back to memory and logs an error.
 - **Request Body Limit**: The maximum buffered request body can be adjusted with `-max_body_size` (default 10MB). Set the flag to `0` to disable the limit entirely.
 - **Allowlist**: Integrations can restrict specific callers to particular paths, methods and required parameters.
-- **Configuration Driven**: Behavior is controlled via a JSON configuration file.
+- **Configuration Driven**: Behavior is controlled via a YAML configuration file.
 - **Validated Startup**: The configuration is checked at startup and errors are reported before serving traffic.
 - **Clean Shutdown**: On SIGINT or SIGTERM the server and rate limiters are gracefully stopped.
 - **Hot Reload**: Send `SIGHUP` to reload the configuration and allowlist without restarting.

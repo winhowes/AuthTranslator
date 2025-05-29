@@ -7,14 +7,14 @@ import (
 )
 
 func TestLoadAllowlistsInvalidFile(t *testing.T) {
-	_, err := loadAllowlists("nonexistent.json")
+	_, err := loadAllowlists("nonexistent.yaml")
 	if err == nil {
 		t.Fatal("expected error for missing file")
 	}
 }
 
-func TestLoadAllowlistsInvalidJSON(t *testing.T) {
-	tmp, err := ioutil.TempFile("", "bad*.json")
+func TestLoadAllowlistsInvalidYAML(t *testing.T) {
+	tmp, err := ioutil.TempFile("", "bad*.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -27,12 +27,12 @@ func TestLoadAllowlistsInvalidJSON(t *testing.T) {
 
 	_, err = loadAllowlists(tmp.Name())
 	if err == nil {
-		t.Fatal("expected JSON unmarshal error")
+		t.Fatal("expected YAML unmarshal error")
 	}
 }
 
 func TestLoadAllowlistsUnknownField(t *testing.T) {
-	tmp, err := ioutil.TempFile("", "unknown*.json")
+	tmp, err := ioutil.TempFile("", "unknown*.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}
