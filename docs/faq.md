@@ -30,7 +30,7 @@ Either:
 kill -s SIGHUP <pid>
 ```
 
-—or—start the proxy with `-watch` so it polls the config directory for changes every second.
+—or—start the proxy with `-watch` so it automatically reloads when the config or allowlist files change.
 
 ---
 
