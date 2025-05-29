@@ -5,6 +5,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -175,5 +176,56 @@ func TestSlackSignatureWrongSecret(t *testing.T) {
 	cfg, _ := p.ParseParams(map[string]interface{}{"secrets": []string{"env:BAD"}})
 	if p.Authenticate(context.Background(), r, cfg) {
 		t.Fatal("expected auth to fail with wrong secret")
+	}
+}
+
+type errReadCloser struct{}
+
+func (errReadCloser) Read([]byte) (int, error) { return 0, errors.New("err") }
+func (errReadCloser) Close() error             { return nil }
+
+func TestSlackSignatureRequiredParams(t *testing.T) {
+	p := SlackSignatureAuth{}
+	if got := p.RequiredParams(); len(got) != 1 || got[0] != "secrets" {
+		t.Fatalf("unexpected required params %v", got)
+	}
+}
+
+func TestSlackSignatureParseParamsMissingSecrets(t *testing.T) {
+	p := SlackSignatureAuth{}
+	if _, err := p.ParseParams(map[string]interface{}{}); err == nil {
+		t.Fatal("expected error for missing secrets")
+	}
+}
+
+func TestSlackSignatureMissingTimestamp(t *testing.T) {
+	body := "b"
+	ts := strconv.FormatInt(time.Now().Unix(), 10)
+	base := fmt.Sprintf("v0:%s:%s", ts, body)
+	mac := hmac.New(sha256.New, []byte("key"))
+	mac.Write([]byte(base))
+	sig := "v0=" + hex.EncodeToString(mac.Sum(nil))
+	r := &http.Request{Header: http.Header{
+		"X-Slack-Signature": []string{sig},
+	}, Body: io.NopCloser(strings.NewReader(body))}
+	p := SlackSignatureAuth{}
+	t.Setenv("SEC", "key")
+	cfg, _ := p.ParseParams(map[string]interface{}{"secrets": []string{"env:SEC"}})
+	if p.Authenticate(context.Background(), r, cfg) {
+		t.Fatal("expected auth to fail without timestamp")
+	}
+}
+
+func TestSlackSignatureBodyReadError(t *testing.T) {
+	ts := strconv.FormatInt(time.Now().Unix(), 10)
+	r := &http.Request{Header: http.Header{
+		"X-Slack-Request-Timestamp": []string{ts},
+		"X-Slack-Signature":         []string{"v0=sig"},
+	}, Body: errReadCloser{}}
+	p := SlackSignatureAuth{}
+	t.Setenv("SEC", "key")
+	cfg, _ := p.ParseParams(map[string]interface{}{"secrets": []string{"env:SEC"}})
+	if p.Authenticate(context.Background(), r, cfg) {
+		t.Fatal("expected auth to fail on body read error")
 	}
 }
