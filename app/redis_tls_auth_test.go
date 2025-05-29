@@ -49,6 +49,33 @@ func readCommand(t *testing.T, br *bufio.Reader) string {
 	return cmd
 }
 
+func readCommandArgs(t *testing.T, br *bufio.Reader) []string {
+	t.Helper()
+	line, err := br.ReadString('\n')
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(line) == 0 || line[0] != '*' {
+		t.Fatalf("bad prefix %q", line)
+	}
+	count, err := strconv.Atoi(strings.TrimSpace(line[1:]))
+	if err != nil {
+		t.Fatal(err)
+	}
+	args := make([]string, count)
+	for i := 0; i < count; i++ {
+		if _, err := br.ReadString('\n'); err != nil {
+			t.Fatal(err)
+		}
+		line, err = br.ReadString('\n')
+		if err != nil {
+			t.Fatal(err)
+		}
+		args[i] = strings.TrimSpace(line)
+	}
+	return args
+}
+
 func TestRateLimiterRedisAuth(t *testing.T) {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -81,6 +108,52 @@ func TestRateLimiterRedisAuth(t *testing.T) {
 	oldAddr := *redisAddr
 	oldTimeout := *redisTimeout
 	*redisAddr = "redis://:pw@" + ln.Addr().String()
+	*redisTimeout = time.Second
+	rl := NewRateLimiter(1, time.Second)
+	defer func() {
+		rl.Stop()
+		*redisAddr = oldAddr
+		*redisTimeout = oldTimeout
+	}()
+	if !rl.Allow("k") {
+		t.Fatal("allow failed")
+	}
+	<-done
+}
+
+func TestRateLimiterRedisAuthUsername(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		c, err := ln.Accept()
+		if err != nil {
+			return
+		}
+		defer c.Close()
+		br := bufio.NewReader(c)
+		args := readCommandArgs(t, br)
+		if len(args) != 3 || strings.ToUpper(args[0]) != "AUTH" || args[1] != "user" || args[2] != "pw" {
+			t.Errorf("args %v, want [AUTH user pw]", args)
+			return
+		}
+		c.Write([]byte("+OK\r\n"))
+		if cmd := readCommand(t, br); cmd != "INCR" {
+			t.Errorf("cmd %s, want INCR", cmd)
+		}
+		c.Write([]byte(":1\r\n"))
+		if cmd := readCommand(t, br); cmd != "EXPIRE" {
+			t.Errorf("cmd %s, want EXPIRE", cmd)
+		}
+		c.Write([]byte(":1\r\n"))
+	}()
+	oldAddr := *redisAddr
+	oldTimeout := *redisTimeout
+	*redisAddr = "redis://user:pw@" + ln.Addr().String()
 	*redisTimeout = time.Second
 	rl := NewRateLimiter(1, time.Second)
 	defer func() {
@@ -141,6 +214,67 @@ func TestRateLimiterRedisTLSAuth(t *testing.T) {
 	oldAddr := *redisAddr
 	oldTimeout := *redisTimeout
 	*redisAddr = "rediss://:pw@" + ln.Addr().String()
+	*redisTimeout = time.Second
+	rl := NewRateLimiter(1, time.Second)
+	defer func() {
+		rl.Stop()
+		*redisAddr = oldAddr
+		*redisTimeout = oldTimeout
+	}()
+	if !rl.Allow("k") {
+		t.Fatal("allow failed")
+	}
+	<-done
+}
+
+func TestRateLimiterRedisTLSAuthUsername(t *testing.T) {
+	key, _ := rsa.GenerateKey(rand.Reader, 1024)
+	tmpl := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "srv"},
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		KeyUsage:     x509.KeyUsageDigitalSignature,
+		NotBefore:    time.Now().Add(-time.Hour),
+		NotAfter:     time.Now().Add(time.Hour),
+		IPAddresses:  []net.IP{net.ParseIP("127.0.0.1")},
+	}
+	der, _ := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
+	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})
+	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)})
+	cert, _ := tls.X509KeyPair(certPEM, keyPEM)
+
+	ln, err := tls.Listen("tcp", "127.0.0.1:0", &tls.Config{Certificates: []tls.Certificate{cert}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		c, err := ln.Accept()
+		if err != nil {
+			return
+		}
+		defer c.Close()
+		br := bufio.NewReader(c)
+		args := readCommandArgs(t, br)
+		if len(args) != 3 || strings.ToUpper(args[0]) != "AUTH" || args[1] != "user" || args[2] != "pw" {
+			t.Errorf("args %v, want [AUTH user pw]", args)
+			return
+		}
+		c.Write([]byte("+OK\r\n"))
+		if cmd := readCommand(t, br); cmd != "INCR" {
+			t.Errorf("cmd %s, want INCR", cmd)
+		}
+		c.Write([]byte(":1\r\n"))
+		if cmd := readCommand(t, br); cmd != "EXPIRE" {
+			t.Errorf("cmd %s, want EXPIRE", cmd)
+		}
+		c.Write([]byte(":1\r\n"))
+	}()
+	oldAddr := *redisAddr
+	oldTimeout := *redisTimeout
+	*redisAddr = "rediss://user:pw@" + ln.Addr().String()
 	*redisTimeout = time.Second
 	rl := NewRateLimiter(1, time.Second)
 	defer func() {
