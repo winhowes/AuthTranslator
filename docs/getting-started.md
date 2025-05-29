@@ -75,6 +75,10 @@ Make sure `$SLACK_TOKEN` and `$SLACK_SIGNING` are still in your environment.
 
 Full schema details: [Configuration](configuration.md).
 
+AuthTranslator is extensible via three types of plugins:
+[Auth Plugins](auth-plugins.md), [Secret Back-Ends](secret-backends.md) and
+[Integration Plugins](integration-plugins.md).
+
 ---
 
 ## Next steps
