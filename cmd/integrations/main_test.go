@@ -1,16 +1,20 @@
 package main
 
 import (
-	"flag"
-	"io"
-	"os"
-	"os/exec"
-  	"path/filepath"
-	"strings"
-	"testing"
+        "flag"
+        "io"
+        "os"
+        "os/exec"
+        "path/filepath"
+        "strings"
+        "testing"
+        "net/http"
+        "net/http/httptest"
 
-	"github.com/winhowes/AuthTranslator/cmd/integrations/plugins"
+        "github.com/winhowes/AuthTranslator/cmd/integrations/plugins"
 )
+
+var server = flag.String("server", "http://localhost:8080/integrations", "integration endpoint")
 
 func TestAddUpdateDeleteList(t *testing.T) {
 	dir := t.TempDir()
