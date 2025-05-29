@@ -10,8 +10,10 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -364,5 +366,90 @@ func TestRedisCmdUnexpectedPrefix(t *testing.T) {
 	}()
 	if err := redisCmd(cli, "PING"); err == nil {
 		t.Fatal("expected error for unexpected reply prefix")
+	}
+}
+
+func writeTempFile(t *testing.T, data string) string {
+	f, err := os.CreateTemp("", "cfg*.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.WriteString(data); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return f.Name()
+}
+
+func buildApp(t *testing.T) string {
+	bin := filepath.Join(t.TempDir(), "appbin")
+	cmd := exec.Command("go", "build", "-o", bin, ".")
+	cmd.Env = os.Environ()
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("build failed: %v\n%s", err, out)
+	}
+	return bin
+}
+
+func TestMainRunAndShutdown(t *testing.T) {
+	cfg := writeTempFile(t, `{"integrations":[{"name":"test","destination":"http://example.com"}]}`)
+	defer os.Remove(cfg)
+	al := writeTempFile(t, `[]`)
+	defer os.Remove(al)
+
+	bin := buildApp(t)
+	cmd := exec.Command(bin, "-config", cfg, "-allowlist", al, "-addr", "127.0.0.1:0")
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("start failed: %v", err)
+	}
+	time.Sleep(100 * time.Millisecond)
+	if err := cmd.Process.Signal(os.Interrupt); err != nil {
+		t.Fatalf("signal failed: %v", err)
+	}
+	done := make(chan error, 1)
+	go func() { done <- cmd.Wait() }()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("process exit: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		cmd.Process.Kill()
+		t.Fatal("timeout waiting for process exit")
+	}
+}
+
+func TestMainReloadSignal(t *testing.T) {
+	cfg := writeTempFile(t, `{"integrations":[{"name":"test","destination":"http://example.com"}]}`)
+	defer os.Remove(cfg)
+	al := writeTempFile(t, `[]`)
+	defer os.Remove(al)
+
+	bin := buildApp(t)
+	cmd := exec.Command(bin, "-config", cfg, "-allowlist", al, "-addr", "127.0.0.1:0")
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("start failed: %v", err)
+	}
+	time.Sleep(200 * time.Millisecond)
+	if err := cmd.Process.Signal(syscall.SIGHUP); err != nil {
+		t.Fatalf("signal failed: %v", err)
+	}
+	time.Sleep(100 * time.Millisecond)
+	if err := cmd.Process.Signal(syscall.Signal(0)); err != nil {
+		t.Fatalf("process exited unexpectedly: %v", err)
+	}
+	cmd.Process.Signal(os.Interrupt)
+	done := make(chan error, 1)
+	go func() { done <- cmd.Wait() }()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("process exit: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		cmd.Process.Kill()
+		t.Fatal("timeout waiting for process exit")
 	}
 }
