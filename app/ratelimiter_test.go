@@ -84,3 +84,20 @@ func TestRateLimiterRedisFallback(t *testing.T) {
 		t.Fatal("second call should be rate limited using fallback")
 	}
 }
+
+func TestRedisTTLArgs(t *testing.T) {
+	cmd, val := redisTTLArgs(1500 * time.Millisecond)
+	if cmd != "PEXPIRE" || val != "1500" {
+		t.Fatalf("expected PEXPIRE 1500, got %s %s", cmd, val)
+	}
+
+	cmd, val = redisTTLArgs(500 * time.Millisecond)
+	if cmd != "PEXPIRE" || val != "500" {
+		t.Fatalf("expected PEXPIRE 500, got %s %s", cmd, val)
+	}
+
+	cmd, val = redisTTLArgs(0)
+	if cmd != "EXPIRE" || val != "0" {
+		t.Fatalf("expected EXPIRE 0 for zero duration, got %s %s", cmd, val)
+	}
+}
