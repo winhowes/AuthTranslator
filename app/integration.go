@@ -132,7 +132,9 @@ type Integration struct {
 	OutgoingAuth    []AuthPluginConfig `json:"outgoing_auth"`
 	RateLimitWindow string             `json:"rate_limit_window"`
 
-	IdleConnTimeout       string `json:"idle_conn_timeout,omitempty"`
+	rateLimitDur time.Duration `json:"-"`
+
+  IdleConnTimeout       string `json:"idle_conn_timeout,omitempty"`
 	TLSHandshakeTimeout   string `json:"tls_handshake_timeout,omitempty"`
 	ResponseHeaderTimeout string `json:"response_header_timeout,omitempty"`
 	TLSInsecureSkipVerify bool   `json:"tls_insecure_skip_verify,omitempty"`
@@ -175,6 +177,9 @@ func prepareIntegration(i *Integration) error {
 		if d <= 0 {
 			return fmt.Errorf("rate_limit_window must be > 0")
 		}
+		i.rateLimitDur = d
+	} else {
+		i.rateLimitDur = 0
 	}
 
 	// ─── Validate incoming-auth configs ───────────────────────────────────────
@@ -272,16 +277,9 @@ func AddIntegration(i *Integration) error {
 	if err := prepareIntegration(i); err != nil {
 		return err
 	}
-	window := time.Minute
-	if i.RateLimitWindow != "" {
-		var err error
-		window, err = time.ParseDuration(i.RateLimitWindow)
-		if err != nil {
-			return fmt.Errorf("invalid rate_limit_window: %w", err)
-		}
-		if window <= 0 {
-			return fmt.Errorf("rate_limit_window must be > 0")
-		}
+	window := i.rateLimitDur
+	if window == 0 {
+		window = time.Minute
 	}
 	integrations.Lock()
 	if _, exists := integrations.m[i.Name]; exists {
@@ -320,16 +318,9 @@ func UpdateIntegration(i *Integration) error {
 	if err := prepareIntegration(i); err != nil {
 		return err
 	}
-	window := time.Minute
-	if i.RateLimitWindow != "" {
-		var err error
-		window, err = time.ParseDuration(i.RateLimitWindow)
-		if err != nil {
-			return fmt.Errorf("invalid rate_limit_window: %w", err)
-		}
-		if window <= 0 {
-			return fmt.Errorf("rate_limit_window must be > 0")
-		}
+	window := i.rateLimitDur
+	if window == 0 {
+		window = time.Minute
 	}
 	integrations.Lock()
 	if old, exists := integrations.m[i.Name]; exists {
