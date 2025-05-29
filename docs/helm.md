@@ -60,12 +60,12 @@ configYaml: |
     slack:
       destination: https://slack.com
       outgoing_auth:
-        type: token
-        params:
-          secrets:
-            - env:SLACK_TOKEN
-          header: Authorization
-          prefix: "Bearer "
+        - type: token
+          params:
+            secrets:
+              - env:SLACK_TOKEN
+            header: Authorization
+            prefix: "Bearer "
 
 allowlistYaml: |
   - integration: slack
