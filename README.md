@@ -159,8 +159,9 @@ The project exists to make it trivial to translate one type of authentication in
 
    The listen address can be configured with the `-addr` flag. By default the server listens on `:8080`. Incoming requests are matched against the `X-AT-Int` header, if present, or otherwise the host header to determine the route and associated authentication plugin. Use `-disable_x_at_int` to ignore the header entirely or `-x_at_int_host` to only respect the header when a specific host is requested. The configuration file is chosen with `-config` (default `config.yaml`). The allowlist file can be specified with `-allowlist`; it defaults to `allowlist.yaml`. Set `-redis-addr` to persist rate limits in Redis; failures fall back to memory with an error log. Use `-redis-timeout` to control how long dialing Redis can take.
    Send `SIGHUP` or run with `-watch` to reload these files automatically without
-   restarting. If the allowlist fails to load during reload, the previously loaded
-   entries remain in effect.
+   restarting. The watcher re-adds itself when the files are renamed so edits
+   that replace the file still trigger a reload. If the allowlist fails to load
+   during a reload, the previously loaded entries remain in effect.
 
    **Service flags**
 
@@ -219,7 +220,7 @@ The project exists to make it trivial to translate one type of authentication in
    ```bash
    export IN_TOKEN=secret-in
    export OUT_TOKEN=secret-out
-   go run ./app -config app/config.yaml -allowlist app/allowlist.yaml
+   go run ./app -config app/config.yaml -allowlist app/allowlist.yaml -watch
    ```
 
    In another terminal, call the proxy using the integration name as the Host header:
