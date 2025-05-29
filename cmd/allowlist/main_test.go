@@ -54,7 +54,7 @@ func TestAddEntryNewFile(t *testing.T) {
 		},
 	}
 	if !reflect.DeepEqual(entries, want) {
-		t.Fatalf("entries mismatch:\n%v\nwant\n%v", entries, want)
+		t.Fatalf("entries mismatch:\n%#v\nwant\n%#v", entries, want)
 	}
 }
 

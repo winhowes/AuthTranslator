@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	yaml "gopkg.in/yaml.v3"
@@ -112,6 +113,7 @@ func addEntry(args []string) {
 	callerCfg.Capabilities = append(callerCfg.Capabilities, plugins.CapabilityConfig{Name: *capName, Params: params})
 
 	out, _ := yaml.Marshal(entries)
+
 	if err := os.WriteFile(*file, out, 0644); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -158,11 +160,18 @@ func removeEntry(args []string) {
 				if caps[i].Name == *capName {
 					caps = append(caps[:i], caps[i+1:]...)
 					i--
+					continue
 				}
 			}
-			entries[ei].Callers[ci].Capabilities = caps
 			if len(caps) == 0 {
 				entries[ei].Callers = append(entries[ei].Callers[:ci], entries[ei].Callers[ci+1:]...)
+			} else {
+				for i := range caps {
+					if len(caps[i].Params) == 0 {
+						caps[i].Params = nil
+					}
+				}
+				entries[ei].Callers[ci].Capabilities = caps
 			}
 			break
 		}
@@ -173,6 +182,7 @@ func removeEntry(args []string) {
 	}
 
 	out, _ := yaml.Marshal(entries)
+	out = bytes.ReplaceAll(out, []byte("params: {}"), []byte("params: null"))
 	if err := os.WriteFile(*file, out, 0644); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
