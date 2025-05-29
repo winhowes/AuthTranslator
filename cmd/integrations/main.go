@@ -12,6 +12,9 @@ import (
 	"github.com/winhowes/AuthTranslator/cmd/integrations/plugins"
 )
 
+// exit allows tests to stub os.Exit.
+var exit = os.Exit
+
 var server = flag.String("server", "http://localhost:8080/integrations", "integration endpoint")
 
 func usage() {
@@ -26,7 +29,7 @@ func main() {
 	flag.Parse()
 	if flag.NArg() < 1 {
 		usage()
-		os.Exit(1)
+		exit(1)
 	}
 	cmd := flag.Arg(0)
 	args := flag.Args()[1:]
@@ -38,7 +41,7 @@ func main() {
 	if cmd == "delete" {
 		if len(args) < 1 {
 			fmt.Fprintln(os.Stderr, "delete requires integration name")
-			os.Exit(1)
+			exit(1)
 		}
 		deleteIntegration(args[0])
 		return
@@ -46,17 +49,17 @@ func main() {
 	if cmd == "update" {
 		if len(args) < 1 {
 			fmt.Fprintln(os.Stderr, "update requires plugin name")
-			os.Exit(1)
+			exit(1)
 		}
 		builder := plugins.Get(args[0])
 		if builder == nil {
 			fmt.Fprintf(os.Stderr, "unknown plugin %s\n", args[0])
-			os.Exit(1)
+			exit(1)
 		}
 		integ, err := builder(args[1:])
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
+			exit(1)
 		}
 		sendIntegrationWithMethod(http.MethodPut, integ)
 		return
@@ -65,12 +68,12 @@ func main() {
 	builder := plugins.Get(cmd)
 	if builder == nil {
 		fmt.Fprintf(os.Stderr, "unknown plugin %s\n", cmd)
-		os.Exit(1)
+		exit(1)
 	}
 	integ, err := builder(args)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		exit(1)
 	}
 	sendIntegrationWithMethod(http.MethodPost, integ)
 }
@@ -79,18 +82,18 @@ func sendIntegrationWithMethod(method string, i plugins.Integration) {
 	data, err := json.Marshal(i)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		exit(1)
 	}
 	req, err := http.NewRequest(method, *server, bytes.NewBuffer(data))
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		exit(1)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		exit(1)
 	}
 	defer resp.Body.Close()
 	success := http.StatusCreated
@@ -100,7 +103,7 @@ func sendIntegrationWithMethod(method string, i plugins.Integration) {
 	if resp.StatusCode != success {
 		body, _ := io.ReadAll(resp.Body)
 		fmt.Fprintf(os.Stderr, "server error: %s\n%s\n", resp.Status, string(body))
-		os.Exit(1)
+		exit(1)
 	}
 	if method == http.MethodPost {
 		fmt.Println("integration added")
@@ -117,19 +120,19 @@ func deleteIntegration(name string) {
 	req, err := http.NewRequest(http.MethodDelete, *server, bytes.NewBuffer(data))
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		exit(1)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		exit(1)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusNoContent {
 		body, _ := io.ReadAll(resp.Body)
 		fmt.Fprintf(os.Stderr, "server error: %s\n%s\n", resp.Status, string(body))
-		os.Exit(1)
+		exit(1)
 	}
 	fmt.Println("integration deleted")
 }
@@ -138,20 +141,20 @@ func listIntegrations() {
 	resp, err := http.Get(*server)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		exit(1)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		fmt.Fprintf(os.Stderr, "server error: %s\n%s\n", resp.Status, string(body))
-		os.Exit(1)
+		exit(1)
 	}
 	var list []struct {
 		Name string `json:"name"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		exit(1)
 	}
 	for _, i := range list {
 		fmt.Println(i.Name)

@@ -14,6 +14,8 @@ import (
 	"github.com/winhowes/AuthTranslator/cmd/allowlist/plugins"
 )
 
+type exitCode struct{ code int }
+
 // helper to capture stdout from f
 func captureOutput(f func()) string {
 	r, w, err := os.Pipe()
@@ -27,6 +29,25 @@ func captureOutput(f func()) string {
 	os.Stdout = old
 	out, _ := io.ReadAll(r)
 	return string(out)
+}
+
+// expectExit runs f and expects it to call exit with the provided code.
+func expectExit(t *testing.T, code int, f func()) {
+	t.Helper()
+	defer func() {
+		if r := recover(); r != nil {
+			if ec, ok := r.(exitCode); ok {
+				if ec.code != code {
+					t.Fatalf("expected exit %d, got %d", code, ec.code)
+				}
+			} else {
+				panic(r)
+			}
+		} else {
+			t.Fatalf("expected exit %d", code)
+		}
+	}()
+	f()
 }
 
 func TestAddEntryNewFile(t *testing.T) {
@@ -390,4 +411,77 @@ func TestMainListCommand(t *testing.T) {
 	if !strings.Contains(out, "slack:") {
 		t.Fatalf("unexpected output: %s", out)
 	}
+}
+
+func TestMainUsageNoArgs(t *testing.T) {
+	oldFS := flag.CommandLine
+	oldFile := file
+	oldExit := exit
+	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+	buf := &bytes.Buffer{}
+	flag.CommandLine.SetOutput(buf)
+	file = flag.CommandLine.String("file", "allowlist.yaml", "allowlist file")
+	exit = func(c int) { panic(exitCode{c}) }
+	defer func() {
+		flag.CommandLine = oldFS
+		file = oldFile
+		exit = oldExit
+	}()
+
+	os.Args = []string{"allowlist"}
+	expectExit(t, 1, main)
+	if !strings.Contains(buf.String(), "Usage: allowlist") {
+		t.Fatalf("usage output unexpected: %s", buf.String())
+	}
+}
+
+func TestMainUnknownCommand(t *testing.T) {
+	oldFS := flag.CommandLine
+	oldFile := file
+	oldExit := exit
+	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+	buf := &bytes.Buffer{}
+	flag.CommandLine.SetOutput(buf)
+	file = flag.CommandLine.String("file", "allowlist.yaml", "allowlist file")
+	exit = func(c int) { panic(exitCode{c}) }
+	defer func() {
+		flag.CommandLine = oldFS
+		file = oldFile
+		exit = oldExit
+	}()
+
+	os.Args = []string{"allowlist", "bogus"}
+	expectExit(t, 1, main)
+	if !strings.Contains(buf.String(), "Usage: allowlist") {
+		t.Fatalf("usage output unexpected: %s", buf.String())
+	}
+}
+
+func TestRemoveEntryReadError(t *testing.T) {
+	tmpDir := t.TempDir()
+	path := filepath.Join(tmpDir, "missing", "allow.yaml")
+
+	old := *file
+	*file = path
+	t.Cleanup(func() { *file = old })
+
+	removeEntry([]string{"-integration", "foo", "-caller", "u1", "-capability", "cap"})
+}
+
+func TestAddEntryWriteError(t *testing.T) {
+	tmpDir := t.TempDir()
+	path := filepath.Join(tmpDir, "missing", "allow.yaml")
+
+	old := *file
+	*file = path
+	oldExit := exit
+	exit = func(c int) { panic(exitCode{c}) }
+	t.Cleanup(func() {
+		*file = old
+		exit = oldExit
+	})
+
+	expectExit(t, 1, func() {
+		addEntry([]string{"-integration", "foo", "-caller", "u1", "-capability", "cap"})
+	})
 }

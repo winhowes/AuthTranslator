@@ -1,6 +1,7 @@
 package jwt
 
 import (
+	"context"
 	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
@@ -8,6 +9,7 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/pem"
+	"net/http"
 	"testing"
 )
 
@@ -98,5 +100,23 @@ func TestJWTAuthParamsFuncs(t *testing.T) {
 	opt := j.OptionalParams()
 	if len(opt) != 4 {
 		t.Fatalf("unexpected optional params: %v", opt)
+	}
+}
+func TestVerifyRS256BadPem(t *testing.T) {
+	if verifyRS256([]string{"a", "b", "c"}, []byte("bad")) {
+		t.Fatal("expected failure")
+	}
+}
+
+func TestJWTOutgoingAddAuthMissingSecret(t *testing.T) {
+	r := &http.Request{Header: http.Header{}}
+	p := JWTAuthOut{}
+	cfg, err := p.ParseParams(map[string]interface{}{"secrets": []string{"env:NO"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.AddAuth(context.Background(), r, cfg)
+	if v := r.Header.Get("Authorization"); v != "" {
+		t.Fatalf("expected empty header, got %s", v)
 	}
 }

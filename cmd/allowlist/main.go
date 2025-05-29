@@ -11,6 +11,9 @@ import (
 	"github.com/winhowes/AuthTranslator/cmd/allowlist/plugins"
 )
 
+// exit allows tests to stub os.Exit.
+var exit = os.Exit
+
 var file = flag.String("file", "allowlist.yaml", "allowlist file")
 
 func usage() {
@@ -24,7 +27,7 @@ func main() {
 	flag.Parse()
 	if flag.NArg() < 1 {
 		usage()
-		os.Exit(1)
+		exit(1)
 	}
 	switch flag.Arg(0) {
 	case "list":
@@ -35,7 +38,7 @@ func main() {
 		removeEntry(flag.Args()[1:])
 	default:
 		usage()
-		os.Exit(1)
+		exit(1)
 	}
 }
 
@@ -116,7 +119,7 @@ func addEntry(args []string) {
 
 	if err := os.WriteFile(*file, out, 0644); err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		exit(1)
 	}
 }
 
@@ -185,6 +188,6 @@ func removeEntry(args []string) {
 	out = bytes.ReplaceAll(out, []byte("params: {}"), []byte("params: null"))
 	if err := os.WriteFile(*file, out, 0644); err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		exit(1)
 	}
 }

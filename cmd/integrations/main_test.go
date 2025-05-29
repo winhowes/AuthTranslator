@@ -4,16 +4,18 @@ import (
 	"bytes"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"os/exec"
 	"strings"
 	"testing"
 
 	"github.com/winhowes/AuthTranslator/cmd/integrations/plugins"
 )
+
+type exitCode struct{ code int }
 
 // captureOutput captures stdout from f and returns it as a string.
 func captureOutput(f func()) string {
@@ -28,6 +30,25 @@ func captureOutput(f func()) string {
 	os.Stdout = old
 	out, _ := io.ReadAll(r)
 	return string(out)
+}
+
+// expectExit runs f and expects it to call exit with code.
+func expectExit(t *testing.T, code int, f func()) {
+	t.Helper()
+	defer func() {
+		if r := recover(); r != nil {
+			if ec, ok := r.(exitCode); ok {
+				if ec.code != code {
+					t.Fatalf("expected exit %d, got %d", code, ec.code)
+				}
+			} else {
+				panic(r)
+			}
+		} else {
+			t.Fatalf("expected exit %d", code)
+		}
+	}()
+	f()
 }
 
 func TestSendIntegrationWithMethodPost(t *testing.T) {
@@ -234,34 +255,121 @@ func TestMainUpdateDeleteCommands(t *testing.T) {
 	}
 }
 
-// Helper process for exercising main() in a separate process.
-func TestMainHelper(t *testing.T) {
-	if os.Getenv("GO_WANT_INTEGRATIONS_HELPER") != "1" {
-		return
-	}
-	for i, a := range os.Args {
-		if a == "--" {
-			os.Args = append([]string{os.Args[0]}, os.Args[i+1:]...)
-			break
-		}
-	}
-	// Recreate flag set and server flag so we can parse arguments.
+func TestMainCreateCommand(t *testing.T) {
+	var method string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		method = r.Method
+		w.WriteHeader(http.StatusCreated)
+	}))
+	defer srv.Close()
+
+	oldFS := flag.CommandLine
+	oldServer := server
 	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
-	server = flag.CommandLine.String("server", *server, "integration endpoint")
-	main()
-	os.Exit(0)
+	server = flag.CommandLine.String("server", srv.URL, "integration endpoint")
+	t.Cleanup(func() {
+		flag.CommandLine = oldFS
+		server = oldServer
+	})
+
+	origArgs := os.Args
+	os.Args = []string{"integrations", "-server", srv.URL, "slack", "-token", "t", "-signing-secret", "s"}
+	defer func() { os.Args = origArgs }()
+
+	out := captureOutput(main)
+	if method != http.MethodPost {
+		t.Fatalf("expected POST, got %s", method)
+	}
+	if !strings.Contains(out, "integration added") {
+		t.Fatalf("create output unexpected: %s", out)
+	}
 }
 
+func TestMainNoArgs(t *testing.T) {
+	oldFS := flag.CommandLine
+	oldExit := exit
+	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+	exit = func(c int) { panic(exitCode{c}) }
+	defer func() {
+		flag.CommandLine = oldFS
+		exit = oldExit
+	}()
+
+	os.Args = []string{"integrations"}
+	expectExit(t, 1, main)
+}
+
+func TestMainUpdateMissingPlugin(t *testing.T) {
+	oldFS := flag.CommandLine
+	oldServer := server
+	oldExit := exit
+	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+	server = flag.CommandLine.String("server", "http://example", "integration endpoint")
+	exit = func(c int) { panic(exitCode{c}) }
+	defer func() {
+		flag.CommandLine = oldFS
+		server = oldServer
+		exit = oldExit
+	}()
+
+	os.Args = []string{"integrations", "update"}
+	expectExit(t, 1, main)
+}
+
+func TestMainUpdateUnknownPlugin(t *testing.T) {
+	oldFS := flag.CommandLine
+	oldServer := server
+	oldExit := exit
+	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+	server = flag.CommandLine.String("server", "http://example", "integration endpoint")
+	exit = func(c int) { panic(exitCode{c}) }
+	defer func() {
+		flag.CommandLine = oldFS
+		server = oldServer
+		exit = oldExit
+	}()
+
+	os.Args = []string{"integrations", "update", "bogus"}
+	expectExit(t, 1, main)
+}
+
+func TestMainUpdateBuilderError(t *testing.T) {
+	plugins.Register("failb", func(args []string) (plugins.Integration, error) {
+		return plugins.Integration{}, fmt.Errorf("bad")
+	})
+
+	oldFS := flag.CommandLine
+	oldServer := server
+	oldExit := exit
+	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+	server = flag.CommandLine.String("server", "http://example", "integration endpoint")
+	exit = func(c int) { panic(exitCode{c}) }
+	defer func() {
+		flag.CommandLine = oldFS
+		server = oldServer
+		exit = oldExit
+	}()
+
+	os.Args = []string{"integrations", "update", "failb"}
+	expectExit(t, 1, main)
+}
+
+// Helper process for exercising main() in a separate process.
 func TestMainUnknownPlugin(t *testing.T) {
-	cmd := exec.Command(os.Args[0], "-test.run=TestMainHelper", "--", "unknown")
-	cmd.Env = append(os.Environ(), "GO_WANT_INTEGRATIONS_HELPER=1")
-	out, err := cmd.CombinedOutput()
-	if err == nil {
-		t.Fatalf("expected error, got nil")
-	}
-	if !strings.Contains(string(out), "unknown plugin unknown") {
-		t.Fatalf("unexpected output: %s", out)
-	}
+	oldFS := flag.CommandLine
+	oldServer := server
+	oldExit := exit
+	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+	server = flag.CommandLine.String("server", "http://example.com", "integration endpoint")
+	exit = func(c int) { panic(exitCode{c}) }
+	defer func() {
+		flag.CommandLine = oldFS
+		server = oldServer
+		exit = oldExit
+	}()
+
+	os.Args = []string{"integrations", "unknown"}
+	expectExit(t, 1, main)
 }
 
 func TestMainServerError(t *testing.T) {
@@ -270,15 +378,20 @@ func TestMainServerError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	cmd := exec.Command(os.Args[0], "-test.run=TestMainHelper", "--", "-server", srv.URL+"/integrations", "update", "slack", "-token", "t", "-signing-secret", "s")
-	cmd.Env = append(os.Environ(), "GO_WANT_INTEGRATIONS_HELPER=1")
-	out, err := cmd.CombinedOutput()
-	if err == nil {
-		t.Fatalf("expected error, got nil")
-	}
-	if !strings.Contains(string(out), "server error") {
-		t.Fatalf("unexpected output: %s", out)
-	}
+	oldFS := flag.CommandLine
+	oldServer := server
+	oldExit := exit
+	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+	server = flag.CommandLine.String("server", srv.URL+"/integrations", "integration endpoint")
+	exit = func(c int) { panic(exitCode{c}) }
+	defer func() {
+		flag.CommandLine = oldFS
+		server = oldServer
+		exit = oldExit
+	}()
+
+	os.Args = []string{"integrations", "update", "slack", "-token", "t", "-signing-secret", "s"}
+	expectExit(t, 1, main)
 }
 
 func TestMainListInvalidJSON(t *testing.T) {
@@ -288,13 +401,95 @@ func TestMainListInvalidJSON(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	cmd := exec.Command(os.Args[0], "-test.run=TestMainHelper", "--", "-server", srv.URL+"/integrations", "list")
-	cmd.Env = append(os.Environ(), "GO_WANT_INTEGRATIONS_HELPER=1")
-	out, err := cmd.CombinedOutput()
-	if err == nil {
-		t.Fatalf("expected error, got nil")
-	}
-	if !strings.Contains(string(out), "invalid character") {
-		t.Fatalf("unexpected output: %s", out)
-	}
+	oldFS := flag.CommandLine
+	oldServer := server
+	oldExit := exit
+	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+	server = flag.CommandLine.String("server", srv.URL+"/integrations", "integration endpoint")
+	exit = func(c int) { panic(exitCode{c}) }
+	defer func() {
+		flag.CommandLine = oldFS
+		server = oldServer
+		exit = oldExit
+	}()
+
+	os.Args = []string{"integrations", "list"}
+	expectExit(t, 1, main)
+}
+
+func TestSendIntegrationWithMethodError(t *testing.T) {
+	integ := plugins.Integration{Name: "bad"}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("boom"))
+	}))
+	defer srv.Close()
+
+	oldServer := *server
+	oldExit := exit
+	*server = srv.URL
+	exit = func(c int) { panic(exitCode{c}) }
+	defer func() {
+		*server = oldServer
+		exit = oldExit
+	}()
+
+	expectExit(t, 1, func() { sendIntegrationWithMethod(http.MethodPost, integ) })
+}
+
+func TestDeleteIntegrationError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("fail"))
+	}))
+	defer srv.Close()
+
+	oldServer := *server
+	oldExit := exit
+	*server = srv.URL
+	exit = func(c int) { panic(exitCode{c}) }
+	defer func() {
+		*server = oldServer
+		exit = oldExit
+	}()
+
+	expectExit(t, 1, func() { deleteIntegration("x") })
+}
+
+func TestListIntegrationsServerError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("boom"))
+	}))
+	defer srv.Close()
+
+	oldServer := *server
+	oldExit := exit
+	*server = srv.URL
+	exit = func(c int) { panic(exitCode{c}) }
+	defer func() {
+		*server = oldServer
+		exit = oldExit
+	}()
+
+	expectExit(t, 1, listIntegrations)
+}
+
+func TestListIntegrationsDecodeErrorDirect(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("notjson"))
+	}))
+	defer srv.Close()
+
+	oldServer := *server
+	oldExit := exit
+	*server = srv.URL
+	exit = func(c int) { panic(exitCode{c}) }
+	defer func() {
+		*server = oldServer
+		exit = oldExit
+	}()
+
+	expectExit(t, 1, listIntegrations)
 }
