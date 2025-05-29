@@ -18,7 +18,7 @@ type CallRule struct {
 }
 
 type RequestConstraint struct {
-	Headers []string               `json:"headers,omitempty" yaml:"headers,omitempty"`
+	Headers map[string][]string    `json:"headers,omitempty" yaml:"headers,omitempty"`
 	Body    map[string]interface{} `json:"body,omitempty" yaml:"body,omitempty"`
 }
 

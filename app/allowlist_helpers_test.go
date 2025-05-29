@@ -58,13 +58,13 @@ func TestValidateRequestTable(t *testing.T) {
 				r.Header.Set("X-Test", "v")
 				return r
 			}(),
-			cons:   RequestConstraint{Headers: []string{"X-Test"}},
+			cons:   RequestConstraint{Headers: map[string][]string{"X-Test": {"v"}}},
 			wantOK: true,
 		},
 		{
 			name:   "header missing",
 			r:      httptest.NewRequest(http.MethodGet, "http://x", nil),
-			cons:   RequestConstraint{Headers: []string{"X-Test"}},
+			cons:   RequestConstraint{Headers: map[string][]string{"X-Test": {"v"}}},
 			wantOK: false,
 		},
 		{

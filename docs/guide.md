@@ -211,8 +211,9 @@ In production the proxy usually sits behind a wildcard DNS record and matching w
 ### Allowlist Rules
 
 Each caller entry lists path patterns and method constraints. `*` matches a
-single path segment while `**` matches any remaining segments. Header names are
-listed under `headers` and required body fields under `body`.
+single path segment while `**` matches any remaining segments. Headers are
+listed under `headers` with optional values and required body fields under
+`body`.
 
 Example rule requiring an `X-Token` header and a JSON field:
 
@@ -221,7 +222,7 @@ path: /api/**
 methods:
   POST:
     headers:
-      - X-Token
+      X-Token: [abc123]
     body:
       action: create
 ```

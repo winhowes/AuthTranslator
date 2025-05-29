@@ -9,7 +9,7 @@ type CallRule struct {
 
 // RequestConstraint lists required headers and body parameters.
 type RequestConstraint struct {
-	Headers []string               `json:"headers"`
+	Headers map[string][]string    `json:"headers"`
 	Query   map[string][]string    `json:"query"`
 	Body    map[string]interface{} `json:"body"`
 }

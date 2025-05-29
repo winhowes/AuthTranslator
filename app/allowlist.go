@@ -131,9 +131,22 @@ func matchSegments(pattern, path []string) bool {
 
 // validateRequest checks headers and body according to the request constraint.
 func validateRequest(r *http.Request, c RequestConstraint) bool {
-	for _, h := range c.Headers {
-		if r.Header.Get(h) == "" {
+	for name, wantVals := range c.Headers {
+		gotVals, ok := r.Header[name]
+		if !ok {
 			return false
+		}
+		for _, want := range wantVals {
+			found := false
+			for _, got := range gotVals {
+				if got == want {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return false
+			}
 		}
 	}
 	if len(c.Query) > 0 {
