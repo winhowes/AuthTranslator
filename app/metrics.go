@@ -126,7 +126,7 @@ func recordDuration(integration string, d time.Duration) {
 }
 
 func metricsHandler(w http.ResponseWriter, r *http.Request) {
-	if *metricsUser != "" || *metricsPass != "" {
+	if *metricsUser != "" && *metricsPass != "" {
 		user, pass, ok := r.BasicAuth()
 		if !ok || subtle.ConstantTimeCompare([]byte(user), []byte(*metricsUser)) != 1 ||
 			subtle.ConstantTimeCompare([]byte(pass), []byte(*metricsPass)) != 1 {
