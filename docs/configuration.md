@@ -35,7 +35,6 @@ integrations:
     in_rate_limit:  100
     out_rate_limit: 800
     rate_limit_window: 1m
-    tags: [chat, team‑comm]
 ```
 
 See [Secret Back-Ends](secret-backends.md) for all supported URI schemes.
@@ -64,7 +63,6 @@ See [Secret Back-Ends](secret-backends.md) for all supported URI schemes.
 | `disable_keep_alives` | bool       | `false`      | Disable HTTP keep‑alive connections. |
 | `max_idle_conns` | int            | `0`          | Total idle connections to keep open. |
 | `max_idle_conns_per_host` | int     | `0`          | Idle connection limit per upstream host. |
-| `tags`          | `[]string`     | `[]`         | Arbitrary labels for dashboards / CLI queries.                               |
 
 #### `PluginSpec`
 

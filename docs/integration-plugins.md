@@ -77,6 +77,5 @@ From here you can tweak fields—e.g. turn on `tls_insecure_skip_verify` for a d
 ## Best practices for authors
 
 * **Set sane timeouts** SaaS APIs differ; codify them so callers don’t guess.
-* **Namespace tags** Add `tags: [chat, slack]` so dashboards can group traffic.
 * **Keep zero secrets** Integration plugins should only reference secret URIs, never raw tokens.
 
