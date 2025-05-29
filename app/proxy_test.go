@@ -4,6 +4,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	_ "github.com/winhowes/AuthTranslator/app/auth/plugins/token"
+	_ "github.com/winhowes/AuthTranslator/app/secrets/plugins"
 )
 
 func TestProxyHandlerPrefersHeader(t *testing.T) {
@@ -290,5 +293,68 @@ func TestProxyHandlerRateLimiterUsesIP(t *testing.T) {
 	proxyHandler(rr2, req2)
 	if rr2.Code != http.StatusTooManyRequests {
 		t.Fatalf("expected rate limit rejection, got %d", rr2.Code)
+	}
+}
+
+func TestProxyHandlerNotFound(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "http://missing/", nil)
+	req.Host = "missing"
+	rr := httptest.NewRecorder()
+	proxyHandler(rr, req)
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", rr.Code)
+	}
+}
+
+func TestProxyHandlerAuthFailure(t *testing.T) {
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer backend.Close()
+
+	t.Setenv("TOK", "secret")
+	integ := Integration{
+		Name:         "authfail",
+		Destination:  backend.URL,
+		InRateLimit:  1,
+		OutRateLimit: 1,
+		IncomingAuth: []AuthPluginConfig{{Type: "token", Params: map[string]interface{}{"secrets": []string{"env:TOK"}, "header": "X-Auth"}}},
+	}
+	if err := AddIntegration(&integ); err != nil {
+		t.Fatalf("failed to add integration: %v", err)
+	}
+	t.Cleanup(func() { integ.inLimiter.Stop(); integ.outLimiter.Stop() })
+
+	req := httptest.NewRequest(http.MethodGet, "http://authfail/", nil)
+	req.Host = "authfail"
+	req.Header.Set("X-Auth", "wrong")
+	rr := httptest.NewRecorder()
+	proxyHandler(rr, req)
+	if rr.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d", rr.Code)
+	}
+}
+
+func TestProxyHandlerBadGateway(t *testing.T) {
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer backend.Close()
+
+	integ := Integration{Name: "badgw", Destination: backend.URL, InRateLimit: 1, OutRateLimit: 1}
+	if err := AddIntegration(&integ); err != nil {
+		t.Fatalf("failed to add integration: %v", err)
+	}
+	integrations.Lock()
+	integrations.m["badgw"].proxy = nil
+	integrations.Unlock()
+	t.Cleanup(func() { integ.inLimiter.Stop(); integ.outLimiter.Stop() })
+
+	req := httptest.NewRequest(http.MethodGet, "http://badgw/", nil)
+	req.Host = "badgw"
+	rr := httptest.NewRecorder()
+	proxyHandler(rr, req)
+	if rr.Code != http.StatusBadGateway {
+		t.Fatalf("expected 502, got %d", rr.Code)
 	}
 }
