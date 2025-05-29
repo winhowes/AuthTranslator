@@ -42,7 +42,14 @@ func (t *TokenAuth) Authenticate(ctx context.Context, r *http.Request, p interfa
 	if !ok {
 		return false
 	}
-	tokenValue := strings.TrimPrefix(r.Header.Get(cfg.Header), cfg.Prefix)
+	headerVal := r.Header.Get(cfg.Header)
+	if cfg.Prefix != "" {
+		if !strings.HasPrefix(headerVal, cfg.Prefix) {
+			return false
+		}
+		headerVal = strings.TrimPrefix(headerVal, cfg.Prefix)
+	}
+	tokenValue := headerVal
 	for _, ref := range cfg.Secrets {
 		token, err := secrets.LoadSecret(ctx, ref)
 		if err != nil {
