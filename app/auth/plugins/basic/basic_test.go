@@ -97,3 +97,45 @@ func TestBasicPluginOptionalParams(t *testing.T) {
 		t.Fatalf("unexpected optional params: %v", got)
 	}
 }
+func TestBasicParseParamsDefaultsAndError(t *testing.T) {
+	p := BasicAuth{}
+	// defaults when header and prefix not provided
+	cfg, err := p.ParseParams(map[string]interface{}{"secrets": []string{"env:S"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	in := cfg.(*inParams)
+	if in.Header != "Authorization" || in.Prefix != "Basic " {
+		t.Fatalf("unexpected defaults: %v", in)
+	}
+	// error when secrets missing
+	if _, err := p.ParseParams(map[string]interface{}{}); err == nil {
+		t.Fatal("expected error for missing secrets")
+	}
+}
+
+func TestBasicIdentifyFailures(t *testing.T) {
+	p := BasicAuth{}
+	t.Setenv("S", "user:pass")
+	cfg, err := p.ParseParams(map[string]interface{}{"secrets": []string{"env:S"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// invalid base64
+	r := &http.Request{Header: http.Header{"Authorization": []string{"Basic $$"}}}
+	if p.Authenticate(context.Background(), r, cfg) {
+		t.Fatal("auth should fail")
+	}
+	if id, ok := p.Identify(r, cfg); ok || id != "" {
+		t.Fatalf("unexpected id %s", id)
+	}
+	// missing username
+	cred := base64.StdEncoding.EncodeToString([]byte(":pass"))
+	r = &http.Request{Header: http.Header{"Authorization": []string{"Basic " + cred}}}
+	if p.Authenticate(context.Background(), r, cfg) {
+		t.Fatal("auth should fail")
+	}
+	if id, ok := p.Identify(r, cfg); ok || id != "" {
+		t.Fatalf("expected empty id, got %s", id)
+	}
+}

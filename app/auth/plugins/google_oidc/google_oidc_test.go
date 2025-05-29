@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -178,5 +179,29 @@ func TestGoogleOIDCIncomingAuthFail(t *testing.T) {
 	}
 	if p.Authenticate(context.Background(), r, cfg) {
 		t.Fatal("expected authentication to fail")
+	}
+}
+func TestVerifyRS256AndParseAndVerify(t *testing.T) {
+	key, _ := rsa.GenerateKey(rand.Reader, 1024)
+	kid := "kid1"
+	tok := makeToken("aud", "sub", time.Now().Add(time.Hour).Unix(), key, kid)
+	parts := strings.Split(tok, ".")
+	if !verifyRS256(parts, &key.PublicKey) {
+		t.Fatal("verifyRS256 failed")
+	}
+	bad := []string{parts[0], parts[1], parts[2] + "bad"}
+	if verifyRS256(bad, &key.PublicKey) {
+		t.Fatal("verifyRS256 should fail")
+	}
+	keyCache.mu.Lock()
+	keyCache.keys = map[string]*rsa.PublicKey{kid: &key.PublicKey}
+	keyCache.expiry = time.Now().Add(time.Hour)
+	keyCache.mu.Unlock()
+	claims, ok := parseAndVerify(tok)
+	if !ok || claims["sub"] != "sub" {
+		t.Fatalf("unexpected claims %v", claims)
+	}
+	if _, ok := parseAndVerify(parts[0] + "." + parts[1] + ".bad"); ok {
+		t.Fatal("expected parseAndVerify failure")
 	}
 }
