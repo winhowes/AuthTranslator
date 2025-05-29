@@ -311,3 +311,73 @@ func TestJWTIdentifyBadInput(t *testing.T) {
 		t.Fatalf("expected empty id for malformed token, got %s", id)
 	}
 }
+
+func TestJWTAuthCustomHeaderPrefix(t *testing.T) {
+	secrets.ClearCache()
+	key := "s"
+	claims := map[string]interface{}{
+		"aud": "a",
+		"sub": "user",
+		"exp": time.Now().Add(time.Hour).Unix(),
+	}
+	tok := makeHS256ClaimsToken(key, claims)
+	r := &http.Request{Header: http.Header{"Authz": []string{"Token " + tok}}}
+	p := JWTAuth{}
+	t.Setenv("K", key)
+	cfg, err := p.ParseParams(map[string]interface{}{
+		"secrets": []string{"env:K"},
+		"header":  "Authz",
+		"prefix":  "Token ",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !p.Authenticate(context.Background(), r, cfg) {
+		t.Fatal("expected authentication to succeed")
+	}
+	if id, ok := p.Identify(r, cfg); !ok || id != "user" {
+		t.Fatalf("unexpected id %s", id)
+	}
+}
+
+func TestJWTAuthNoExpOrInvalidExp(t *testing.T) {
+	secrets.ClearCache()
+	key := "sec"
+	p := JWTAuth{}
+	t.Setenv("K", key)
+	cfg, err := p.ParseParams(map[string]interface{}{"secrets": []string{"env:K"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	claims := map[string]interface{}{"aud": "a", "sub": "u"}
+	tok := makeHS256ClaimsToken(key, claims)
+	r := &http.Request{Header: http.Header{"Authorization": []string{"Bearer " + tok}}}
+	if !p.Authenticate(context.Background(), r, cfg) {
+		t.Fatal("missing exp should still authenticate")
+	}
+
+	claims["exp"] = "notanumber"
+	tok = makeHS256ClaimsToken(key, claims)
+	r = &http.Request{Header: http.Header{"Authorization": []string{"Bearer " + tok}}}
+	if !p.Authenticate(context.Background(), r, cfg) {
+		t.Fatal("non numeric exp should authenticate")
+	}
+}
+
+func TestJWTOutgoingAddAuthMultipleSecrets(t *testing.T) {
+	secrets.ClearCache()
+	r := &http.Request{Header: http.Header{}}
+	p := JWTAuthOut{}
+	t.Setenv("TOK1", "tok1")
+	t.Setenv("TOK2", "tok2")
+	cfg, err := p.ParseParams(map[string]interface{}{"secrets": []string{"env:TOK1", "env:TOK2"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.AddAuth(context.Background(), r, cfg)
+	got := r.Header.Get("Authorization")
+	if got != "Bearer tok1" && got != "Bearer tok2" {
+		t.Fatalf("unexpected header %s", got)
+	}
+}
