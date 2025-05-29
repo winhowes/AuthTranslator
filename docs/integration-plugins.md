@@ -70,7 +70,7 @@ integrations:
     << generated block >>
 ```
 
-From here you can tweak fields—e.g. turn on `tls_skip_verify` for a dev sandbox.
+From here you can tweak fields—e.g. turn on `tls_insecure_skip_verify` for a dev sandbox.
 
 ---
 
