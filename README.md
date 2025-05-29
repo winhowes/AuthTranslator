@@ -1,4 +1,5 @@
-[![Go Report Card](https://goreportcard.com/badge/github.com/winhowes/AuthTranslator)](https://goreportcard.com/report/github.com/winhowes/AuthTranslator)
+[![Go Report Card](https://goreportcard.com/badge/github.com/winhowes/AuthTranslator)](https://goreportcard.com/report/github.com/winhowes/AuthTranslator) [![Coverage](https://codecov.io/gh/winhowes/AuthTranslator/branch/main/graph/badge.svg)](https://codecov.io/gh/winhowes/AuthTranslator)
+
 
 # AuthTranslator
 
