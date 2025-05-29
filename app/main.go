@@ -19,6 +19,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/fsnotify/fsnotify"
+
 	"github.com/winhowes/AuthTranslator/app/authplugins"
 	_ "github.com/winhowes/AuthTranslator/app/authplugins/plugins"
 	_ "github.com/winhowes/AuthTranslator/app/integrationplugins/plugins"
@@ -302,32 +304,37 @@ func redisCmdInt(conn net.Conn, args ...string) (int, error) {
 	}
 }
 
-func watchFiles(interval time.Duration, files []string, out chan<- struct{}) {
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
+func watchFiles(files []string, out chan<- struct{}) {
+	w, err := fsnotify.NewWatcher()
+	if err != nil {
+		logger.Error("failed to create watcher", "error", err)
+		return
+	}
+	defer w.Close()
 
-	mods := make(map[string]time.Time)
 	for _, f := range files {
-		if fi, err := os.Stat(f); err == nil {
-			mods[f] = fi.ModTime()
+		if err := w.Add(f); err != nil {
+			logger.Error("watch add failed", "file", f, "error", err)
 		}
 	}
 
-	for range ticker.C {
-		changed := false
-		for _, f := range files {
-			if fi, err := os.Stat(f); err == nil {
-				if fi.ModTime().After(mods[f]) {
-					mods[f] = fi.ModTime()
-					changed = true
+	for {
+		select {
+		case ev, ok := <-w.Events:
+			if !ok {
+				return
+			}
+			if ev.Op&(fsnotify.Write|fsnotify.Rename) != 0 {
+				select {
+				case out <- struct{}{}:
+				default:
 				}
 			}
-		}
-		if changed {
-			select {
-			case out <- struct{}{}:
-			default:
+		case err, ok := <-w.Errors:
+			if !ok {
+				return
 			}
+			logger.Error("watch error", "error", err)
 		}
 	}
 }
@@ -535,7 +542,7 @@ func main() {
 	signal.Notify(reloadSig, syscall.SIGHUP)
 
 	if *watch {
-		go watchFiles(time.Second, []string{*configFile, *allowlistFile}, watchSig)
+		go watchFiles([]string{*configFile, *allowlistFile}, watchSig)
 	}
 
 	for {
