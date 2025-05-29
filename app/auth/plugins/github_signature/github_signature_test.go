@@ -160,3 +160,17 @@ func TestGitHubSignatureBodyError(t *testing.T) {
 		t.Fatal("expected authentication to fail on body error")
 	}
 }
+
+func TestGitHubSignatureParseParamsUnknownField(t *testing.T) {
+	p := GitHubSignatureAuth{}
+	if _, err := p.ParseParams(map[string]interface{}{"secrets": []string{"env:S"}, "extra": true}); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestGitHubSignatureName(t *testing.T) {
+	p := GitHubSignatureAuth{}
+	if p.Name() != "github_signature" {
+		t.Fatalf("unexpected name %s", p.Name())
+	}
+}

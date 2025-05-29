@@ -15,6 +15,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/winhowes/AuthTranslator/app/secrets"
+
 	_ "github.com/winhowes/AuthTranslator/app/secrets/plugins"
 )
 
@@ -258,5 +260,33 @@ func TestSlackSignatureParseParamsUnknownField(t *testing.T) {
 	p := SlackSignatureAuth{}
 	if _, err := p.ParseParams(map[string]interface{}{"secrets": []string{"env:S"}, "extra": true}); err == nil {
 		t.Fatal("expected error")
+	}
+}
+
+func TestSlackSignatureInvalidParams(t *testing.T) {
+	r := &http.Request{Header: http.Header{}}
+	p := SlackSignatureAuth{}
+	if p.Authenticate(context.Background(), r, struct{}{}) {
+		t.Fatal("expected failure")
+	}
+}
+
+type failPlugin struct{}
+
+func (failPlugin) Prefix() string                               { return "fail" }
+func (failPlugin) Load(context.Context, string) (string, error) { return "", errors.New("fail") }
+
+func TestSlackSignatureSecretError(t *testing.T) {
+	secrets.Register(failPlugin{})
+	body := "body"
+	ts := strconv.FormatInt(time.Now().Unix(), 10)
+	r := &http.Request{Header: http.Header{
+		"X-Slack-Request-Timestamp": []string{ts},
+		"X-Slack-Signature":         []string{"v0=sig"},
+	}, Body: io.NopCloser(strings.NewReader(body))}
+	p := SlackSignatureAuth{}
+	cfg := &slackSigParams{Secrets: []string{"fail:oops"}, Version: "v0", SigHeader: "X-Slack-Signature", TimestampHeader: "X-Slack-Request-Timestamp", Tolerance: 300}
+	if p.Authenticate(context.Background(), r, cfg) {
+		t.Fatal("expected failure when secret load errors")
 	}
 }
