@@ -24,6 +24,19 @@ func TestBasicOutgoingAddAuth(t *testing.T) {
 	}
 }
 
+func TestBasicOutgoingAddAuthMissingSecret(t *testing.T) {
+	r := &http.Request{Header: http.Header{}}
+	p := BasicAuthOut{}
+	cfg, err := p.ParseParams(map[string]interface{}{"secrets": []string{"env:MISSING"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.AddAuth(context.Background(), r, cfg)
+	if got := r.Header.Get("Authorization"); got != "" {
+		t.Fatalf("expected empty header, got %s", got)
+	}
+}
+
 func TestBasicIncomingAuth(t *testing.T) {
 	cred := base64.StdEncoding.EncodeToString([]byte("user:pass"))
 	r := &http.Request{Header: http.Header{"Authorization": []string{"Basic " + cred}}}

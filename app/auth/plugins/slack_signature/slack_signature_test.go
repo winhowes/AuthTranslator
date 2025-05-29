@@ -64,6 +64,23 @@ func TestSlackSignatureAuthOldTimestamp(t *testing.T) {
 	}
 }
 
+func TestSlackSignatureAuthBadTimestamp(t *testing.T) {
+	r := &http.Request{Header: http.Header{
+		"X-Slack-Request-Timestamp": []string{"notanint"},
+		"X-Slack-Signature":         []string{"v0=abc"},
+	}, Body: io.NopCloser(strings.NewReader(""))}
+
+	p := SlackSignatureAuth{}
+	t.Setenv("SEC", "key")
+	cfg, err := p.ParseParams(map[string]interface{}{"secrets": []string{"env:SEC"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Authenticate(context.Background(), r, cfg) {
+		t.Fatal("expected authentication to fail")
+	}
+}
+
 func TestSlackSignatureDefaults(t *testing.T) {
 	p := SlackSignatureAuth{}
 	t.Setenv("SEC", "key")
