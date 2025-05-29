@@ -42,7 +42,6 @@ AuthTranslator exposes several command‑line options:
 | `-max_body_size` | maximum bytes buffered from request bodies; use `0` to disable |
 | `-log-level` | log verbosity (`DEBUG`, `INFO`, `WARN`, `ERROR`) |
 | `-log-format` | log output format (`text` or `json`) |
-| `-debug` | expose the `/integrations` endpoint for the CLI |
 | `-version` | print the build version and exit |
 | `-watch` | automatically reload when config or allowlist files change |
 | `-enable-metrics` | expose the `/_at_internal/metrics` endpoint (default `true`) |

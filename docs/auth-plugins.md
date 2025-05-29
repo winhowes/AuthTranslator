@@ -121,7 +121,6 @@ Identifiers flow through to:
 |   |
 | - |
 
-* Start the proxy with `-debug` and curl `/_at_internal/metrics` to see **`auth_plugin_errors_total`**.
 * Use `AUTH_TRANSLATOR_LOG_LEVEL=debug` to dump request headers after plugin injection (redacted for secrets).
 
 ---
