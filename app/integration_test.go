@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net/http"
 	"testing"
 	"time"
 
@@ -205,5 +206,34 @@ func TestIntegrationInvalidWindow(t *testing.T) {
 	}
 	if err := AddIntegration(i); err == nil {
 		t.Fatal("expected error for non-positive window")
+	}
+}
+
+func TestIntegrationTransportSettings(t *testing.T) {
+	i := &Integration{
+		Name:                  "tr",
+		Destination:           "http://example.com",
+		IdleConnTimeout:       "2s",
+		TLSHandshakeTimeout:   "1s",
+		ResponseHeaderTimeout: "3s",
+		TLSInsecureSkipVerify: true,
+	}
+	if err := AddIntegration(i); err != nil {
+		t.Fatalf("add: %v", err)
+	}
+	t.Cleanup(func() {
+		i.inLimiter.Stop()
+		i.outLimiter.Stop()
+	})
+
+	tr, ok := i.proxy.Transport.(*http.Transport)
+	if !ok {
+		t.Fatalf("expected http.Transport, got %T", i.proxy.Transport)
+	}
+	if tr.IdleConnTimeout != 2*time.Second || tr.TLSHandshakeTimeout != 1*time.Second || tr.ResponseHeaderTimeout != 3*time.Second {
+		t.Fatalf("transport timeouts not applied")
+	}
+	if tr.TLSClientConfig == nil || !tr.TLSClientConfig.InsecureSkipVerify {
+		t.Fatalf("TLS settings not applied")
 	}
 }

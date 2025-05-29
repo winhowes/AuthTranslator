@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"net/http"
@@ -133,6 +134,12 @@ type Integration struct {
 
 	rateLimitDur time.Duration `json:"-"`
 
+  IdleConnTimeout       string `json:"idle_conn_timeout,omitempty"`
+	TLSHandshakeTimeout   string `json:"tls_handshake_timeout,omitempty"`
+	ResponseHeaderTimeout string `json:"response_header_timeout,omitempty"`
+	TLSInsecureSkipVerify bool   `json:"tls_insecure_skip_verify,omitempty"`
+	DisableKeepAlives     bool   `json:"disable_keep_alives,omitempty"`
+
 	inLimiter  *RateLimiter
 	outLimiter *RateLimiter
 
@@ -223,6 +230,44 @@ func prepareIntegration(i *Integration) error {
 			}
 		}
 	}
+
+	tr := http.DefaultTransport.(*http.Transport).Clone()
+	if existing, ok := i.proxy.Transport.(*http.Transport); ok {
+		tr = existing.Clone()
+	}
+
+	if i.IdleConnTimeout != "" {
+		d, err := time.ParseDuration(i.IdleConnTimeout)
+		if err != nil || d < 0 {
+			return fmt.Errorf("invalid idle_conn_timeout: %w", err)
+		}
+		tr.IdleConnTimeout = d
+	}
+	if i.TLSHandshakeTimeout != "" {
+		d, err := time.ParseDuration(i.TLSHandshakeTimeout)
+		if err != nil || d < 0 {
+			return fmt.Errorf("invalid tls_handshake_timeout: %w", err)
+		}
+		tr.TLSHandshakeTimeout = d
+	}
+	if i.ResponseHeaderTimeout != "" {
+		d, err := time.ParseDuration(i.ResponseHeaderTimeout)
+		if err != nil || d < 0 {
+			return fmt.Errorf("invalid response_header_timeout: %w", err)
+		}
+		tr.ResponseHeaderTimeout = d
+	}
+	if i.TLSInsecureSkipVerify {
+		if tr.TLSClientConfig == nil {
+			tr.TLSClientConfig = &tls.Config{}
+		}
+		tr.TLSClientConfig.InsecureSkipVerify = true
+	}
+	if i.DisableKeepAlives {
+		tr.DisableKeepAlives = true
+	}
+
+	i.proxy.Transport = tr
 
 	return nil
 }
