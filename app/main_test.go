@@ -552,3 +552,75 @@ func TestMainTLSMissingKey(t *testing.T) {
 		t.Fatalf("unexpected exit status: %v", err)
 	}
 }
+
+func TestMainWatchReload(t *testing.T) {
+	cfg := writeTempFile(t, `{"integrations":[{"name":"test","destination":"http://example.com"}]}`)
+	defer os.Remove(cfg)
+	al := writeTempFile(t, `[]`)
+	defer os.Remove(al)
+
+	bin := buildApp(t)
+	addr := freeAddr(t)
+	cmd := exec.Command(bin, "-config", cfg, "-allowlist", al, "-addr", addr, "-watch")
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("start failed: %v", err)
+	}
+	done := make(chan error, 1)
+	go func() { done <- cmd.Wait() }()
+	defer func() {
+		cmd.Process.Signal(os.Interrupt)
+		select {
+		case <-done:
+		case <-time.After(2 * time.Second):
+			cmd.Process.Kill()
+			<-done
+		}
+	}()
+
+	time.Sleep(200 * time.Millisecond)
+
+	getReload := func() string {
+		resp, err := http.Get("http://" + addr + "/_at_internal/healthz")
+		if err != nil {
+			t.Fatalf("request failed: %v", err)
+		}
+		defer resp.Body.Close()
+		return resp.Header.Get("X-Last-Reload")
+	}
+
+	first := getReload()
+	if first == "" {
+		t.Fatal("missing initial reload header")
+	}
+	firstTime, err := time.Parse(time.RFC3339, first)
+	if err != nil {
+		t.Fatalf("invalid reload time: %v", err)
+	}
+
+	time.Sleep(time.Second)
+
+	// write same contents with a newline to trigger a write event
+	if err := os.WriteFile(cfg, []byte(`{"integrations":[{"name":"test","destination":"http://example.com"}]}`+"\n"), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	var second string
+	start := time.Now()
+	for time.Since(start) < 3*time.Second {
+		time.Sleep(100 * time.Millisecond)
+		second = getReload()
+		if second != "" && second != first {
+			break
+		}
+	}
+	if second == "" {
+		t.Fatal("config change did not trigger reload")
+	}
+	secondTime, err := time.Parse(time.RFC3339, second)
+	if err != nil {
+		t.Fatalf("invalid reload time: %v", err)
+	}
+	if !secondTime.After(firstTime) {
+		t.Fatal("config change did not trigger reload")
+	}
+}
