@@ -237,6 +237,20 @@ func NewRateLimiter(limit int, duration time.Duration) *RateLimiter {
 	return rl
 }
 
+func redisTTLArgs(d time.Duration) (string, string) {
+	if d <= 0 {
+		return "EXPIRE", "0"
+	}
+	if d%time.Second == 0 {
+		return "EXPIRE", strconv.Itoa(int(d.Seconds()))
+	}
+	ms := d.Milliseconds()
+	if ms == 0 {
+		ms = 1
+	}
+	return "PEXPIRE", strconv.FormatInt(ms, 10)
+}
+
 // Stop stops the rate limiter's reset goroutine and ticker.
 func (rl *RateLimiter) Stop() {
 	if rl.resetTicker != nil {
@@ -360,7 +374,8 @@ func (rl *RateLimiter) allowRedis(key string) (bool, error) {
 		bad = true
 	}
 	if n == 1 {
-		_, err = redisCmdInt(conn, "EXPIRE", key, strconv.Itoa(int(rl.window.Seconds())))
+		cmd, ttl := redisTTLArgs(rl.window)
+		_, err = redisCmdInt(conn, cmd, key, ttl)
 		if err != nil {
 			bad = true
 		}
