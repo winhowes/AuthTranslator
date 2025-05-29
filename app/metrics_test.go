@@ -21,7 +21,7 @@ func resetMetrics() {
 
 func TestMetricsHandlerEmpty(t *testing.T) {
 	resetMetrics()
-	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	req := httptest.NewRequest(http.MethodGet, "/_at_internal/metrics", nil)
 	rr := httptest.NewRecorder()
 	metricsHandler(rr, req)
 
@@ -46,7 +46,7 @@ func TestMetricsHandlerOutput(t *testing.T) {
 	recordDuration("foo", 200*time.Millisecond)
 	recordDuration("bar", 50*time.Millisecond)
 
-	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	req := httptest.NewRequest(http.MethodGet, "/_at_internal/metrics", nil)
 	rr := httptest.NewRecorder()
 	metricsHandler(rr, req)
 

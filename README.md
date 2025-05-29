@@ -550,10 +550,10 @@ AuthTranslator writes log messages to standard output using Go's `log/slog` pack
 
 ## Health Checks and Metrics
 
-AuthTranslator exposes a readiness endpoint at `/healthz` which returns HTTP `200` when the server is running.
+AuthTranslator exposes a readiness endpoint at `/_at_internal/healthz` which returns HTTP `200` when the server is running.
 The response includes an `X-Last-Reload` header indicating the last time configuration was reloaded.
 
-Metrics are available at `/metrics` using the Prometheus text format. The following metrics are exported:
+Metrics are available at `/_at_internal/metrics` using the Prometheus text format. The following metrics are exported:
 
 - `authtranslator_requests_total{integration="<name>"}` – total requests processed per integration.
 - `authtranslator_rate_limit_events_total{integration="<name>"}` – requests rejected due to rate limits.

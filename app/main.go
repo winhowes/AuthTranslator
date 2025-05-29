@@ -590,8 +590,8 @@ func main() {
 		http.HandleFunc("/integrations", integrationsHandler)
 	}
 
-	http.HandleFunc("/healthz", healthzHandler)
-	http.HandleFunc("/metrics", metricsHandler)
+	http.HandleFunc("/_at_internal/healthz", healthzHandler)
+	http.HandleFunc("/_at_internal/metrics", metricsHandler)
 
 	http.HandleFunc("/", proxyHandler)
 
