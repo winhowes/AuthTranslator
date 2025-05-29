@@ -8,8 +8,9 @@ import (
 	"net/http"
 )
 
-// MaxBodySize limits how many bytes GetBody will read. It can be overridden
-// by applications to enforce a custom limit.
+// MaxBodySize limits how many bytes GetBody will read. Applications may
+// override this value to enforce a custom limit. A value of zero or negative
+// disables the limit entirely.
 var MaxBodySize int64 = 10 << 20 // 10MB
 
 // ErrBodyTooLarge is returned when a request body exceeds MaxBodySize.
@@ -23,12 +24,17 @@ func GetBody(r *http.Request) ([]byte, error) {
 	if b, ok := r.Context().Value(bodyKey{}).([]byte); ok {
 		return b, nil
 	}
-	lr := io.LimitReader(r.Body, MaxBodySize+1)
-	b, err := io.ReadAll(lr)
+
+	var reader io.Reader = r.Body
+	if MaxBodySize > 0 {
+		reader = io.LimitReader(r.Body, MaxBodySize+1)
+	}
+
+	b, err := io.ReadAll(reader)
 	if err != nil {
 		return nil, err
 	}
-	if int64(len(b)) > MaxBodySize {
+	if MaxBodySize > 0 && int64(len(b)) > MaxBodySize {
 		return nil, ErrBodyTooLarge
 	}
 	r.Body = io.NopCloser(bytes.NewReader(b))

@@ -76,3 +76,19 @@ func TestGetBodyCustomLimit(t *testing.T) {
 		t.Fatalf("expected ErrBodyTooLarge, got %v", err)
 	}
 }
+
+func TestGetBodyUnlimited(t *testing.T) {
+	old := MaxBodySize
+	large := make([]byte, int(old+1))
+	MaxBodySize = 0
+	defer func() { MaxBodySize = old }()
+
+	r := httptest.NewRequest(http.MethodPost, "http://example.com", bytes.NewBuffer(large))
+	b, err := GetBody(r)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(b) != len(large) {
+		t.Fatalf("expected body length %d, got %d", len(large), len(b))
+	}
+}
