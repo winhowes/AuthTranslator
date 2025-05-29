@@ -112,3 +112,32 @@ func TestValidateAllowlistEntriesCapabilityParamErrors(t *testing.T) {
 		t.Fatal("expected error for invalid capability params")
 	}
 }
+
+func TestValidateAllowlistEntriesDuplicateRule(t *testing.T) {
+	entries := []AllowlistEntry{{
+		Integration: "test",
+		Callers: []CallerConfig{{
+			ID: "c",
+			Rules: []CallRule{
+				{Path: "/x", Methods: map[string]RequestConstraint{"GET": {}}},
+				{Path: "/x", Methods: map[string]RequestConstraint{"GET": {}}},
+			},
+		}},
+	}}
+	if err := validateAllowlistEntries(entries); err == nil {
+		t.Fatal("expected error for duplicate rule")
+	}
+}
+
+func TestValidateAllowlistEntriesDuplicateWildcardCaller(t *testing.T) {
+	entries := []AllowlistEntry{{
+		Integration: "test",
+		Callers: []CallerConfig{
+			{ID: "*", Rules: []CallRule{{Path: "/a", Methods: map[string]RequestConstraint{"GET": {}}}}},
+			{ID: "", Rules: []CallRule{{Path: "/b", Methods: map[string]RequestConstraint{"POST": {}}}}},
+		},
+	}}
+	if err := validateAllowlistEntries(entries); err == nil {
+		t.Fatal("expected error for duplicate caller id")
+	}
+}
