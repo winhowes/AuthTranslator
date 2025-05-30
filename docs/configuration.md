@@ -10,7 +10,7 @@ AuthTranslator loads up to **two** YAML (or pure‑JSON) documents at runtime:
 If no allowlist is provided, every request is permitted once inbound authentication succeeds.
 Running without an allowlist effectively gives all authenticated callers unrestricted access, so supplying `allowlist.yaml` is **strongly recommended** even if it just contains a single wildcard entry to start.
 
-The proxy currently infers its schema directly from Go structs. A top‑level `apiVersion` key is **optional** and ignored at runtime (reserved for future compatibility).
+The proxy currently infers its schema directly from Go structs. Unknown top‑level keys cause a validation error.
 
 > **Tip** The Go YAML parser accepts JSON too, so curl pipes / CI steps can build your config in whichever syntax is easier to template.
 
@@ -19,7 +19,6 @@ The proxy currently infers its schema directly from Go structs. A top‑level `a
 ## 1  `config.yaml` – integrations
 
 ```yaml
-apiVersion: v1alpha1
 integrations:
   - name: slack
     destination: https://slack.com
@@ -43,7 +42,6 @@ See [Secret Back-Ends](secret-backends.md) for all supported URI schemes.
 
 | Field          | Type                    | Default | Notes                                                    |   |
 | -------------- | ----------------------- | ------- | -------------------------------------------------------- | - |
-| `apiVersion`   | string                  | –       | Optional; reserved for future versions.                  |   |
 | `integrations` | `[]Integration` | –       | List of integrations. Each element's `name` is used in logs and allowlist. |
 
 ### `Integration` object
@@ -88,7 +86,6 @@ Two ways to authorise a caller:
 2. **Low‑level filter** – match on HTTP path, method, query, headers, JSON‑body or form‑data.
 
 ```yaml
-apiVersion: v1alpha1
 - integration: slack
   callers:
     - id: demo-user
@@ -121,7 +118,6 @@ Regular expressions are not supported.
 
 | Field        | Type               | Notes                                          |   |
 | ------------ | ------------------ | ---------------------------------------------- | - |
-| `apiVersion` | string             | Optional; reserved for future versions.        |   |
 | `callers`    | map\[string]Caller | Caller ID comes from the incoming‑auth plugin. |   |
 
 ### `Caller` object

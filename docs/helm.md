@@ -50,7 +50,6 @@ image:
 redisAddress: "redis://redis:6379/0"
 
 config: |
-  apiVersion: v1alpha1
   integrations:
     - name: slack
       destination: https://slack.com
