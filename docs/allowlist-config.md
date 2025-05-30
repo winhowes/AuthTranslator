@@ -6,9 +6,9 @@ The **allowlist** answers a single question:
 
 It lives in `allowlist.yaml` and is hot‑reloaded just like `config.yaml`.
 While the proxy starts without this file, doing so lets any authenticated caller access every integration. In production we **strongly recommend** defining an allowlist, even if it initially grants a single wildcard caller.
+Unknown top‑level keys cause a validation error.
 
 ```yaml
-apiVersion: v1alpha1  # optional, ignored today
 - integration: <integration-name>
   callers:
     - id: <callerID>
