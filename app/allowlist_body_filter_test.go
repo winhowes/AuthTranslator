@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	yaml "gopkg.in/yaml.v3"
 )
 
 // helper to create request preserving body
@@ -110,5 +112,18 @@ func TestBodyNestedMatching(t *testing.T) {
 		if got := validateRequest(r, RequestConstraint{Body: tt.rule}); got != tt.want {
 			t.Errorf("%s: got %v want %v", tt.name, got, tt.want)
 		}
+	}
+}
+
+func TestBodyNumericTypeMismatch(t *testing.T) {
+	body := []byte(`{"num":1}`)
+	var rule map[string]interface{}
+	if err := yaml.Unmarshal([]byte("num: 1"), &rule); err != nil {
+		t.Fatal(err)
+	}
+
+	r := req(http.MethodPost, body)
+	if !validateRequest(r, RequestConstraint{Body: rule}) {
+		t.Fatal("expected numeric types to match")
 	}
 }
