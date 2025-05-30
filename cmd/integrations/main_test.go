@@ -247,6 +247,21 @@ func TestAddIntegrationWriteError(t *testing.T) {
 	}
 }
 
+func TestAddIntegrationReadError(t *testing.T) {
+	dir := t.TempDir()
+	cfg := filepath.Join(dir, "cfg.yaml")
+	os.Mkdir(cfg, 0755)
+	cmd := exec.Command(os.Args[0], "-test.run=TestAddIntegrationHelper", "--")
+	cmd.Env = append(os.Environ(), "GO_WANT_ADDINTEGRATION_HELPER=1", "CFG="+cfg)
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("expected error")
+	}
+	if len(out) == 0 {
+		t.Fatalf("expected error output")
+	}
+}
+
 func TestUsageOutput(t *testing.T) {
 	oldFS := flag.CommandLine
 	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
