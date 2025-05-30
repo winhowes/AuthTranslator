@@ -65,7 +65,7 @@ allowlist: |
   - integration: slack
     callers:
       - id: demo
-        capabilities: [slack.chat.write.public]
+        capabilities: [post_public_as]
 
 ```
 
