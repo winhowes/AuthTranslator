@@ -1095,7 +1095,7 @@ func main() {
 	http.HandleFunc("/", proxyHandler)
 
 	srv := &http.Server{Addr: *addr}
-	var h3srv *http3.Server
+        var h3srv *http3.Server
 
 	go func() {
 		if err := serve(srv, *tlsCert, *tlsKey); err != nil && err != http.ErrServerClosed {
@@ -1103,8 +1103,8 @@ func main() {
 		}
 	}()
 
-	if *enableHTTP3 && *tlsCert != "" && *tlsKey != "" {
-		h3srv = &http3.Server{Server: srv}
+        if *enableHTTP3 && *tlsCert != "" && *tlsKey != "" {
+                h3srv = &http3.Server{Addr: *addr, Handler: http.DefaultServeMux}
 		go func() {
 			if err := h3srv.ListenAndServeTLS(*tlsCert, *tlsKey); err != nil && err != http.ErrServerClosed {
 				log.Fatalf("listen http3: %v", err)
