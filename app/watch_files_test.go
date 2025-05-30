@@ -102,3 +102,33 @@ func TestWatchFilesCancel(t *testing.T) {
 		t.Fatal("watchFiles did not exit after cancel")
 	}
 }
+
+func TestWatchFilesAddError(t *testing.T) {
+	tmp, err := os.CreateTemp("", "watch*.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	name := tmp.Name()
+	tmp.Close()
+	defer os.Remove(name)
+
+	missing := name + ".missing"
+
+	ch := make(chan struct{}, 1)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go watchFiles(ctx, []string{name, missing}, ch)
+
+	time.Sleep(50 * time.Millisecond)
+
+	if err := os.WriteFile(name, []byte("1"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	select {
+	case <-ch:
+		// success
+	case <-time.After(time.Second):
+		t.Fatal("timeout waiting for event")
+	}
+}

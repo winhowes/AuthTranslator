@@ -130,3 +130,20 @@ func TestMatchValueNested(t *testing.T) {
 		t.Fatal("expected nested match")
 	}
 }
+
+func TestMatchValueNumeric(t *testing.T) {
+	if !matchValue(1, 1.0) {
+		t.Fatal("expected numeric equality")
+	}
+	if !matchValue(1.0, 1) {
+		t.Fatal("expected numeric equality")
+	}
+	if matchValue(1, 2.0) {
+		t.Fatal("expected numeric mismatch")
+	}
+	data := map[string]interface{}{"n": 5}
+	rule := map[string]interface{}{"n": 5.0}
+	if !matchValue(data, rule) {
+		t.Fatal("expected map numeric match")
+	}
+}
