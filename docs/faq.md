@@ -79,7 +79,7 @@ Yes. Both protocols are proxied transparently so long as the upstream service sp
 
 ### 11 Why am I seeing 429s even though I set `requests` high?
 
-Remember limits are **per caller ID** *and* **per integration**. If your load‑test tool randomises caller IDs you’ll hit the default 1000 req/min bucket. Either consolidate IDs or raise the limit.
+Remember limits are **per caller ID** *and* **per integration**. If your load‑test tool randomises caller IDs, each ID uses the limit configured in `config.yaml`. Consolidate IDs or raise the limit as needed.
 
 ---
 
