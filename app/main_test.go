@@ -3,10 +3,17 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
 	"flag"
 	"fmt"
 	"io"
 	"log/slog"
+	"math/big"
 	"net"
 	"net/http"
 	"os"
@@ -16,6 +23,8 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/quic-go/quic-go/http3"
 )
 
 func TestAddrFlagDefault(t *testing.T) {
@@ -755,6 +764,36 @@ func freeAddr(t *testing.T) string {
 	return addr
 }
 
+func generateTLSFiles(t *testing.T) (string, string) {
+	key, err := rsa.GenerateKey(rand.Reader, 1024)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tmpl := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "srv"},
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		KeyUsage:     x509.KeyUsageDigitalSignature,
+		NotBefore:    time.Now().Add(-time.Hour),
+		NotAfter:     time.Now().Add(time.Hour),
+		IPAddresses:  []net.IP{net.ParseIP("127.0.0.1")},
+	}
+	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})
+	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)})
+
+	certFile := writeTempFile(t, string(certPEM))
+	keyFile := writeTempFile(t, string(keyPEM))
+	t.Cleanup(func() {
+		os.Remove(certFile)
+		os.Remove(keyFile)
+	})
+	return certFile, keyFile
+}
+
 func TestMainRunAndShutdown(t *testing.T) {
 	cfg := writeTempFile(t, `{"integrations":[{"name":"test","destination":"http://example.com"}]}`)
 	defer os.Remove(cfg)
@@ -991,5 +1030,86 @@ func TestMainMetricsFlagMismatch(t *testing.T) {
 		if ee, ok := err.(*exec.ExitError); !ok || ee.ExitCode() == 0 {
 			t.Fatalf("case %d: unexpected exit status: %v", i, err)
 		}
+	}
+}
+
+func TestMainHTTP3Enabled(t *testing.T) {
+	cfg := writeTempFile(t, `{"integrations":[{"name":"test","destination":"http://example.com"}]}`)
+	defer os.Remove(cfg)
+	al := writeTempFile(t, `[]`)
+	defer os.Remove(al)
+	cert, key := generateTLSFiles(t)
+
+	addr := freeAddr(t)
+	cmd := runMainCmd("-config", cfg, "-allowlist", al, "-addr", addr, "-tls-cert", cert, "-tls-key", key, "-enable-http3")
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("start failed: %v", err)
+	}
+	done := make(chan error, 1)
+	go func() { done <- cmd.Wait() }()
+	defer func() {
+		cmd.Process.Signal(os.Interrupt)
+		select {
+		case <-done:
+		case <-time.After(2 * time.Second):
+			cmd.Process.Kill()
+			<-done
+		}
+	}()
+
+	time.Sleep(200 * time.Millisecond)
+
+	rt := &http3.RoundTripper{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
+	defer rt.Close()
+	client := &http.Client{Transport: rt}
+	resp, err := client.Get("https://" + addr + "/_at_internal/healthz")
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+}
+
+func TestMainHTTP3NoTLS(t *testing.T) {
+	cfg := writeTempFile(t, `{"integrations":[{"name":"test","destination":"http://example.com"}]}`)
+	defer os.Remove(cfg)
+	al := writeTempFile(t, `[]`)
+	defer os.Remove(al)
+
+	addr := freeAddr(t)
+	cmd := runMainCmd("-config", cfg, "-allowlist", al, "-addr", addr, "-enable-http3")
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("start failed: %v", err)
+	}
+	done := make(chan error, 1)
+	go func() { done <- cmd.Wait() }()
+	defer func() {
+		cmd.Process.Signal(os.Interrupt)
+		select {
+		case <-done:
+		case <-time.After(2 * time.Second):
+			cmd.Process.Kill()
+			<-done
+		}
+	}()
+
+	time.Sleep(200 * time.Millisecond)
+
+	// HTTP/1 request should succeed
+	resp, err := http.Get("http://" + addr + "/_at_internal/healthz")
+	if err != nil {
+		t.Fatalf("http1 request failed: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected http1 200, got %d", resp.StatusCode)
+	}
+
+	// HTTP/3 request should fail since TLS is not enabled
+	rt := &http3.RoundTripper{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
+	defer rt.Close()
+	client := &http.Client{Transport: rt}
+	if _, err := client.Get("https://" + addr + "/_at_internal/healthz"); err == nil {
+		t.Fatal("expected http3 request to fail without TLS")
 	}
 }
