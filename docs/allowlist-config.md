@@ -60,7 +60,8 @@ Look for a `capabilities.go` file under `app/integrations/plugins/<integration>/
 >
 > (Use `--help` for plugin-specific flags.)
 >
-> For guidelines on adding new capabilities, see [integration-plugins.md](integration-plugins.md).
+> For a reference of built-in capabilities, see [capabilities.md](capabilities.md).
+> For guidelines on adding new ones, see [integration-plugins.md](integration-plugins.md).
 
 ### Granular Rule
 
