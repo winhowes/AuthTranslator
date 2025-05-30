@@ -69,18 +69,32 @@ Adds the configured token to the `X-Api-Key` header on each request.
 ## Writing your own plugin
 
 1. **Create a new package** under `app/auth/plugins/<name>`.
-2. Implement exactly one of:
+2. Implement either the **IncomingAuthPlugin** or **OutgoingAuthPlugin** interface from
+   [`app/auth/registry.go`](../app/auth/registry.go):
 
    ```go
-   func Authenticate(req *http.Request) (auth.Result, error)  // inbound – validate
-   func Inject(req *http.Request) error                       // outbound – mutate
+   type IncomingAuthPlugin interface {
+       Name() string
+       ParseParams(map[string]interface{}) (interface{}, error)
+       Authenticate(ctx context.Context, r *http.Request, params interface{}) bool
+       RequiredParams() []string
+       OptionalParams() []string
+   }
+
+   type OutgoingAuthPlugin interface {
+       Name() string
+       ParseParams(map[string]interface{}) (interface{}, error)
+       AddAuth(ctx context.Context, r *http.Request, params interface{})
+       RequiredParams() []string
+       OptionalParams() []string
+   }
    ```
 
-   `auth.Result` embeds `auth.Identifier` so you can optionally attach a caller‑ID (see below).
+   Incoming plugins may additionally implement the `Identifier` interface to expose a caller ID.
 3. Register the plugin in `init()`:
 
    ```go
-   auth.Register("<name>", &MyPlugin{})
+   authplugins.RegisterIncoming(&MyPlugin{}) // or RegisterOutgoing
    ```
 4. `go test ./app/...` – the main binary picks it up automatically.
 
