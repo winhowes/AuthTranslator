@@ -1,0 +1,33 @@
+version: "3.9"
+services:
+  authtranslator:
+    image: ghcr.io/winhowes/authtranslator:latest
+    container_name: authtranslator
+    ports:
+      - "8080:8080"               # → host http://localhost:8080
+    environment:
+      # Secret URIs resolve env: …
+      SLACK_TOKEN: "xoxb-REPLACE"
+      SLACK_SIGNING: "8f2b-REPLACE"
+      # Optional: enable Redis-backed rate limits
+    volumes:
+      - ./config:/conf:ro          # bind-mount configs for hot reload
+    command: |
+      -config /conf/config.yaml \
+      -allowlist /conf/allowlist.yaml \
+      -redis-addr redis://redis:6379/0 \
+      -watch                       # reload on file change
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: unless-stopped
+    expose:
+      - "6379"
+    volumes:
+      - redis-data:/data
+
+volumes:
+  redis-data:
