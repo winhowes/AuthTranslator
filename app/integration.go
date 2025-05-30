@@ -198,7 +198,7 @@ func prepareIntegration(i *Integration) error {
 		i.RateLimitStrategy = "fixed_window"
 	}
 	switch i.RateLimitStrategy {
-	case "fixed_window", "token_bucket":
+	case "fixed_window", "token_bucket", "leaky_bucket":
 	default:
 		return fmt.Errorf("invalid rate_limit_strategy %s", i.RateLimitStrategy)
 	}

@@ -42,7 +42,7 @@ func validateConfig(c *Config) error {
 		}
 		if i.RateLimitStrategy != "" {
 			switch i.RateLimitStrategy {
-			case "fixed_window", "token_bucket":
+			case "fixed_window", "token_bucket", "leaky_bucket":
 			default:
 				return fmt.Errorf("integration %s has invalid rate_limit_strategy", i.Name)
 			}
