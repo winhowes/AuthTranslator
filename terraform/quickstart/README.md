@@ -3,7 +3,7 @@ machine. Ensure Docker is installed then run:
 
 ```bash
 terraform init
-terraform apply
+terraform apply -var container_image=ghcr.io/winhowes/authtranslator:latest
 ```
 
 The container will listen on port 8080.
