@@ -34,6 +34,7 @@ docker run --rm -p 8080:8080 \
 # 2. Curl through the proxy
 curl -H "Host: slack" -H "X-Auth: <short‑lived>" \
      http://localhost:8080/api/chat.postMessage
+# alternatively set `X-AT-Int: slack` if you can’t change the Host header
 ```
 
 ```bash

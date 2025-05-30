@@ -52,6 +52,7 @@ curl -H "Host: slack" \                               # tells the proxy which in
 If everything is wired up you’ll get back Slack’s normal JSON response and your message appears in **#general**.
 
 In production deployments AuthTranslator is typically reached via a wildcard DNS entry like `*.auth.example.com` with a matching wildcard TLS certificate. The `Host` header (or subdomain) selects which integration handles each request.
+If you can’t modify the `Host` header, set an `X-AT-Int` header with the integration name. This override is enabled by default but can be disabled with `-disable_x_at_int` or restricted using `-x_at_int_host`.
 
 ---
 
