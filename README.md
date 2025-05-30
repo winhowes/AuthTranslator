@@ -13,7 +13,7 @@
 
 | Feature | Details |
 |---------|---------|
-| Centralised secret custody | Only the proxy stores integration secrets; developers never see them. |
+| Centralized secret custody | Only the proxy stores integration secrets; developers never see them. |
 | Plug-in everything | Auth types, secret back-ends, metrics, and integration templates are Go plug-ins. |
 | Per-caller / per-integration rate-limits | Backed by Redis or in-memory. |
 | Granular request authorization | Grant callers high-level **capabilities** (e.g. `slack.chat.write.public`) or fine-grained filters on path, query, headers and body. |
