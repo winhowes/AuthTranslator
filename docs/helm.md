@@ -13,16 +13,13 @@ From the repository root:
 ```bash
 helm upgrade --install authtranslator charts/authtranslator \
   --namespace authtranslator --create-namespace \
-  --set image.tag="$(git rev-parse --short HEAD)" \
-  --set slack.token=$SLACK_TOKEN \
-  --set slack.signing=$SLACK_SIGNING
+  --set image.tag="$(git rev-parse --short HEAD)"
 ```
 
 This:
 
 * Creates a `Deployment` running **one replica** of AuthTranslator.
-* Mounts your `config.yaml` and `allowlist.yaml` via `ConfigMap`.
-* Sets two **Kubernetes Secrets** for the Slack token & signing secret.
+* Mounts your `config.yaml` and `allowlist.yaml` via a `ConfigMap`.
 * Exposes port 8080 via a `ClusterIP` Service called `authtranslator`.
 
 ---
@@ -33,14 +30,11 @@ This:
 | ------------------ | --------------------------------- | ------------------------------------------------------------------ |
 | `image.repository` | `ghcr.io/winhowes/authtranslator` | Override to use a private registry.                                |
 | `image.tag`        | `latest`                          | Image tag or digest.                                               |
-| `replicaCount`     | `1`                               | Horizontal scaling factor.                                         |
-| `service.type`     | `ClusterIP`                       | `LoadBalancer` or `NodePort` as needed.                            |
+| `image.pullPolicy` | `IfNotPresent`                    | Image pull policy.                                                 |
 | `redisAddress`     | `""`                              | Address passed to `-redis-addr` – either `host:port` or a `redis://`/`rediss://` URL. |
 | `redisCA`          | `""`                              | CA file verifying Redis TLS passed to `-redis-ca`. |
-| `configYaml`       | *(string)*                        | Raw YAML for `config.yaml`.                                        |
-| `allowlistYaml`    | *(string)*                        | Raw YAML for `allowlist.yaml`.                                     |
-| `extraEnv`         | `{}`                              | Map of extra env vars (e.g., `STRIPE_TOKEN`).                      |
-| `resources`        | `{}`                              | Pod CPU/memory requests & limits.                                  |
+| `config`           | *(string)*                        | Raw YAML for `config.yaml`.                                        |
+| `allowlist`        | *(string)*                        | Raw YAML for `allowlist.yaml`.                                     |
 
 Full schema lives in [`charts/authtranslator/values.yaml`](../charts/authtranslator/values.yaml).
 
@@ -50,11 +44,9 @@ Full schema lives in [`charts/authtranslator/values.yaml`](../charts/authtransla
 image:
   tag: "1.2.3"
 
-replicaCount: 2
-
 redisAddress: "redis://redis:6379/0"
 
-configYaml: |
+config: |
   apiVersion: v1alpha1
   integrations:
     - name: slack
@@ -67,15 +59,12 @@ configYaml: |
             header: Authorization
             prefix: "Bearer "
 
-allowlistYaml: |
+allowlist: |
   - integration: slack
     callers:
       - id: demo
         capabilities: [slack.chat.write.public]
 
-extraEnv:
-  SLACK_TOKEN: "xoxb-..."
-  SLACK_SIGNING: "8f2b-..."
 ```
 
 Install with:
@@ -96,8 +85,6 @@ helm upgrade authtranslator charts/authtranslator -f values.yaml --set image.tag
 # If something breaks:
 helm rollback authtranslator 1   # roll back to previous revision
 ```
-
-> **Note** Config and allowlist hot‑reload inside the container, but image tag changes require a pod rollout.
 
 ---
 
