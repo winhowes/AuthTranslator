@@ -40,6 +40,13 @@ func validateConfig(c *Config) error {
 				return fmt.Errorf("integration %s has invalid rate_limit_window", i.Name)
 			}
 		}
+		if i.RateLimitStrategy != "" {
+			switch i.RateLimitStrategy {
+			case "fixed_window", "token_bucket":
+			default:
+				return fmt.Errorf("integration %s has invalid rate_limit_strategy", i.Name)
+			}
+		}
 		if i.IdleConnTimeout != "" {
 			d, err := time.ParseDuration(i.IdleConnTimeout)
 			if err != nil || d < 0 {

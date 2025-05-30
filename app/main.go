@@ -164,8 +164,8 @@ func reload() error {
 		if window == 0 {
 			window = time.Minute
 		}
-		integ.inLimiter = NewRateLimiter(integ.InRateLimit, window)
-		integ.outLimiter = NewRateLimiter(integ.OutRateLimit, window)
+		integ.inLimiter = NewRateLimiter(integ.InRateLimit, window, integ.RateLimitStrategy)
+		integ.outLimiter = NewRateLimiter(integ.OutRateLimit, window, integ.RateLimitStrategy)
 		newMap[integ.Name] = &integ
 	}
 
@@ -223,11 +223,18 @@ type RateLimiter struct {
 	mu          sync.Mutex
 	limit       int
 	window      time.Duration
+	strategy    string
 	requests    map[string]int
+	buckets     map[string]*tokenBucket
 	resetTicker *time.Ticker
 	done        chan struct{}
 	useRedis    bool
 	conns       chan net.Conn
+}
+
+type tokenBucket struct {
+	tokens float64
+	last   time.Time
 }
 
 // NewRateLimiter creates a RateLimiter that limits how many
@@ -236,20 +243,28 @@ type RateLimiter struct {
 // disables rate limiting. Duration specifies the length of the window
 // and how often counters reset. If a redis address is configured,
 // counts are stored in Redis so limits are shared across instances.
-func NewRateLimiter(limit int, duration time.Duration) *RateLimiter {
+func NewRateLimiter(limit int, duration time.Duration, strategy string) *RateLimiter {
+	if strategy == "" {
+		strategy = "fixed_window"
+	}
 	rl := &RateLimiter{
 		limit:    limit,
 		window:   duration,
+		strategy: strategy,
 		done:     make(chan struct{}),
-		useRedis: *redisAddr != "",
-		requests: make(map[string]int),
+		useRedis: *redisAddr != "" && strategy == "fixed_window",
+	}
+	if strategy == "fixed_window" {
+		rl.requests = make(map[string]int)
+	} else if strategy == "token_bucket" {
+		rl.buckets = make(map[string]*tokenBucket)
 	}
 
 	if rl.useRedis {
 		rl.conns = make(chan net.Conn, 4)
 	}
 
-	if limit > 0 {
+	if limit > 0 && strategy == "fixed_window" {
 		rl.resetTicker = time.NewTicker(duration)
 
 		go func() {
@@ -310,23 +325,48 @@ func (rl *RateLimiter) Allow(key string) bool {
 	if rl.limit <= 0 {
 		return true
 	}
-	if rl.useRedis {
-		ok, err := rl.allowRedis(key)
-		if err != nil {
-			logger.Error("redis limiter failed, falling back to memory", "error", err)
-		} else {
-			return ok
+	if rl.strategy == "fixed_window" {
+		if rl.useRedis {
+			ok, err := rl.allowRedis(key)
+			if err != nil {
+				logger.Error("redis limiter failed, falling back to memory", "error", err)
+			} else {
+				return ok
+			}
 		}
+
+		rl.mu.Lock()
+		defer rl.mu.Unlock()
+
+		if rl.requests[key] >= rl.limit {
+			return false
+		}
+
+		rl.requests[key]++
+		return true
 	}
 
+	// token_bucket strategy
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
-
-	if rl.requests[key] >= rl.limit {
+	b := rl.buckets[key]
+	now := time.Now()
+	if b == nil {
+		rl.buckets[key] = &tokenBucket{tokens: float64(rl.limit - 1), last: now}
+		return true
+	}
+	refill := now.Sub(b.last).Seconds() * float64(rl.limit) / rl.window.Seconds()
+	if refill > 0 {
+		b.tokens += refill
+		if b.tokens > float64(rl.limit) {
+			b.tokens = float64(rl.limit)
+		}
+		b.last = now
+	}
+	if b.tokens < 1 {
 		return false
 	}
-
-	rl.requests[key]++
+	b.tokens--
 	return true
 }
 

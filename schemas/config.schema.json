@@ -19,6 +19,10 @@
         "in_rate_limit": { "type": "integer" },
         "out_rate_limit": { "type": "integer" },
         "rate_limit_window": { "type": "string" },
+        "rate_limit_strategy": {
+          "type": "string",
+          "enum": ["fixed_window", "token_bucket"]
+        },
         "incoming_auth": {
           "type": "array",
           "items": { "$ref": "#/definitions/authPlugin" }
