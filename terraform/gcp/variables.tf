@@ -25,3 +25,15 @@ variable "redis_ca" {
   default     = ""
 }
 
+variable "config_path" {
+  description = "Path to the configuration file inside the container"
+  type        = string
+  default     = "config.yaml"
+}
+
+variable "allowlist_path" {
+  description = "Path to the allowlist file inside the container"
+  type        = string
+  default     = "allowlist.yaml"
+}
+
