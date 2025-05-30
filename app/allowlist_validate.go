@@ -54,17 +54,25 @@ func validateAllowlistEntry(name string, callers []CallerConfig) error {
 				return fmt.Errorf("caller %q rule %d has no methods", id, ri)
 			}
 			for m := range r.Methods {
-				if m == "" || strings.ToUpper(m) != m {
-					return fmt.Errorf("caller %q rule %d invalid method %s", id, ri, m)
+				if strings.TrimSpace(m) == "" {
+					return fmt.Errorf("caller %q rule %d invalid method %q", id, ri, m)
 				}
 			}
 		}
 	}
 	copyCallers := make([]CallerConfig, len(callers))
 	for i, c := range callers {
+		rules := append([]CallRule(nil), c.Rules...)
+		for ri := range rules {
+			methods := make(map[string]RequestConstraint, len(rules[ri].Methods))
+			for m, cons := range rules[ri].Methods {
+				methods[strings.ToUpper(m)] = cons
+			}
+			rules[ri].Methods = methods
+		}
 		copyCallers[i] = CallerConfig{
 			ID:           c.ID,
-			Rules:        append([]CallRule(nil), c.Rules...),
+			Rules:        rules,
 			Capabilities: append([]integrationplugins.CapabilityConfig(nil), c.Capabilities...),
 		}
 	}

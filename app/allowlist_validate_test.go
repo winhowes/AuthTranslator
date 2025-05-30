@@ -75,13 +75,13 @@ func TestValidateAllowlistEntriesMissingPath(t *testing.T) {
 	}
 }
 
-func TestValidateAllowlistEntriesInvalidMethodCase(t *testing.T) {
+func TestValidateAllowlistEntriesMethodCaseIgnored(t *testing.T) {
 	entries := []AllowlistEntry{{
 		Integration: "test",
 		Callers:     []CallerConfig{{ID: "c", Rules: []CallRule{{Path: "/x", Methods: map[string]RequestConstraint{"get": {}}}}}},
 	}}
-	if err := validateAllowlistEntries(entries); err == nil {
-		t.Fatal("expected error for invalid method case")
+	if err := validateAllowlistEntries(entries); err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
