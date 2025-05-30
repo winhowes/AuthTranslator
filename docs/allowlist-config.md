@@ -49,7 +49,7 @@ Look for a `capabilities.go` file under `app/integrations/plugins/<integration>/
 - integration: slack
   callers:
     - id: bot-123
-      capabilities: [slack.chat.write.public]
+      capabilities: [post_public_as]
 ```
 
 > **Discovering capabilities** Run the CLI helper:
@@ -116,6 +116,6 @@ A request passes if **any** rule (or capability‑expanded rule) matches.
 
 ## 3  Tips & conventions
 
-* **One capability ≈ one business use‑case** (e.g. `slack.chat.write.public`).
+* **One capability ≈ one business use‑case** (e.g. `post_public_as`).
 * Prefer **uppercase** HTTP methods (`GET`, `POST`) for consistency.
 * Log level `debug` will print which rule matched; helpful in staging.

@@ -90,7 +90,7 @@ Two ways to authorise a caller:
   callers:
     - id: demo-user
       # easiest: assign a capability
-      capabilities: [slack.chat.write.public]
+      capabilities: [post_public_as]
 
     - id: service‑42
       # granular example
