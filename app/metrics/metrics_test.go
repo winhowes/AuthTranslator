@@ -1,7 +1,6 @@
-package main
+package metrics
 
 import (
-	"flag"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -24,7 +23,7 @@ func TestMetricsHandlerEmpty(t *testing.T) {
 	resetMetrics()
 	req := httptest.NewRequest(http.MethodGet, "/_at_internal/metrics", nil)
 	rr := httptest.NewRecorder()
-	metricsHandler(rr, req)
+	Handler(rr, req, "", "")
 
 	if ct := rr.Header().Get("Content-Type"); ct != "text/plain; version=0.0.4" {
 		t.Fatalf("expected content type text/plain; version=0.0.4, got %s", ct)
@@ -36,20 +35,20 @@ func TestMetricsHandlerEmpty(t *testing.T) {
 
 func TestMetricsHandlerOutput(t *testing.T) {
 	resetMetrics()
-	incRequest("foo")
-	incRequest("foo")
-	incRateLimit("foo")
-	incAuthFailure("foo")
-	recordStatus("foo", http.StatusOK)
-	recordStatus("bar", http.StatusTeapot)
-	incRequest("bar")
-	recordDuration("foo", 100*time.Millisecond)
-	recordDuration("foo", 200*time.Millisecond)
-	recordDuration("bar", 50*time.Millisecond)
+	IncRequest("foo")
+	IncRequest("foo")
+	IncRateLimit("foo")
+	IncAuthFailure("foo")
+	RecordStatus("foo", http.StatusOK)
+	RecordStatus("bar", http.StatusTeapot)
+	IncRequest("bar")
+	RecordDuration("foo", 100*time.Millisecond)
+	RecordDuration("foo", 200*time.Millisecond)
+	RecordDuration("bar", 50*time.Millisecond)
 
 	req := httptest.NewRequest(http.MethodGet, "/_at_internal/metrics", nil)
 	rr := httptest.NewRecorder()
-	metricsHandler(rr, req)
+	Handler(rr, req, "", "")
 
 	if ct := rr.Header().Get("Content-Type"); ct != "text/plain; version=0.0.4" {
 		t.Fatalf("expected content type text/plain; version=0.0.4, got %s", ct)
@@ -88,23 +87,9 @@ func TestMetricsHandlerOutput(t *testing.T) {
 
 func TestMetricsHandlerAuth(t *testing.T) {
 	resetMetrics()
-	oldUser := *metricsUser
-	oldPass := *metricsPass
-	t.Cleanup(func() {
-		flag.Set("metrics-user", oldUser)
-		flag.Set("metrics-pass", oldPass)
-	})
-
-	if err := flag.Set("metrics-user", "admin"); err != nil {
-		t.Fatal(err)
-	}
-	if err := flag.Set("metrics-pass", "secret"); err != nil {
-		t.Fatal(err)
-	}
-
 	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
 	rr := httptest.NewRecorder()
-	metricsHandler(rr, req)
+	Handler(rr, req, "admin", "secret")
 	if rr.Code != http.StatusUnauthorized {
 		t.Fatalf("expected 401 for missing creds, got %d", rr.Code)
 	}
@@ -112,7 +97,7 @@ func TestMetricsHandlerAuth(t *testing.T) {
 	req = httptest.NewRequest(http.MethodGet, "/metrics", nil)
 	req.SetBasicAuth("admin", "wrong")
 	rr = httptest.NewRecorder()
-	metricsHandler(rr, req)
+	Handler(rr, req, "admin", "secret")
 	if rr.Code != http.StatusUnauthorized {
 		t.Fatalf("expected 401 for bad creds, got %d", rr.Code)
 	}
@@ -120,7 +105,7 @@ func TestMetricsHandlerAuth(t *testing.T) {
 	req = httptest.NewRequest(http.MethodGet, "/metrics", nil)
 	req.SetBasicAuth("admin", "secret")
 	rr = httptest.NewRecorder()
-	metricsHandler(rr, req)
+	Handler(rr, req, "admin", "secret")
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected 200 for valid creds, got %d", rr.Code)
 	}
