@@ -33,6 +33,7 @@ import (
 	_ "github.com/winhowes/AuthTranslator/app/metrics/plugins"
 	"github.com/winhowes/AuthTranslator/app/secrets"
 	_ "github.com/winhowes/AuthTranslator/app/secrets/plugins"
+	http3 "golang.org/x/net/http3"
 )
 
 // version is the application version. It can be overridden at build time using
@@ -85,6 +86,7 @@ var watch = flag.Bool("watch", false, "watch config and allowlist files for chan
 var metricsUser = flag.String("metrics-user", "", "username for metrics endpoint")
 var metricsPass = flag.String("metrics-pass", "", "password for metrics endpoint")
 var enableMetrics = flag.Bool("enable-metrics", true, "expose /metrics endpoint")
+var enableHTTP3 = flag.Bool("enable-http3", false, "serve HTTP/3 in addition to HTTP/1 and HTTP/2")
 var logger = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 
 func usage() {
@@ -1092,12 +1094,22 @@ func main() {
 	http.HandleFunc("/", proxyHandler)
 
 	srv := &http.Server{Addr: *addr}
+	var h3srv *http3.Server
 
 	go func() {
 		if err := serve(srv, *tlsCert, *tlsKey); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("listen: %v", err)
 		}
 	}()
+
+	if *enableHTTP3 && *tlsCert != "" && *tlsKey != "" {
+		h3srv = &http3.Server{Server: srv}
+		go func() {
+			if err := h3srv.ListenAndServeTLS(*tlsCert, *tlsKey); err != nil && err != http.ErrServerClosed {
+				log.Fatalf("listen http3: %v", err)
+			}
+		}()
+	}
 
 	stop := make(chan os.Signal, 1)
 	reloadSig := make(chan os.Signal, 1)
@@ -1142,6 +1154,11 @@ shutdown:
 	defer cancel()
 	if err := srv.Shutdown(ctx); err != nil {
 		logger.Error("server shutdown", "error", err)
+	}
+	if h3srv != nil {
+		if err := h3srv.Close(); err != nil {
+			logger.Error("http3 shutdown", "error", err)
+		}
 	}
 
 	for _, i := range ListIntegrations() {

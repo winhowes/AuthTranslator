@@ -54,6 +54,23 @@ func TestConfigFlagSet(t *testing.T) {
 	}
 }
 
+func TestHTTP3FlagDefault(t *testing.T) {
+	if *enableHTTP3 {
+		t.Fatalf("expected default false, got %v", *enableHTTP3)
+	}
+}
+
+func TestHTTP3FlagSet(t *testing.T) {
+	old := *enableHTTP3
+	t.Cleanup(func() { flag.Set("enable-http3", strconv.FormatBool(old)) })
+	if err := flag.Set("enable-http3", "true"); err != nil {
+		t.Fatal(err)
+	}
+	if !*enableHTTP3 {
+		t.Fatal("expected enable-http3 true")
+	}
+}
+
 type stubServer struct{ tls bool }
 
 func (s *stubServer) ListenAndServe() error                    { return nil }
