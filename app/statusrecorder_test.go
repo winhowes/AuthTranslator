@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bufio"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -50,5 +52,67 @@ func TestStatusRecorderWritePreservesStatus(t *testing.T) {
 	}
 	if rr.Code != http.StatusAccepted {
 		t.Fatalf("response writer code %d", rr.Code)
+	}
+}
+
+// dummyWriter implements http.ResponseWriter without Flush or Hijack
+// to test behavior when the underlying writer does not support them.
+type dummyWriter struct{}
+
+func (dummyWriter) Header() http.Header         { return make(http.Header) }
+func (dummyWriter) Write(b []byte) (int, error) { return len(b), nil }
+func (dummyWriter) WriteHeader(int)             {}
+
+// hijackableRecorder records whether Hijack was called.
+type hijackableRecorder struct {
+	*httptest.ResponseRecorder
+	called bool
+}
+
+func (h *hijackableRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	h.called = true
+	return nil, nil, nil
+}
+
+func TestStatusRecorderFlushForwarded(t *testing.T) {
+	rr := httptest.NewRecorder()
+	rec := &statusRecorder{ResponseWriter: rr}
+
+	rec.Flush()
+
+	if !rr.Flushed {
+		t.Fatal("expected underlying writer to be flushed")
+	}
+}
+
+func TestStatusRecorderFlushUnsupported(t *testing.T) {
+	rec := &statusRecorder{ResponseWriter: dummyWriter{}}
+
+	// should not panic even though writer does not implement http.Flusher
+	rec.Flush()
+}
+
+func TestStatusRecorderHijackForwarded(t *testing.T) {
+	rr := &hijackableRecorder{ResponseRecorder: httptest.NewRecorder()}
+	rec := &statusRecorder{ResponseWriter: rr}
+
+	conn, buf, err := rec.Hijack()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if conn != nil || buf != nil {
+		t.Fatalf("expected nil return values, got %v %v", conn, buf)
+	}
+	if !rr.called {
+		t.Fatal("underlying hijacker not called")
+	}
+}
+
+func TestStatusRecorderHijackUnsupported(t *testing.T) {
+	rec := &statusRecorder{ResponseWriter: dummyWriter{}}
+
+	_, _, err := rec.Hijack()
+	if err == nil {
+		t.Fatal("expected error for unsupported hijacker")
 	}
 }
