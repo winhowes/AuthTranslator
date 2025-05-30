@@ -379,6 +379,103 @@ func TestAllowRedisLeakyBucketReject(t *testing.T) {
 	<-done
 }
 
+func TestRetryAfterRedisUnsupportedScheme(t *testing.T) {
+	old := *redisAddr
+	*redisAddr = "foo://localhost"
+	rl := NewRateLimiter(1, time.Second, "")
+	t.Cleanup(func() {
+		*redisAddr = old
+		rl.Stop()
+	})
+	if _, err := rl.retryAfterRedis("k"); err == nil {
+		t.Fatal("expected error for unsupported scheme")
+	}
+}
+
+func TestRetryAfterRedisTLSCAError(t *testing.T) {
+	oldAddr, oldCA := *redisAddr, *redisCA
+	*redisAddr = "rediss://localhost:1"
+	*redisCA = "does_not_exist.pem"
+	rl := NewRateLimiter(1, time.Second, "")
+	t.Cleanup(func() {
+		*redisAddr = oldAddr
+		*redisCA = oldCA
+		rl.Stop()
+	})
+	if _, err := rl.retryAfterRedis("k"); err == nil {
+		t.Fatal("expected error reading CA file")
+	}
+}
+
+func TestRetryAfterRedisErrorResponse(t *testing.T) {
+	old := *redisAddr
+	*redisAddr = "dummy"
+	rl := NewRateLimiter(1, time.Second, "")
+	t.Cleanup(func() {
+		*redisAddr = old
+		rl.Stop()
+	})
+	srv, cli := net.Pipe()
+	rl.conns <- cli
+	done := make(chan struct{})
+	go func() {
+		defer func() { srv.Close(); close(done) }()
+		br := bufio.NewReader(srv)
+		if cmd, args := parseRedisCommand(t, br); cmd != "PTTL" || args[0] != "k" {
+			t.Errorf("unexpected command %s %v", cmd, args)
+			return
+		}
+		srv.Write([]byte("-ERR fail\r\n"))
+	}()
+	if _, err := rl.retryAfterRedis("k"); err == nil {
+		t.Fatal("expected error response")
+	}
+	<-done
+	select {
+	case <-rl.conns:
+		t.Fatal("connection was returned on error")
+	default:
+	}
+}
+
+func TestRetryAfterRedisTTL(t *testing.T) {
+	old := *redisAddr
+	*redisAddr = "dummy"
+	rl := NewRateLimiter(1, time.Second, "")
+	t.Cleanup(func() {
+		*redisAddr = old
+		rl.Stop()
+	})
+	srv, cli := net.Pipe()
+	rl.conns <- cli
+	done := make(chan struct{})
+	go func() {
+		defer func() { srv.Close(); close(done) }()
+		br := bufio.NewReader(srv)
+		if cmd, args := parseRedisCommand(t, br); cmd != "PTTL" || args[0] != "k" {
+			t.Errorf("unexpected command %s %v", cmd, args)
+			return
+		}
+		srv.Write([]byte(":1500\r\n"))
+	}()
+	d, err := rl.retryAfterRedis("k")
+	if err != nil {
+		t.Fatalf("retryAfterRedis returned error: %v", err)
+	}
+	if d != 1500*time.Millisecond {
+		t.Fatalf("expected 1500ms, got %v", d)
+	}
+	<-done
+	select {
+	case c := <-rl.conns:
+		if c != cli {
+			t.Fatal("unexpected connection returned")
+		}
+	default:
+		t.Fatal("connection was not returned to pool")
+	}
+}
+
 // Helper process used for testing main().
 func TestMainHelper(t *testing.T) {
 	if os.Getenv("GO_WANT_MAIN_HELPER") != "1" {
