@@ -11,6 +11,9 @@ This chart deploys [AuthTranslator](https://github.com/winhowes/AuthTranslator) 
 | `image.pullPolicy` | Image pull policy | `IfNotPresent` |
 | `redisAddress` | Address passed to `-redis-addr` – either `host:port` or a `redis://`/`rediss://` URL | `""` |
 | `redisCA` | CA file for verifying Redis TLS passed to `-redis-ca` | `""` |
+| `resources` | Pod resource requests/limits | see `values.yaml` |
+| `imagePullSecrets` | List of image pull secrets | `[]` |
+| `serviceAccountName` | Pod service account | `""` |
 | `config` | Contents of `config.yaml` stored in a ConfigMap | sample configuration |
 | `allowlist` | Contents of `allowlist.yaml` stored in a ConfigMap | sample allowlist |
 

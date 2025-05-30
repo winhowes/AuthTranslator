@@ -15,6 +15,15 @@ spec:
       labels:
         {{- include "authtranslator.labels" . | nindent 8 }}
     spec:
+      {{- if .Values.serviceAccountName }}
+      serviceAccountName: {{ .Values.serviceAccountName }}
+      {{- end }}
+      {{- if .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- range .Values.imagePullSecrets }}
+        - name: {{ . }}
+        {{- end }}
+      {{- end }}
       containers:
         - name: authtranslator
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -39,6 +48,16 @@ spec:
           ports:
             - containerPort: 8080
               name: http
+          livenessProbe:
+            httpGet:
+              path: /_at_internal/healthz
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /_at_internal/healthz
+              port: http
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
       volumes:
         - name: config
           configMap:
