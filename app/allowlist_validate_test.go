@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/json"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -139,5 +141,53 @@ func TestValidateAllowlistEntriesDuplicateWildcardCaller(t *testing.T) {
 	}}
 	if err := validateAllowlistEntries(entries); err == nil {
 		t.Fatal("expected error for duplicate caller id")
+	}
+}
+
+func TestValidateAllowlistEntriesDoesNotModifyInput(t *testing.T) {
+	// snapshot existing registry and restore after test
+	orig := make(map[string]map[string]integrationplugins.CapabilitySpec)
+	for integ, caps := range integrationplugins.AllCapabilities() {
+		m := make(map[string]integrationplugins.CapabilitySpec, len(caps))
+		for name, spec := range caps {
+			m[name] = spec
+		}
+		orig[integ] = m
+	}
+	t.Cleanup(func() {
+		reg := integrationplugins.AllCapabilities()
+		for k := range reg {
+			delete(reg, k)
+		}
+		for k, v := range orig {
+			reg[k] = v
+		}
+	})
+
+	integrationplugins.RegisterCapability("copytest", "cap", integrationplugins.CapabilitySpec{
+		Generate: func(map[string]interface{}) ([]integrationplugins.CallRule, error) {
+			return []integrationplugins.CallRule{{Path: "/x", Methods: map[string]integrationplugins.RequestConstraint{"GET": {}}}}, nil
+		},
+	})
+	original := []AllowlistEntry{{
+		Integration: "copytest",
+		Callers:     []CallerConfig{{ID: "c", Capabilities: []integrationplugins.CapabilityConfig{{Name: "cap"}}}},
+	}}
+
+	// Make a deep copy to detect modifications
+	b, err := json.Marshal(original)
+	if err != nil {
+		t.Fatalf("json marshal: %v", err)
+	}
+	var entries []AllowlistEntry
+	if err := json.Unmarshal(b, &entries); err != nil {
+		t.Fatalf("json unmarshal: %v", err)
+	}
+
+	if err := validateAllowlistEntries(entries); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !reflect.DeepEqual(entries, original) {
+		t.Fatalf("input modified: %#v", entries)
 	}
 }
