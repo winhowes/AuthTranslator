@@ -55,7 +55,7 @@ graph LR
 ```
 
 1. **Auth plug‑in** validates + strips caller credential → forwards request allowing your services to use short lived credentials when sending requests to or receiving requests from 3rd parties.
-2. Allow‑list enforces either capability‑based rules or precise filters on path, method, query params, headers, and JSON‑body or form‑data keys.
+2. The allowlist enforces either capability‑based rules or precise filters on path, method, query params, headers, and JSON‑body or form‑data keys.
 
 ---
 
@@ -97,7 +97,7 @@ go run ./cmd/integrations slack \
   -token env:SLACK_TOKEN -signing-secret env:SLACK_SIGNING
 ```
 
-Also see [`cmd/allowlist`](cmd/allowlist) for CRUD operations on the allow‑list.
+Also see [`cmd/allowlist`](cmd/allowlist) for CRUD operations on the allowlist.
 
 ---
 

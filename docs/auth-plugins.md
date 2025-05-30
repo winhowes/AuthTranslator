@@ -2,11 +2,11 @@
 
 AuthTranslator’s behaviour is extended by **plugins** – small Go packages that validate the *incoming* caller credential or inject the *outgoing* credential expected by an upstream service.
 
-* **Incoming plugins** run **before** any allow‑list checks. They must either
+* **Incoming plugins** run **before** any allowlist checks. They must either
 
   1. **Accept**: return a `callerID` string; the request continues, or
   2. **Reject**: return an error → the proxy replies **401/403**.
-* **Outgoing plugins** run **after** the allow‑list passes. They mutate the request (headers, query or body) so the upstream authenticates it.
+* **Outgoing plugins** run **after** the allowlist passes. They mutate the request (headers, query or body) so the upstream authenticates it.
 
 > **Tip** Any plugin can be swapped at runtime – just edit `config.yaml` and send `SIGHUP` (or run with `-watch`).
 
@@ -104,7 +104,7 @@ A minimal example lives in [`app/auth/plugins/example`](../app/auth/plugins/exam
 
 ### Caller identifiers
 
-Incoming plugins that want to feed the **allow‑list** and **rate‑limiter** should satisfy the `auth.Identifier` interface:
+Incoming plugins that want to feed the **allowlist** and **rate‑limiter** should satisfy the `auth.Identifier` interface:
 
 ```go
 type Identifier interface {
