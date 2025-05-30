@@ -545,6 +545,76 @@ func TestRetryAfterRedisTTL(t *testing.T) {
 	}
 }
 
+func TestRetryAfterRedisNoTTL(t *testing.T) {
+	old := *redisAddr
+	*redisAddr = "dummy"
+	rl := NewRateLimiter(1, time.Second, "")
+	t.Cleanup(func() {
+		*redisAddr = old
+		rl.Stop()
+	})
+
+	srv, cli := net.Pipe()
+	rl.conns <- cli
+	done := make(chan struct{})
+	go func() {
+		defer func() { srv.Close(); close(done) }()
+		br := bufio.NewReader(srv)
+		if cmd, args := parseRedisCommand(t, br); cmd != "PTTL" || args[0] != "k" {
+			t.Errorf("unexpected command %s %v", cmd, args)
+			return
+		}
+		srv.Write([]byte(":-1\r\n"))
+	}()
+
+	d, err := rl.retryAfterRedis("k")
+	if err != nil {
+		t.Fatalf("retryAfterRedis returned error: %v", err)
+	}
+	if d != 0 {
+		t.Fatalf("expected 0 duration, got %v", d)
+	}
+	<-done
+	select {
+	case c := <-rl.conns:
+		if c != cli {
+			t.Fatal("unexpected connection returned")
+		}
+	default:
+		t.Fatal("connection was not returned to pool")
+	}
+}
+
+func TestRetryAfterRedisDialError(t *testing.T) {
+	oldAddr, oldTimeout := *redisAddr, *redisTimeout
+	*redisAddr = "127.0.0.1:1"
+	*redisTimeout = 10 * time.Millisecond
+	rl := NewRateLimiter(1, time.Second, "")
+	t.Cleanup(func() {
+		*redisAddr = oldAddr
+		*redisTimeout = oldTimeout
+		rl.Stop()
+	})
+	if _, err := rl.retryAfterRedis("k"); err == nil {
+		t.Fatal("expected dial error")
+	}
+}
+
+func TestAllowRedisDialError(t *testing.T) {
+	oldAddr, oldTimeout := *redisAddr, *redisTimeout
+	*redisAddr = "127.0.0.1:1"
+	*redisTimeout = 10 * time.Millisecond
+	rl := NewRateLimiter(1, time.Second, "")
+	t.Cleanup(func() {
+		*redisAddr = oldAddr
+		*redisTimeout = oldTimeout
+		rl.Stop()
+	})
+	if _, err := rl.allowRedis("k"); err == nil {
+		t.Fatal("expected dial error")
+	}
+}
+
 // Helper process used for testing main().
 func TestMainHelper(t *testing.T) {
 	if os.Getenv("GO_WANT_MAIN_HELPER") != "1" {
