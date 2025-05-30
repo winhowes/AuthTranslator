@@ -602,6 +602,8 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 
 	logger.Info("incoming request", "method", r.Method, "integration", integ.Name, "path", r.URL.Path, "caller_id", callerID)
 
+	r = r.WithContext(metrics.WithCaller(r.Context(), callerID))
+
 	if !integ.inLimiter.Allow(rateKey) {
 		logger.Warn("caller exceeded rate limit", "caller", rateKey, "host", host)
 		incRateLimit(integ.Name)
