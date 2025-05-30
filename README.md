@@ -76,6 +76,7 @@ Secrets can be pulled from several providers:
 
 * **env:** `SLACK_TOKEN=…`
 * **file:** path to an on‑disk file
+* **k8s:** Kubernetes secrets
 * **gcp:** Google Cloud KMS
 * **aws:** AWS Secrets Manager
 * **azure:** Azure Key Vault
