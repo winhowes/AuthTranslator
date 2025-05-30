@@ -39,3 +39,12 @@ func TestRegisterAndGet(t *testing.T) {
 	}
 	delete(registry, "dummy")
 }
+
+func TestGetCaseInsensitive(t *testing.T) {
+	dummy := func(args []string) (Integration, error) { return Integration{Name: "ci"}, nil }
+	Register("Ci", dummy)
+	t.Cleanup(func() { delete(registry, "ci") })
+	if Get("cI") == nil {
+		t.Fatal("case-insensitive Get failed")
+	}
+}
