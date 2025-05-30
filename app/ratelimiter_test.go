@@ -154,3 +154,51 @@ func TestLeakyBucketSmoothing(t *testing.T) {
 		t.Fatal("call should be allowed after leak")
 	}
 }
+
+func TestTokenBucketMaxTokens(t *testing.T) {
+	rl := NewRateLimiter(2, 50*time.Millisecond, "token_bucket")
+	t.Cleanup(rl.Stop)
+	key := "caller"
+
+	if !rl.Allow(key) {
+		t.Fatal("initial call should be allowed")
+	}
+
+	time.Sleep(200 * time.Millisecond)
+
+	if !rl.Allow(key) {
+		t.Fatal("first call after refill should be allowed")
+	}
+	if !rl.Allow(key) {
+		t.Fatal("second call after refill should be allowed")
+	}
+	if rl.Allow(key) {
+		t.Fatal("third call should exceed the limit")
+	}
+}
+
+func TestLeakyBucketPartialLeak(t *testing.T) {
+	rl := NewRateLimiter(2, 100*time.Millisecond, "leaky_bucket")
+	t.Cleanup(rl.Stop)
+	key := "caller"
+
+	if !rl.Allow(key) {
+		t.Fatal("first call should be allowed")
+	}
+	if !rl.Allow(key) {
+		t.Fatal("second call should be allowed")
+	}
+
+	time.Sleep(25 * time.Millisecond)
+	if rl.Allow(key) {
+		t.Fatal("call before sufficient leak should be rate limited")
+	}
+
+	time.Sleep(50 * time.Millisecond)
+	if !rl.Allow(key) {
+		t.Fatal("call should succeed after enough leak")
+	}
+	if rl.Allow(key) {
+		t.Fatal("next immediate call should be rate limited")
+	}
+}

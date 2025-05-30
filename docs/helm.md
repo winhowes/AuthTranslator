@@ -132,5 +132,4 @@ Example Terraform configurations live in the [`terraform/`](../terraform/) direc
 
 Set the variables for your environment and run `terraform apply` inside the
 chosen folder to create the service. The modules accept optional
-`redis_address`, `redis_timeout` and `redis_ca` variables which map to the
-container flags.
+`redis_address` and `redis_ca` variables which map to the container flags.

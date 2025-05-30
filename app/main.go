@@ -9,8 +9,10 @@ import (
 	"flag"
 	"fmt"
 	yaml "gopkg.in/yaml.v3"
+	"io"
 	"log"
 	"log/slog"
+	"math"
 	"net"
 	"net/http"
 	"net/url"
@@ -232,6 +234,7 @@ type RateLimiter struct {
 	leaky       map[string]*leakyBucket
 	resetTicker *time.Ticker
 	done        chan struct{}
+	resetTime   time.Time
 	useRedis    bool
 	conns       chan net.Conn
 }
@@ -257,11 +260,12 @@ func NewRateLimiter(limit int, duration time.Duration, strategy string) *RateLim
 		strategy = "fixed_window"
 	}
 	rl := &RateLimiter{
-		limit:    limit,
-		window:   duration,
-		strategy: strategy,
-		done:     make(chan struct{}),
-		useRedis: *redisAddr != "" && strategy == "fixed_window",
+		limit:     limit,
+		window:    duration,
+		strategy:  strategy,
+		done:      make(chan struct{}),
+		resetTime: time.Now(),
+		useRedis:  *redisAddr != "",
 	}
 	if strategy == "fixed_window" {
 		rl.requests = make(map[string]int)
@@ -284,6 +288,7 @@ func NewRateLimiter(limit int, duration time.Duration, strategy string) *RateLim
 				case <-rl.resetTicker.C:
 					rl.mu.Lock()
 					rl.requests = make(map[string]int)
+					rl.resetTime = time.Now()
 					rl.mu.Unlock()
 				case <-rl.done:
 					return
@@ -336,31 +341,25 @@ func (rl *RateLimiter) Allow(key string) bool {
 	if rl.limit <= 0 {
 		return true
 	}
-	if rl.strategy == "fixed_window" {
-		if rl.useRedis {
-			ok, err := rl.allowRedis(key)
-			if err != nil {
-				logger.Error("redis limiter failed, falling back to memory", "error", err)
-			} else {
-				return ok
-			}
+	if rl.useRedis {
+		ok, err := rl.allowRedis(key)
+		if err == nil {
+			return ok
 		}
+		logger.Error("redis limiter failed, falling back to memory", "error", err)
+	}
 
-		rl.mu.Lock()
-		defer rl.mu.Unlock()
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
 
+	switch rl.strategy {
+	case "fixed_window":
 		if rl.requests[key] >= rl.limit {
 			return false
 		}
-
 		rl.requests[key]++
 		return true
-	}
-
-	// token_bucket or leaky_bucket strategy
-	rl.mu.Lock()
-	defer rl.mu.Unlock()
-	if rl.strategy == "token_bucket" {
+	case "token_bucket":
 		b := rl.buckets[key]
 		now := time.Now()
 		if b == nil {
@@ -380,28 +379,87 @@ func (rl *RateLimiter) Allow(key string) bool {
 		}
 		b.tokens--
 		return true
-	}
-
-	// leaky_bucket strategy
-	l := rl.leaky[key]
-	now := time.Now()
-	if l == nil {
-		rl.leaky[key] = &leakyBucket{level: 1, last: now}
+	case "leaky_bucket":
+		l := rl.leaky[key]
+		now := time.Now()
+		if l == nil {
+			rl.leaky[key] = &leakyBucket{level: 1, last: now}
+			return true
+		}
+		leaked := now.Sub(l.last).Seconds() * float64(rl.limit) / rl.window.Seconds()
+		level := l.level - leaked
+		if level < 0 {
+			level = 0
+		}
+		if level+1 > float64(rl.limit) {
+			l.level = level
+			l.last = now
+			return false
+		}
+		l.level = level + 1
+		l.last = now
+		return true
+	default:
 		return true
 	}
-	leaked := now.Sub(l.last).Seconds() * float64(rl.limit) / rl.window.Seconds()
-	level := l.level - leaked
-	if level < 0 {
-		level = 0
+}
+
+func (rl *RateLimiter) RetryAfter(key string) time.Duration {
+	if rl.limit <= 0 {
+		return 0
 	}
-	if level+1 > float64(rl.limit) {
-		l.level = level
-		l.last = now
-		return false
+	if rl.useRedis {
+		if d, err := rl.retryAfterRedis(key); err == nil {
+			return d
+		}
 	}
-	l.level = level + 1
-	l.last = now
-	return true
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+	now := time.Now()
+	switch rl.strategy {
+	case "fixed_window":
+		d := rl.window - time.Since(rl.resetTime)
+		if d < 0 {
+			return 0
+		}
+		return d
+	case "token_bucket":
+		b := rl.buckets[key]
+		if b == nil {
+			return 0
+		}
+		rate := float64(rl.limit) / rl.window.Seconds()
+		need := 1 - b.tokens
+		if need <= 0 {
+			return 0
+		}
+		secs := need / rate
+		if secs < 0 {
+			return 0
+		}
+		return time.Duration(secs * float64(time.Second))
+	case "leaky_bucket":
+		l := rl.leaky[key]
+		if l == nil {
+			return 0
+		}
+		rate := float64(rl.limit) / rl.window.Seconds()
+		level := l.level - now.Sub(l.last).Seconds()*rate
+		if level < 0 {
+			level = 0
+		}
+		over := level + 1 - float64(rl.limit)
+		if over <= 0 {
+			return 0
+		}
+		secs := over / rate
+		if secs < 0 {
+			return 0
+		}
+		return time.Duration(secs * float64(time.Second))
+	default:
+		return rl.window
+	}
 }
 
 func (rl *RateLimiter) allowRedis(key string) (bool, error) {
@@ -474,17 +532,32 @@ func (rl *RateLimiter) allowRedis(key string) (bool, error) {
 		}
 	}
 	bad := false
-
-	n, err := redisCmdInt(conn, "INCR", key)
-	if err != nil {
-		bad = true
-	}
-	if n == 1 {
-		cmd, ttl := redisTTLArgs(rl.window)
-		_, err = redisCmdInt(conn, cmd, key, ttl)
+	var allowed bool
+	switch rl.strategy {
+	case "token_bucket":
+		allowed, err = rl.allowRedisTokenBucket(conn, key)
 		if err != nil {
 			bad = true
 		}
+	case "leaky_bucket":
+		allowed, err = rl.allowRedisLeakyBucket(conn, key)
+		if err != nil {
+			bad = true
+		}
+	default:
+		var n int
+		n, err = redisCmdInt(conn, "INCR", key)
+		if err != nil {
+			bad = true
+		}
+		if n == 1 {
+			cmd, ttl := redisTTLArgs(rl.window)
+			_, err = redisCmdInt(conn, cmd, key, ttl)
+			if err != nil {
+				bad = true
+			}
+		}
+		allowed = n <= rl.limit
 	}
 	if rl.conns != nil {
 		if bad {
@@ -502,7 +575,196 @@ func (rl *RateLimiter) allowRedis(key string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return n <= rl.limit, nil
+	return allowed, nil
+}
+
+func (rl *RateLimiter) allowRedisTokenBucket(conn net.Conn, key string) (bool, error) {
+	now := time.Now()
+	val, err := redisCmdString(conn, "GET", key)
+	if err != nil {
+		return false, err
+	}
+	var tokens float64
+	var last int64
+	if val != "" {
+		parts := strings.Fields(val)
+		if len(parts) == 2 {
+			tokens, _ = strconv.ParseFloat(parts[0], 64)
+			last, _ = strconv.ParseInt(parts[1], 10, 64)
+		}
+	} else {
+		tokens = float64(rl.limit)
+		last = now.UnixNano()
+	}
+	lastTime := time.Unix(0, last)
+	refill := now.Sub(lastTime).Seconds() * float64(rl.limit) / rl.window.Seconds()
+	if refill > 0 {
+		tokens += refill
+		if tokens > float64(rl.limit) {
+			tokens = float64(rl.limit)
+		}
+		lastTime = now
+	}
+	if tokens < 1 {
+		val = fmt.Sprintf("%f %d", tokens, lastTime.UnixNano())
+		if err := redisCmd(conn, "SET", key, val); err != nil {
+			return false, err
+		}
+		cmd, ttl := redisTTLArgs(rl.window)
+		_, err := redisCmdInt(conn, cmd, key, ttl)
+		return false, err
+	}
+	tokens--
+	val = fmt.Sprintf("%f %d", tokens, now.UnixNano())
+	if err := redisCmd(conn, "SET", key, val); err != nil {
+		return false, err
+	}
+	cmd, ttl := redisTTLArgs(rl.window)
+	_, err = redisCmdInt(conn, cmd, key, ttl)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func (rl *RateLimiter) allowRedisLeakyBucket(conn net.Conn, key string) (bool, error) {
+	now := time.Now()
+	val, err := redisCmdString(conn, "GET", key)
+	if err != nil {
+		return false, err
+	}
+	var level float64
+	var last int64
+	if val != "" {
+		parts := strings.Fields(val)
+		if len(parts) == 2 {
+			level, _ = strconv.ParseFloat(parts[0], 64)
+			last, _ = strconv.ParseInt(parts[1], 10, 64)
+		}
+	} else {
+		level = 0
+		last = now.UnixNano()
+	}
+	lastTime := time.Unix(0, last)
+	leaked := now.Sub(lastTime).Seconds() * float64(rl.limit) / rl.window.Seconds()
+	level -= leaked
+	if level < 0 {
+		level = 0
+	}
+	if level+1 > float64(rl.limit) {
+		val = fmt.Sprintf("%f %d", level, now.UnixNano())
+		if err := redisCmd(conn, "SET", key, val); err != nil {
+			return false, err
+		}
+		cmd, ttl := redisTTLArgs(rl.window)
+		_, err := redisCmdInt(conn, cmd, key, ttl)
+		return false, err
+	}
+	level++
+	val = fmt.Sprintf("%f %d", level, now.UnixNano())
+	if err := redisCmd(conn, "SET", key, val); err != nil {
+		return false, err
+	}
+	cmd, ttl := redisTTLArgs(rl.window)
+	_, err = redisCmdInt(conn, cmd, key, ttl)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func (rl *RateLimiter) retryAfterRedis(key string) (time.Duration, error) {
+	var conn net.Conn
+	if rl.conns != nil {
+		select {
+		case conn = <-rl.conns:
+		default:
+		}
+	}
+	var err error
+	var username, password string
+	if conn == nil {
+		addr := *redisAddr
+		useTLS := false
+		if strings.Contains(addr, "://") {
+			u, err := url.Parse(addr)
+			if err != nil {
+				return 0, err
+			}
+			if u.Host != "" {
+				addr = u.Host
+			}
+			switch u.Scheme {
+			case "rediss":
+				useTLS = true
+			case "", "redis":
+			default:
+				return 0, fmt.Errorf("unsupported redis scheme %q", u.Scheme)
+			}
+			if u.User != nil {
+				username = u.User.Username()
+				password, _ = u.User.Password()
+			}
+		}
+		d := net.Dialer{Timeout: *redisTimeout}
+		if useTLS {
+			tlsConf := &tls.Config{}
+			if *redisCA != "" {
+				caData, err := os.ReadFile(*redisCA)
+				if err != nil {
+					return 0, err
+				}
+				pool := x509.NewCertPool()
+				if !pool.AppendCertsFromPEM(caData) {
+					return 0, fmt.Errorf("failed to load CA file")
+				}
+				tlsConf.RootCAs = pool
+			} else {
+				tlsConf.InsecureSkipVerify = true
+			}
+			conn, err = tls.DialWithDialer(&d, "tcp", addr, tlsConf)
+		} else {
+			conn, err = d.Dial("tcp", addr)
+		}
+		if err != nil {
+			return 0, err
+		}
+		if username != "" || password != "" {
+			args := []string{"AUTH"}
+			if username != "" {
+				args = append(args, username, password)
+			} else {
+				args = append(args, password)
+			}
+			if err := redisCmd(conn, args...); err != nil {
+				conn.Close()
+				return 0, err
+			}
+		}
+	}
+
+	ttlMS, err := redisCmdInt(conn, "PTTL", key)
+	bad := err != nil
+	if rl.conns != nil {
+		if bad {
+			conn.Close()
+		} else {
+			select {
+			case rl.conns <- conn:
+			default:
+				conn.Close()
+			}
+		}
+	} else {
+		conn.Close()
+	}
+	if err != nil {
+		return 0, err
+	}
+	if ttlMS < 0 {
+		return 0, nil
+	}
+	return time.Duration(ttlMS) * time.Millisecond, nil
 }
 
 func redisCmdInt(conn net.Conn, args ...string) (int, error) {
@@ -530,6 +792,47 @@ func redisCmdInt(conn net.Conn, args ...string) (int, error) {
 		return 0, fmt.Errorf("redis error: %s", strings.TrimSpace(line))
 	default:
 		return 0, fmt.Errorf("unexpected reply: %q", prefix)
+	}
+}
+
+func redisCmdString(conn net.Conn, args ...string) (string, error) {
+	var buf bytes.Buffer
+	fmt.Fprintf(&buf, "*%d\r\n", len(args))
+	for _, a := range args {
+		fmt.Fprintf(&buf, "$%d\r\n%s\r\n", len(a), a)
+	}
+	if _, err := conn.Write(buf.Bytes()); err != nil {
+		return "", err
+	}
+	br := bufio.NewReader(conn)
+	prefix, err := br.ReadByte()
+	if err != nil {
+		return "", err
+	}
+	line, err := br.ReadString('\n')
+	if err != nil {
+		return "", err
+	}
+	switch prefix {
+	case '+', ':':
+		return strings.TrimSpace(line), nil
+	case '$':
+		n, err := strconv.Atoi(strings.TrimSpace(line))
+		if err != nil {
+			return "", err
+		}
+		if n == -1 {
+			return "", nil
+		}
+		buf := make([]byte, n+2)
+		if _, err := io.ReadFull(br, buf); err != nil {
+			return "", err
+		}
+		return string(buf[:n]), nil
+	case '-':
+		return "", fmt.Errorf("redis error: %s", strings.TrimSpace(line))
+	default:
+		return "", fmt.Errorf("unexpected reply: %q", prefix)
 	}
 }
 
@@ -679,12 +982,26 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 	if !integ.inLimiter.Allow(rateKey) {
 		logger.Warn("caller exceeded rate limit", "caller", rateKey, "host", host)
 		metrics.IncRateLimit(integ.Name)
+		if d := integ.inLimiter.RetryAfter(rateKey); d > 0 {
+			secs := int(math.Ceil(d.Seconds()))
+			if secs < 1 {
+				secs = 1
+			}
+			w.Header().Set("Retry-After", strconv.Itoa(secs))
+		}
 		http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
 		return
 	}
 	if !integ.outLimiter.Allow(host) {
 		logger.Warn("host exceeded rate limit", "host", host)
 		metrics.IncRateLimit(integ.Name)
+		if d := integ.outLimiter.RetryAfter(host); d > 0 {
+			secs := int(math.Ceil(d.Seconds()))
+			if secs < 1 {
+				secs = 1
+			}
+			w.Header().Set("Retry-After", strconv.Itoa(secs))
+		}
 		http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
 		return
 	}
