@@ -26,13 +26,8 @@ jobs:
         run: go mod download
       - name: Vet code
         run: go vet ./...
-      - name: Lint (optional)
-        run: |
-          if command -v golangci-lint >/dev/null 2>&1; then
-            golangci-lint run
-          else
-            echo "golangci-lint not installed, skipping"
-          fi
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v8
       - name: Check formatting
         run: test -z "$(gofmt -l .)"
       - name: Run tests with coverage
