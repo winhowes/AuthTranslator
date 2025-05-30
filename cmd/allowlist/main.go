@@ -88,16 +88,19 @@ func addEntry(args []string) {
 		}
 	}
 	// find integration
+	wantName := strings.ToLower(*integ)
 	var entry *plugins.AllowlistEntry
 	for i := range entries {
-		if entries[i].Integration == *integ {
+		if strings.ToLower(entries[i].Integration) == wantName {
 			entry = &entries[i]
 			break
 		}
 	}
 	if entry == nil {
-		entries = append(entries, plugins.AllowlistEntry{Integration: *integ})
+		entries = append(entries, plugins.AllowlistEntry{Integration: wantName})
 		entry = &entries[len(entries)-1]
+	} else {
+		entry.Integration = wantName
 	}
 	// find caller
 	var callerCfg *plugins.CallerConfig
@@ -149,10 +152,12 @@ func removeEntry(args []string) {
 		return
 	}
 
+	wantName := strings.ToLower(*integ)
 	for ei := range entries {
-		if entries[ei].Integration != *integ {
+		if strings.ToLower(entries[ei].Integration) != wantName {
 			continue
 		}
+		entries[ei].Integration = wantName
 		for ci := range entries[ei].Callers {
 			if entries[ei].Callers[ci].ID != *caller {
 				continue
