@@ -33,6 +33,9 @@ Think of it as a *cookie‑cutter* that stamps out a ready‑to‑run block in y
 | `workday` | `https://<domain>/api` (configurable) | `token` |
 | `zendesk` | `https://api.zendesk.com` | `token` |
 *(Full list lives under **[`cmd/integrations/plugins/`](../cmd/integrations/plugins/)**)*
+
+See [**Built-in Capabilities**](capabilities.md) for the convenience permissions
+each integration exposes.
 ## Creating an integration via the CLI
 
 ```bash
