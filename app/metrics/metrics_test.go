@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -108,5 +109,15 @@ func TestMetricsHandlerAuth(t *testing.T) {
 	Handler(rr, req, "admin", "secret")
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected 200 for valid creds, got %d", rr.Code)
+	}
+}
+
+func TestCallerContext(t *testing.T) {
+	ctx := WithCaller(context.Background(), "user1")
+	if got := Caller(ctx); got != "user1" {
+		t.Fatalf("expected caller user1, got %q", got)
+	}
+	if Caller(context.Background()) != "" {
+		t.Fatal("expected empty caller for background context")
 	}
 }

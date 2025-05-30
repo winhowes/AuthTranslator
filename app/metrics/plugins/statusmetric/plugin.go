@@ -1,4 +1,4 @@
-package plugins
+package statusmetric
 
 import (
 	"net/http"
