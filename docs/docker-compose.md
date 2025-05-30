@@ -8,6 +8,8 @@ This guide shows how to spin up **AuthTranslator** together with a Redis instanc
 
 ## 1  Example `docker‑compose.yml`
 
+A ready-made Compose file lives at [`../examples/docker-compose.yml`](../examples/docker-compose.yml).
+
 ```yaml
 version: "3.9"
 services:
