@@ -64,6 +64,13 @@ func TestGetBodyTooLarge(t *testing.T) {
 	if _, err := GetBody(r); err == nil {
 		t.Fatal("expected error for large body")
 	}
+	b, err := io.ReadAll(r.Body)
+	if err != nil {
+		t.Fatalf("error reading body after failure: %v", err)
+	}
+	if len(b) != len(large) {
+		t.Fatalf("expected body length %d, got %d", len(large), len(b))
+	}
 }
 
 func TestGetBodyCustomLimit(t *testing.T) {
