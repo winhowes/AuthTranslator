@@ -27,6 +27,7 @@ resource "google_cloud_run_service" "this" {
             container_port = 8080
           }]
           args = concat(
+            ["-config", var.config_path, "-allowlist", var.allowlist_path],
             var.redis_address != "" ? ["-redis-addr", var.redis_address] : [],
             var.redis_ca != "" ? ["-redis-ca", var.redis_ca] : []
           )

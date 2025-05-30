@@ -31,8 +31,11 @@ resource "azurerm_container_group" "this" {
     memory = "1.0"
 
     command = concat([
-      "./authtranslator"
-      ], var.redis_address != "" ? ["-redis-addr", var.redis_address] : [],
+      "./authtranslator",
+      "-config", var.config_path,
+      "-allowlist", var.allowlist_path
+      ],
+      var.redis_address != "" ? ["-redis-addr", var.redis_address] : [],
       var.redis_ca != "" ? ["-redis-ca", var.redis_ca] : [])
 
     ports {
