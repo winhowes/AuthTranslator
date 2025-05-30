@@ -110,6 +110,43 @@ func TestAddEntryUpdateExisting(t *testing.T) {
 	}
 }
 
+func TestAddEntryIntegrationCaseInsensitive(t *testing.T) {
+	tmpDir := t.TempDir()
+	path := filepath.Join(tmpDir, "allow.yaml")
+
+	initial := []plugins.AllowlistEntry{
+		{Integration: "Foo", Callers: []plugins.CallerConfig{{ID: "u1"}}},
+	}
+	data, _ := yaml.Marshal(initial)
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	old := *file
+	*file = path
+	t.Cleanup(func() { *file = old })
+
+	addEntry([]string{"-integration", "FOO", "-caller", "u1", "-capability", "cap"})
+
+	out, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("failed reading file: %v", err)
+	}
+	var entries []plugins.AllowlistEntry
+	if err := yaml.Unmarshal(out, &entries); err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+	want := []plugins.AllowlistEntry{
+		{
+			Integration: "foo",
+			Callers:     []plugins.CallerConfig{{ID: "u1", Capabilities: []plugins.CapabilityConfig{{Name: "cap", Params: nil}}}},
+		},
+	}
+	if !reflect.DeepEqual(entries, want) {
+		t.Fatalf("entries mismatch:\n%v\nwant\n%v", entries, want)
+	}
+}
+
 func TestListCapsOutput(t *testing.T) {
 	out := captureOutput(listCaps)
 	if !strings.Contains(out, "slack:") {
@@ -160,6 +197,46 @@ func TestRemoveEntry(t *testing.T) {
 			Callers: []plugins.CallerConfig{
 				{ID: "u1", Capabilities: []plugins.CapabilityConfig{{Name: "cap2"}}},
 			},
+		},
+	}
+	if !reflect.DeepEqual(entries, want) {
+		t.Fatalf("entries mismatch:\n%v\nwant\n%v", entries, want)
+	}
+}
+
+func TestRemoveEntryIntegrationCaseInsensitive(t *testing.T) {
+	tmpDir := t.TempDir()
+	path := filepath.Join(tmpDir, "allow.yaml")
+
+	initial := []plugins.AllowlistEntry{
+		{
+			Integration: "Foo",
+			Callers:     []plugins.CallerConfig{{ID: "u1", Capabilities: []plugins.CapabilityConfig{{Name: "cap1"}, {Name: "cap2"}}}},
+		},
+	}
+	data, _ := yaml.Marshal(initial)
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	old := *file
+	*file = path
+	t.Cleanup(func() { *file = old })
+
+	removeEntry([]string{"-integration", "FOO", "-caller", "u1", "-capability", "cap1"})
+
+	out, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("failed reading file: %v", err)
+	}
+	var entries []plugins.AllowlistEntry
+	if err := yaml.Unmarshal(out, &entries); err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+	want := []plugins.AllowlistEntry{
+		{
+			Integration: "foo",
+			Callers:     []plugins.CallerConfig{{ID: "u1", Capabilities: []plugins.CapabilityConfig{{Name: "cap2"}}}},
 		},
 	}
 	if !reflect.DeepEqual(entries, want) {
