@@ -91,7 +91,7 @@ which requests are permitted.
 | Request part | Matching logic                                                                                      |
 | ------------ | --------------------------------------------------------------------------------------------------- |
 | Path         | Must match the pattern **entirely**. `*` matches one segment; `**` matches the rest.                 |
-| Method       | Case‑insensitive string compare. Each method key contains its own constraints. |
+| Method       | Case-insensitive string compare. Each method key contains its own constraints. |
 | Query params | In `methods.<HTTP_METHOD>.query`, each key maps to allowed value list. Extra params allowed. Values match exactly.
 | Headers      | In `methods.<HTTP_METHOD>.headers`, each key has required values; an empty list only checks for presence. Values match exactly.
 | Body         | `methods.<HTTP_METHOD>.body` must be a recursive subset of the request body (JSON or form). Arrays matched unordered. Detection relies on the `Content-Type` header; if it's neither JSON nor form, body checks are skipped.

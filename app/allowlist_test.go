@@ -130,3 +130,18 @@ func TestSetAllowlistDuplicateRule(t *testing.T) {
 		t.Fatal("expected error for duplicate rule")
 	}
 }
+
+func TestSetAllowlistLowercaseMethod(t *testing.T) {
+	allowlists.Lock()
+	allowlists.m = make(map[string]map[string]CallerConfig)
+	allowlists.Unlock()
+
+	if err := SetAllowlist("case", []CallerConfig{{ID: "*", Rules: []CallRule{{Path: "/ok", Methods: map[string]RequestConstraint{"get": {}}}}}}); err != nil {
+		t.Fatalf("failed to set allowlist: %v", err)
+	}
+
+	integ := &Integration{Name: "case"}
+	if _, ok := findConstraint(integ, "*", "/ok", http.MethodGet); !ok {
+		t.Fatal("expected match for uppercase method")
+	}
+}

@@ -73,7 +73,13 @@ func SetAllowlist(name string, callers []CallerConfig) error {
 	m := make(map[string]CallerConfig, len(callers))
 	for _, c := range callers {
 		for ri := range c.Rules {
-			c.Rules[ri].Segments = splitPath(c.Rules[ri].Path)
+			r := &c.Rules[ri]
+			r.Segments = splitPath(r.Path)
+			methods := make(map[string]RequestConstraint, len(r.Methods))
+			for mth, cons := range r.Methods {
+				methods[strings.ToUpper(mth)] = cons
+			}
+			r.Methods = methods
 		}
 		id := c.ID
 		if id == "" {
