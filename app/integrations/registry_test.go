@@ -74,3 +74,22 @@ func TestExpandCapabilitiesGenerateError(t *testing.T) {
 		t.Fatalf("capabilities not cleared")
 	}
 }
+
+func TestCapabilitiesHelpers(t *testing.T) {
+	// Save registry and restore after test
+	orig := capabilityRegistry
+	capabilityRegistry = map[string]map[string]CapabilitySpec{}
+	t.Cleanup(func() { capabilityRegistry = orig })
+
+	spec := CapabilitySpec{Generate: func(map[string]interface{}) ([]CallRule, error) { return nil, nil }}
+	RegisterCapability("foo", "bar", spec)
+
+	if got := CapabilitiesFor("foo"); len(got) != 1 || got["bar"].Generate == nil {
+		t.Fatalf("CapabilitiesFor returned %#v", got)
+	}
+
+	all := AllCapabilities()
+	if len(all) != 1 || len(all["foo"]) != 1 {
+		t.Fatalf("AllCapabilities returned %#v", all)
+	}
+}
