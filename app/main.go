@@ -27,6 +27,7 @@ import (
 	"github.com/winhowes/AuthTranslator/app/auth"
 	_ "github.com/winhowes/AuthTranslator/app/auth/plugins"
 	_ "github.com/winhowes/AuthTranslator/app/integrations/plugins"
+	"github.com/winhowes/AuthTranslator/app/metrics"
 	"github.com/winhowes/AuthTranslator/app/secrets"
 	_ "github.com/winhowes/AuthTranslator/app/secrets/plugins"
 )
@@ -638,6 +639,7 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	metrics.OnRequest(integ.Name, r)
 	rec := &statusRecorder{ResponseWriter: w}
 	integ.proxy.ServeHTTP(rec, r)
 	if rec.status == 0 {

@@ -22,15 +22,15 @@ exposed by default but can be disabled with `-enable-metrics=false`. Provide
 
 > The exact metric list is taken from code; field names below match what ships today.
 
-| Metric                                     | Type      | Labels                     | Description                                                          |
-| ------------------------------------------ | --------- | -------------------------- | -------------------------------------------------------------------- |
-| `authtranslator_requests_total`            | counter   | `integration`               | Total requests processed per integration. |
-| `authtranslator_upstream_responses_total`  | counter   | `integration`, `code`       | HTTP status codes returned by upstreams. |
-| `authtranslator_request_duration_seconds`  | histogram | `integration`               | Histogram of upstream request latency. |
-| `authtranslator_rate_limit_events_total`   | counter   | `integration`               | Incremented when a request is rejected with 429. |
-| `authtranslator_auth_failures_total`       | counter   | `integration`               | Authentication plugin failures. |
+| Metric                                    | Type      | Labels                | Description                                      |
+| ----------------------------------------- | --------- | --------------------- | ------------------------------------------------ |
+| `authtranslator_requests_total`           | counter   | `integration`         | Total requests processed per integration.        |
+| `authtranslator_upstream_responses_total` | counter   | `integration`, `code` | HTTP status codes returned by upstreams.         |
+| `authtranslator_request_duration_seconds` | histogram | `integration`         | Histogram of upstream request latency.           |
+| `authtranslator_rate_limit_events_total`  | counter   | `integration`         | Incremented when a request is rejected with 429. |
+| `authtranslator_auth_failures_total`      | counter   | `integration`         | Authentication plugin failures.                  |
 
-Missing a metric? Open an issue or PR—new counters are easy to wire in.
+Missing a metric? Write a small **metrics plugin** to hook into requests and responses or open a PR—new counters are easy to wire in.
 
 ---
 
@@ -38,10 +38,10 @@ Missing a metric? Open an issue or PR—new counters are easy to wire in.
 
 ```yaml
 targets:
-  - job_name: 'authtranslator'
-    metrics_path: '/_at_internal/metrics'
+  - job_name: "authtranslator"
+    metrics_path: "/_at_internal/metrics"
     static_configs:
-      - targets: ['authtranslator.default.svc.cluster.local:8080']
+      - targets: ["authtranslator.default.svc.cluster.local:8080"]
 ```
 
 When running multiple replicas behind a Service or Load Balancer, prefer the **Prometheus ServiceMonitor** CRD (Kube‑Prometheus stack) or scrape via the node exporter.
@@ -53,15 +53,15 @@ When running multiple replicas behind a Service or Load Balancer, prefer the **P
 The proxy logs in structured **text** by default. Pass
 `-log-format json` to emit **JSON** using Go’s `slog`. Fields:
 
-| Key           | Example                   | Meaning                                                     |
-| ------------- | ------------------------- | ----------------------------------------------------------- |
-| `level`       | `INFO` / `WARN` / `ERROR` | Log severity                                                |
-| `msg`         | `"incoming request"` / `"upstream response"` | Log message |
-| `integration` | `"slack"`                 | Integration block name |
-| `caller_id`   | `"user-123"`              | Identifier from incoming plugin |
-| `method`      | `"POST"`                  | HTTP method (request log) |
-| `path`        | `"/api/chat.postMessage"` | Request path (request log) |
-| `status`      | `200`                     | Upstream status code (response log) |
+| Key           | Example                                      | Meaning                             |
+| ------------- | -------------------------------------------- | ----------------------------------- |
+| `level`       | `INFO` / `WARN` / `ERROR`                    | Log severity                        |
+| `msg`         | `"incoming request"` / `"upstream response"` | Log message                         |
+| `integration` | `"slack"`                                    | Integration block name              |
+| `caller_id`   | `"user-123"`                                 | Identifier from incoming plugin     |
+| `method`      | `"POST"`                                     | HTTP method (request log)           |
+| `path`        | `"/api/chat.postMessage"`                    | Request path (request log)          |
+| `status`      | `200`                                        | Upstream status code (response log) |
 
 Sample line (wrapped for readability):
 
@@ -72,8 +72,8 @@ Sample line (wrapped for readability):
 
 ### Log level
 
-* Default: **INFO**
-* Override: run the proxy with `-log-level DEBUG` (adds request/response headers—secrets redacted)
+- Default: **INFO**
+- Override: run the proxy with `-log-level DEBUG` (adds request/response headers—secrets redacted)
 
 ---
 
@@ -82,7 +82,7 @@ Sample line (wrapped for readability):
 | Alert                     | Expression                                                        | Rationale                        |
 | ------------------------- | ----------------------------------------------------------------- | -------------------------------- |
 | High 5xx rate             | `sum(rate(authtranslator_requests_total{code=~"5.."}[5m])) > 0.1` | Upstream failures or mis‑config. |
-| Prolonged rate‑limit hits | `increase(authtranslator_rate_limit_events_total[5m]) > 100`    | Callers need higher quota.       |
+| Prolonged rate‑limit hits | `increase(authtranslator_rate_limit_events_total[5m]) > 100`      | Callers need higher quota.       |
 | Health endpoint down      | Blackbox probe against `/_at_internal/healthz` fails              | Pod crash or network break.      |
 
 Tune thresholds to your traffic patterns.
