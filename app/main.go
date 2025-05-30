@@ -9,6 +9,7 @@ import (
 	"flag"
 	"fmt"
 	yaml "gopkg.in/yaml.v3"
+	"io"
 	"log"
 	"log/slog"
 	"net"
@@ -260,7 +261,7 @@ func NewRateLimiter(limit int, duration time.Duration, strategy string) *RateLim
 		window:   duration,
 		strategy: strategy,
 		done:     make(chan struct{}),
-		useRedis: *redisAddr != "" && strategy == "fixed_window",
+		useRedis: *redisAddr != "",
 	}
 	if strategy == "fixed_window" {
 		rl.requests = make(map[string]int)
@@ -335,31 +336,25 @@ func (rl *RateLimiter) Allow(key string) bool {
 	if rl.limit <= 0 {
 		return true
 	}
-	if rl.strategy == "fixed_window" {
-		if rl.useRedis {
-			ok, err := rl.allowRedis(key)
-			if err != nil {
-				logger.Error("redis limiter failed, falling back to memory", "error", err)
-			} else {
-				return ok
-			}
+	if rl.useRedis {
+		ok, err := rl.allowRedis(key)
+		if err == nil {
+			return ok
 		}
+		logger.Error("redis limiter failed, falling back to memory", "error", err)
+	}
 
-		rl.mu.Lock()
-		defer rl.mu.Unlock()
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
 
+	switch rl.strategy {
+	case "fixed_window":
 		if rl.requests[key] >= rl.limit {
 			return false
 		}
-
 		rl.requests[key]++
 		return true
-	}
-
-	// token_bucket or leaky_bucket strategy
-	rl.mu.Lock()
-	defer rl.mu.Unlock()
-	if rl.strategy == "token_bucket" {
+	case "token_bucket":
 		b := rl.buckets[key]
 		now := time.Now()
 		if b == nil {
@@ -379,28 +374,29 @@ func (rl *RateLimiter) Allow(key string) bool {
 		}
 		b.tokens--
 		return true
-	}
-
-	// leaky_bucket strategy
-	l := rl.leaky[key]
-	now := time.Now()
-	if l == nil {
-		rl.leaky[key] = &leakyBucket{level: 1, last: now}
+	case "leaky_bucket":
+		l := rl.leaky[key]
+		now := time.Now()
+		if l == nil {
+			rl.leaky[key] = &leakyBucket{level: 1, last: now}
+			return true
+		}
+		leaked := now.Sub(l.last).Seconds() * float64(rl.limit) / rl.window.Seconds()
+		level := l.level - leaked
+		if level < 0 {
+			level = 0
+		}
+		if level+1 > float64(rl.limit) {
+			l.level = level
+			l.last = now
+			return false
+		}
+		l.level = level + 1
+		l.last = now
+		return true
+	default:
 		return true
 	}
-	leaked := now.Sub(l.last).Seconds() * float64(rl.limit) / rl.window.Seconds()
-	level := l.level - leaked
-	if level < 0 {
-		level = 0
-	}
-	if level+1 > float64(rl.limit) {
-		l.level = level
-		l.last = now
-		return false
-	}
-	l.level = level + 1
-	l.last = now
-	return true
 }
 
 func (rl *RateLimiter) allowRedis(key string) (bool, error) {
@@ -473,17 +469,32 @@ func (rl *RateLimiter) allowRedis(key string) (bool, error) {
 		}
 	}
 	bad := false
-
-	n, err := redisCmdInt(conn, "INCR", key)
-	if err != nil {
-		bad = true
-	}
-	if n == 1 {
-		cmd, ttl := redisTTLArgs(rl.window)
-		_, err = redisCmdInt(conn, cmd, key, ttl)
+	var allowed bool
+	switch rl.strategy {
+	case "token_bucket":
+		allowed, err = rl.allowRedisTokenBucket(conn, key)
 		if err != nil {
 			bad = true
 		}
+	case "leaky_bucket":
+		allowed, err = rl.allowRedisLeakyBucket(conn, key)
+		if err != nil {
+			bad = true
+		}
+	default:
+		var n int
+		n, err = redisCmdInt(conn, "INCR", key)
+		if err != nil {
+			bad = true
+		}
+		if n == 1 {
+			cmd, ttl := redisTTLArgs(rl.window)
+			_, err = redisCmdInt(conn, cmd, key, ttl)
+			if err != nil {
+				bad = true
+			}
+		}
+		allowed = n <= rl.limit
 	}
 	if rl.conns != nil {
 		if bad {
@@ -501,7 +512,102 @@ func (rl *RateLimiter) allowRedis(key string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return n <= rl.limit, nil
+	return allowed, nil
+}
+
+func (rl *RateLimiter) allowRedisTokenBucket(conn net.Conn, key string) (bool, error) {
+	now := time.Now()
+	val, err := redisCmdString(conn, "GET", key)
+	if err != nil {
+		return false, err
+	}
+	var tokens float64
+	var last int64
+	if val != "" {
+		parts := strings.Fields(val)
+		if len(parts) == 2 {
+			tokens, _ = strconv.ParseFloat(parts[0], 64)
+			last, _ = strconv.ParseInt(parts[1], 10, 64)
+		}
+	} else {
+		tokens = float64(rl.limit)
+		last = now.UnixNano()
+	}
+	lastTime := time.Unix(0, last)
+	refill := now.Sub(lastTime).Seconds() * float64(rl.limit) / rl.window.Seconds()
+	if refill > 0 {
+		tokens += refill
+		if tokens > float64(rl.limit) {
+			tokens = float64(rl.limit)
+		}
+		lastTime = now
+	}
+	if tokens < 1 {
+		val = fmt.Sprintf("%f %d", tokens, lastTime.UnixNano())
+		if err := redisCmd(conn, "SET", key, val); err != nil {
+			return false, err
+		}
+		cmd, ttl := redisTTLArgs(rl.window)
+		_, err := redisCmdInt(conn, cmd, key, ttl)
+		return false, err
+	}
+	tokens--
+	val = fmt.Sprintf("%f %d", tokens, now.UnixNano())
+	if err := redisCmd(conn, "SET", key, val); err != nil {
+		return false, err
+	}
+	cmd, ttl := redisTTLArgs(rl.window)
+	_, err = redisCmdInt(conn, cmd, key, ttl)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func (rl *RateLimiter) allowRedisLeakyBucket(conn net.Conn, key string) (bool, error) {
+	now := time.Now()
+	val, err := redisCmdString(conn, "GET", key)
+	if err != nil {
+		return false, err
+	}
+	var level float64
+	var last int64
+	if val != "" {
+		parts := strings.Fields(val)
+		if len(parts) == 2 {
+			level, _ = strconv.ParseFloat(parts[0], 64)
+			last, _ = strconv.ParseInt(parts[1], 10, 64)
+		}
+	} else {
+		level = 0
+		last = now.UnixNano()
+	}
+	lastTime := time.Unix(0, last)
+	leaked := now.Sub(lastTime).Seconds() * float64(rl.limit) / rl.window.Seconds()
+	level -= leaked
+	if level < 0 {
+		level = 0
+	}
+	if level+1 > float64(rl.limit) {
+		val = fmt.Sprintf("%f %d", level, now.UnixNano())
+		if err := redisCmd(conn, "SET", key, val); err != nil {
+			return false, err
+		}
+		cmd, ttl := redisTTLArgs(rl.window)
+		_, err := redisCmdInt(conn, cmd, key, ttl)
+		return false, err
+	}
+	level++
+	val = fmt.Sprintf("%f %d", level, now.UnixNano())
+	if err := redisCmd(conn, "SET", key, val); err != nil {
+		return false, err
+	}
+	cmd, ttl := redisTTLArgs(rl.window)
+	_, err = redisCmdInt(conn, cmd, key, ttl)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func redisCmdInt(conn net.Conn, args ...string) (int, error) {
@@ -529,6 +635,47 @@ func redisCmdInt(conn net.Conn, args ...string) (int, error) {
 		return 0, fmt.Errorf("redis error: %s", strings.TrimSpace(line))
 	default:
 		return 0, fmt.Errorf("unexpected reply: %q", prefix)
+	}
+}
+
+func redisCmdString(conn net.Conn, args ...string) (string, error) {
+	var buf bytes.Buffer
+	fmt.Fprintf(&buf, "*%d\r\n", len(args))
+	for _, a := range args {
+		fmt.Fprintf(&buf, "$%d\r\n%s\r\n", len(a), a)
+	}
+	if _, err := conn.Write(buf.Bytes()); err != nil {
+		return "", err
+	}
+	br := bufio.NewReader(conn)
+	prefix, err := br.ReadByte()
+	if err != nil {
+		return "", err
+	}
+	line, err := br.ReadString('\n')
+	if err != nil {
+		return "", err
+	}
+	switch prefix {
+	case '+', ':':
+		return strings.TrimSpace(line), nil
+	case '$':
+		n, err := strconv.Atoi(strings.TrimSpace(line))
+		if err != nil {
+			return "", err
+		}
+		if n == -1 {
+			return "", nil
+		}
+		buf := make([]byte, n+2)
+		if _, err := io.ReadFull(br, buf); err != nil {
+			return "", err
+		}
+		return string(buf[:n]), nil
+	case '-':
+		return "", fmt.Errorf("redis error: %s", strings.TrimSpace(line))
+	default:
+		return "", fmt.Errorf("unexpected reply: %q", prefix)
 	}
 }
 
