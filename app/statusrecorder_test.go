@@ -2,9 +2,11 @@ package main
 
 import (
 	"bufio"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -141,5 +143,83 @@ func TestStatusRecorderCloseNotifyUnsupported(t *testing.T) {
 	case <-rec.CloseNotify():
 		t.Fatal("unexpected close notification")
 	default:
+	}
+}
+
+// readerFromRecorder records whether ReadFrom was called and writes to the
+// embedded ResponseRecorder when invoked.
+type readerFromRecorder struct {
+	*httptest.ResponseRecorder
+	called bool
+}
+
+func (r *readerFromRecorder) ReadFrom(src io.Reader) (int64, error) {
+	r.called = true
+	return io.Copy(r.ResponseRecorder, src)
+}
+
+func TestStatusRecorderReadFromForwarded(t *testing.T) {
+	rr := &readerFromRecorder{ResponseRecorder: httptest.NewRecorder()}
+	rec := &statusRecorder{ResponseWriter: rr}
+
+	n, err := rec.ReadFrom(strings.NewReader("data"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !rr.called {
+		t.Fatal("underlying ReadFrom not called")
+	}
+	if n != 4 {
+		t.Fatalf("expected 4 bytes copied, got %d", n)
+	}
+	if rr.Body.String() != "data" {
+		t.Fatalf("unexpected body %q", rr.Body.String())
+	}
+}
+
+func TestStatusRecorderReadFromFallback(t *testing.T) {
+	rr := httptest.NewRecorder()
+	rec := &statusRecorder{ResponseWriter: rr}
+
+	n, err := rec.ReadFrom(strings.NewReader("more"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if n != 4 {
+		t.Fatalf("expected 4 bytes copied, got %d", n)
+	}
+	if rr.Body.String() != "more" {
+		t.Fatalf("unexpected body %q", rr.Body.String())
+	}
+}
+
+// pushableRecorder records whether Push was called.
+type pushableRecorder struct {
+	*httptest.ResponseRecorder
+	called bool
+}
+
+func (p *pushableRecorder) Push(target string, opts *http.PushOptions) error {
+	p.called = true
+	return nil
+}
+
+func TestStatusRecorderPushForwarded(t *testing.T) {
+	rr := &pushableRecorder{ResponseRecorder: httptest.NewRecorder()}
+	rec := &statusRecorder{ResponseWriter: rr}
+
+	if err := rec.Push("/res", nil); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !rr.called {
+		t.Fatal("underlying pusher not called")
+	}
+}
+
+func TestStatusRecorderPushUnsupported(t *testing.T) {
+	rec := &statusRecorder{ResponseWriter: httptest.NewRecorder()}
+
+	if err := rec.Push("/res", nil); err != http.ErrNotSupported {
+		t.Fatalf("expected %v, got %v", http.ErrNotSupported, err)
 	}
 }
