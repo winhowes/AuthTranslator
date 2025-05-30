@@ -45,6 +45,26 @@ func TestAddUpdateDeleteList(t *testing.T) {
 	}
 }
 
+func TestIntegrationNameNormalization(t *testing.T) {
+	dir := t.TempDir()
+	cfgFile := filepath.Join(dir, "config.yaml")
+	old := *file
+	*file = cfgFile
+	t.Cleanup(func() { *file = old })
+
+	addIntegration(plugins.Integration{Name: "Foo"})
+	list := captureList(t)
+	if len(list) != 1 || list[0] != "foo" {
+		t.Fatalf("unexpected list after add: %v", list)
+	}
+
+	updateIntegration(plugins.Integration{Name: "FOO", Destination: "https://x"})
+	list = captureList(t)
+	if len(list) != 1 || list[0] != "foo" {
+		t.Fatalf("unexpected list after update: %v", list)
+	}
+}
+
 func captureList(t *testing.T) []string {
 	r, w, _ := os.Pipe()
 	old := os.Stdout

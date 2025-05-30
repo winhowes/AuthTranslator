@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 
 	yaml "gopkg.in/yaml.v3"
 
@@ -74,13 +75,14 @@ func main() {
 }
 
 func addIntegration(i plugins.Integration) {
+	i.Name = strings.ToLower(i.Name)
 	list, err := readConfig()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 	for _, existing := range list {
-		if existing.Name == i.Name {
+		if strings.EqualFold(existing.Name, i.Name) {
 			fmt.Fprintf(os.Stderr, "integration %s already exists\n", i.Name)
 			os.Exit(1)
 		}
@@ -94,6 +96,7 @@ func addIntegration(i plugins.Integration) {
 }
 
 func updateIntegration(i plugins.Integration) {
+	i.Name = strings.ToLower(i.Name)
 	list, err := readConfig()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -101,7 +104,7 @@ func updateIntegration(i plugins.Integration) {
 	}
 	found := false
 	for idx := range list {
-		if list[idx].Name == i.Name {
+		if strings.EqualFold(list[idx].Name, i.Name) {
 			list[idx] = i
 			found = true
 			break
@@ -118,13 +121,14 @@ func updateIntegration(i plugins.Integration) {
 }
 
 func deleteIntegration(name string) {
+	name = strings.ToLower(name)
 	list, err := readConfig()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 	for idx := range list {
-		if list[idx].Name == name {
+		if strings.EqualFold(list[idx].Name, name) {
 			list = append(list[:idx], list[idx+1:]...)
 			break
 		}
