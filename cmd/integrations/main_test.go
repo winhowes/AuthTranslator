@@ -174,6 +174,26 @@ func TestWriteConfigError(t *testing.T) {
 	}
 }
 
+func TestWriteConfigSuccess(t *testing.T) {
+	dir := t.TempDir()
+	cfg := filepath.Join(dir, "cfg.yaml")
+	old := *file
+	*file = cfg
+	t.Cleanup(func() { *file = old })
+
+	want := []plugins.Integration{{Name: "a"}, {Name: "b"}}
+	if err := writeConfig(want); err != nil {
+		t.Fatalf("write error: %v", err)
+	}
+	got, err := readConfig()
+	if err != nil {
+		t.Fatalf("read error: %v", err)
+	}
+	if len(got) != len(want) || got[0].Name != "a" || got[1].Name != "b" {
+		t.Fatalf("unexpected config: %v", got)
+	}
+}
+
 func TestUpdateIntegrationAddsNew(t *testing.T) {
 	dir := t.TempDir()
 	cfg := filepath.Join(dir, "cfg.yaml")
@@ -198,6 +218,23 @@ func TestDeleteIntegration(t *testing.T) {
 	list, _ := readConfig()
 	if len(list) != 1 || list[0].Name != "b" {
 		t.Fatalf("unexpected list: %v", list)
+	}
+}
+
+func TestDeleteIntegrationNotFound(t *testing.T) {
+	dir := t.TempDir()
+	cfg := filepath.Join(dir, "cfg.yaml")
+	old := *file
+	*file = cfg
+	t.Cleanup(func() { *file = old })
+
+	if err := writeConfig([]plugins.Integration{{Name: "exists"}}); err != nil {
+		t.Fatalf("setup write error: %v", err)
+	}
+	deleteIntegration("missing")
+	list, _ := readConfig()
+	if len(list) != 1 || list[0].Name != "exists" {
+		t.Fatalf("integration list changed unexpectedly: %v", list)
 	}
 }
 
