@@ -138,3 +138,19 @@ func TestTokenBucketRefill(t *testing.T) {
 		t.Fatal("token should refill after window")
 	}
 }
+
+func TestLeakyBucketSmoothing(t *testing.T) {
+	rl := NewRateLimiter(1, 100*time.Millisecond, "leaky_bucket")
+	t.Cleanup(rl.Stop)
+	key := "caller"
+	if !rl.Allow(key) {
+		t.Fatal("first call should be allowed")
+	}
+	if rl.Allow(key) {
+		t.Fatal("second immediate call should be rate limited")
+	}
+	time.Sleep(120 * time.Millisecond)
+	if !rl.Allow(key) {
+		t.Fatal("call should be allowed after leak")
+	}
+}

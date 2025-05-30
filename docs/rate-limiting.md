@@ -1,6 +1,6 @@
 # Rate‑Limiting
 
-AuthTranslator defaults to a **fixed‑window counter with elastic expiry** (aka *sliding window approximation*). Limits apply **per‑caller ID per integration** so noisy neighbours can’t starve other users of the same upstream service. The schema allows choosing between `fixed_window` and `token_bucket` strategies for different workloads.
+AuthTranslator defaults to a **fixed‑window counter with elastic expiry** (aka *sliding window approximation*). Limits apply **per‑caller ID per integration** so noisy neighbours can’t starve other users of the same upstream service. The schema allows choosing between `fixed_window`, `token_bucket`, and `leaky_bucket` strategies for different workloads.
 
 ---
 
@@ -30,11 +30,13 @@ integrations:
 | `in_rate_limit`     | int      | `0`     | Max inbound requests per caller within the window. |
 | `out_rate_limit`    | int      | `0`     | Max outbound requests per caller within the window. |
 | `rate_limit_window` | duration | `1m`    | Rolling window length for rate limiting. |
-| `rate_limit_strategy` | string | `fixed_window` | Algorithm to apply (`fixed_window` or `token_bucket`). |
+| `rate_limit_strategy` | string | `fixed_window` | Algorithm to apply (`fixed_window`, `token_bucket`, or `leaky_bucket`). |
 
 ### Strategies
 
-`fixed_window` resets counters every `rate_limit_window`. `token_bucket` allows bursts up to the limit and refills steadily over the same window.
+`fixed_window` resets counters every `rate_limit_window`.
+`token_bucket` allows bursts up to the limit and refills steadily over the same window.
+`leaky_bucket` leaks requests at a steady rate so bursts above the limit are smoothed rather than rejected outright.
 
 ---
 
@@ -77,7 +79,6 @@ Grafana sample dashboard lives in [`docs/ops/grafana-rate-limits.json`](ops/graf
 
 ## Future work
 
-* Leaky‑bucket smoothing for less burst‑biased fairness.
 * Back‑pressure headers (`Retry‑After`).
-* Additional algorithms (e.g., leaky bucket).
+* Additional algorithms.
 * Pluggable backends (Memcached / Cloud Spanner).

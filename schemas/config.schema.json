@@ -21,7 +21,7 @@
         "rate_limit_window": { "type": "string" },
         "rate_limit_strategy": {
           "type": "string",
-          "enum": ["fixed_window", "token_bucket"]
+          "enum": ["fixed_window", "token_bucket", "leaky_bucket"]
         },
         "incoming_auth": {
           "type": "array",

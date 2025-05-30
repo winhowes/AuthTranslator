@@ -228,6 +228,7 @@ type RateLimiter struct {
 	strategy    string
 	requests    map[string]int
 	buckets     map[string]*tokenBucket
+	leaky       map[string]*leakyBucket
 	resetTicker *time.Ticker
 	done        chan struct{}
 	useRedis    bool
@@ -237,6 +238,11 @@ type RateLimiter struct {
 type tokenBucket struct {
 	tokens float64
 	last   time.Time
+}
+
+type leakyBucket struct {
+	level float64
+	last  time.Time
 }
 
 // NewRateLimiter creates a RateLimiter that limits how many
@@ -260,6 +266,8 @@ func NewRateLimiter(limit int, duration time.Duration, strategy string) *RateLim
 		rl.requests = make(map[string]int)
 	} else if strategy == "token_bucket" {
 		rl.buckets = make(map[string]*tokenBucket)
+	} else if strategy == "leaky_bucket" {
+		rl.leaky = make(map[string]*leakyBucket)
 	}
 
 	if rl.useRedis {
@@ -348,27 +356,50 @@ func (rl *RateLimiter) Allow(key string) bool {
 		return true
 	}
 
-	// token_bucket strategy
+	// token_bucket or leaky_bucket strategy
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
-	b := rl.buckets[key]
-	now := time.Now()
-	if b == nil {
-		rl.buckets[key] = &tokenBucket{tokens: float64(rl.limit - 1), last: now}
+	if rl.strategy == "token_bucket" {
+		b := rl.buckets[key]
+		now := time.Now()
+		if b == nil {
+			rl.buckets[key] = &tokenBucket{tokens: float64(rl.limit - 1), last: now}
+			return true
+		}
+		refill := now.Sub(b.last).Seconds() * float64(rl.limit) / rl.window.Seconds()
+		if refill > 0 {
+			b.tokens += refill
+			if b.tokens > float64(rl.limit) {
+				b.tokens = float64(rl.limit)
+			}
+			b.last = now
+		}
+		if b.tokens < 1 {
+			return false
+		}
+		b.tokens--
 		return true
 	}
-	refill := now.Sub(b.last).Seconds() * float64(rl.limit) / rl.window.Seconds()
-	if refill > 0 {
-		b.tokens += refill
-		if b.tokens > float64(rl.limit) {
-			b.tokens = float64(rl.limit)
-		}
-		b.last = now
+
+	// leaky_bucket strategy
+	l := rl.leaky[key]
+	now := time.Now()
+	if l == nil {
+		rl.leaky[key] = &leakyBucket{level: 1, last: now}
+		return true
 	}
-	if b.tokens < 1 {
+	leaked := now.Sub(l.last).Seconds() * float64(rl.limit) / rl.window.Seconds()
+	level := l.level - leaked
+	if level < 0 {
+		level = 0
+	}
+	if level+1 > float64(rl.limit) {
+		l.level = level
+		l.last = now
 		return false
 	}
-	b.tokens--
+	l.level = level + 1
+	l.last = now
 	return true
 }
 
