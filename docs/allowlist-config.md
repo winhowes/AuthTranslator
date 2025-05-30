@@ -1,6 +1,6 @@
 # `allowlist.yaml` – Caller Permissions
 
-The **allow‑list** answers a single question:
+The **allowlist** answers a single question:
 
 > *Given this caller ID and integration, is the request allowed?*
 
