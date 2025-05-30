@@ -116,7 +116,11 @@ func addEntry(args []string) {
 	}
 	callerCfg.Capabilities = append(callerCfg.Capabilities, plugins.CapabilityConfig{Name: *capName, Params: params})
 
-	out, _ := yaml.Marshal(entries)
+	out, err := yaml.Marshal(entries)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
 	out = bytes.ReplaceAll(out, []byte("params: {}"), []byte("params: null"))
 
 	if err := os.WriteFile(*file, out, 0644); err != nil {
@@ -188,7 +192,11 @@ func removeEntry(args []string) {
 		break
 	}
 
-	out, _ := yaml.Marshal(entries)
+	out, err := yaml.Marshal(entries)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
 	out = bytes.ReplaceAll(out, []byte("params: {}"), []byte("params: null"))
 	if err := os.WriteFile(*file, out, 0644); err != nil {
 		fmt.Fprintln(os.Stderr, err)
