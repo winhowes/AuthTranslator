@@ -32,7 +32,7 @@ Think of it as a *cookie‑cutter* that stamps out a ready‑to‑run block in y
 | `twilio` | `https://api.twilio.com` | `basic` |
 | `workday` | `https://<domain>/api` (configurable) | `token` |
 | `zendesk` | `https://api.zendesk.com` | `token` |
-*(Full list lives under **[`app/integrations/plugins/`](../app/integrations/plugins/)**)*
+*(Full list lives under **[`cmd/integrations/plugins/`](../cmd/integrations/plugins/)**)*
 ## Creating an integration via the CLI
 
 ```bash
