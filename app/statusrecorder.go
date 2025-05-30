@@ -36,6 +36,9 @@ func (r *statusRecorder) CloseNotify() <-chan bool {
 }
 
 func (r *statusRecorder) ReadFrom(src io.Reader) (int64, error) {
+	if r.status == 0 {
+		r.status = http.StatusOK
+	}
 	if rf, ok := r.ResponseWriter.(io.ReaderFrom); ok {
 		return rf.ReadFrom(src)
 	}

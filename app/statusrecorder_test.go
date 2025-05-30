@@ -193,6 +193,21 @@ func TestStatusRecorderReadFromFallback(t *testing.T) {
 	}
 }
 
+func TestStatusRecorderReadFromDefaultStatus(t *testing.T) {
+	rr := &readerFromRecorder{ResponseRecorder: httptest.NewRecorder()}
+	rec := &statusRecorder{ResponseWriter: rr}
+
+	if _, err := rec.ReadFrom(strings.NewReader("ok")); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.status != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.status)
+	}
+	if rr.Code != http.StatusOK {
+		t.Fatalf("response writer code %d", rr.Code)
+	}
+}
+
 // pushableRecorder records whether Push was called.
 type pushableRecorder struct {
 	*httptest.ResponseRecorder
