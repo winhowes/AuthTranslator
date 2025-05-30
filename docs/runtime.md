@@ -40,6 +40,7 @@ AuthTranslator exposes several command‑line options:
 | `-redis-ca` | CA certificate for verifying Redis TLS |
 | `-redis-timeout` | timeout for dialing Redis (default `5s`) |
 | `-max_body_size` | maximum bytes buffered from request bodies; use `0` to disable |
+| `-secret-refresh` | refresh interval for cached secrets; `0` disables expiry |
 | `-log-level` | log verbosity (`DEBUG`, `INFO`, `WARN`, `ERROR`) |
 | `-log-format` | log output format (`text` or `json`) |
 | `-version` | print the build version and exit |
