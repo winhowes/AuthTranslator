@@ -54,7 +54,7 @@ graph LR
   AuthT -->|long‑lived API key| Slack(Slack API)
 ```
 
-1. **Incoming plug‑in** validates + strips caller credential → produces **caller ID**.
+1. **Auth plug‑in** validates + strips caller credential → forwards request allowing your services to use short lived credentials when sending requests to or receiving requests from 3rd parties.
 2. Allow‑list enforces either capability‑based rules or precise filters on path, method, query params, headers, and JSON‑body or form‑data keys.
 
 ---
