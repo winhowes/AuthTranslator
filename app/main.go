@@ -230,6 +230,12 @@ type RateLimiter struct {
 	conns       chan net.Conn
 }
 
+// NewRateLimiter creates a RateLimiter that limits how many
+// requests a caller may make in a given window. The limit parameter
+// sets the maximum number of allowed requests; a limit of zero or less
+// disables rate limiting. Duration specifies the length of the window
+// and how often counters reset. If a redis address is configured,
+// counts are stored in Redis so limits are shared across instances.
 func NewRateLimiter(limit int, duration time.Duration) *RateLimiter {
 	rl := &RateLimiter{
 		limit:    limit,
