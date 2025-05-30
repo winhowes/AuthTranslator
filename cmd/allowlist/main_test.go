@@ -642,6 +642,30 @@ func TestRemoveEntryReadFileError(t *testing.T) {
 	}
 }
 
+// Helper process for exercising removeEntry in a separate process
+func TestRemoveEntryHelper(t *testing.T) {
+	if os.Getenv("GO_WANT_REMOVE_HELPER") != "1" {
+		return
+	}
+	cfg := os.Getenv("CFG")
+	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+	file = flag.CommandLine.String("file", cfg, "allowlist file")
+	removeEntry([]string{"-integration", "foo", "-caller", "u1", "-capability", "cap"})
+	os.Exit(0)
+}
+
+func TestRemoveEntryWriteError(t *testing.T) {
+	cmd := exec.Command(os.Args[0], "-test.run=TestRemoveEntryHelper", "--")
+	cmd.Env = append(os.Environ(), "GO_WANT_REMOVE_HELPER=1", "CFG=/dev/full")
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("expected error")
+	}
+	if len(out) == 0 {
+		t.Fatalf("expected error output")
+	}
+}
+
 func TestMainNoArgs(t *testing.T) {
 	cmd := exec.Command(os.Args[0], "-test.run=TestAllowlistMainHelper", "--")
 	cmd.Env = append(os.Environ(), "GO_WANT_ALLOWLIST_HELPER=1")
