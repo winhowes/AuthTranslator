@@ -90,7 +90,8 @@ Remember limits are **per callerÂ ID** *and* **per integration**. If your loadâ€
 
 The health endpoint is always enabled. Metrics are exposed by default but you can
 disable them with `-enable-metrics=false` and require HTTP Basic credentials via
-`-metrics-user` and `-metrics-pass`.
+**both** `-metrics-user` **and** `-metrics-pass`. If only one flag is set,
+the proxy refuses to start.
 
 ---
 
