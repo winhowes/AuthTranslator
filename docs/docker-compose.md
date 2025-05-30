@@ -74,6 +74,8 @@ Navigate to:
 * Health: [http://localhost:8080/\_at\_internal/healthz](http://localhost:8080/_at_internal/healthz)
 * Metrics: [http://localhost:8080/\_at\_internal/metrics](http://localhost:8080/_at_internal/metrics)
 
+Docker will keep hitting the health URL above using the image's `HEALTHCHECK`. The `authtranslator` service shows as `healthy` once the endpoint responds with `200 OK`.
+
 ---
 
 ## 3  Customising
