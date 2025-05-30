@@ -197,9 +197,9 @@ func TestK8sInvalidJSON(t *testing.T) {
 }
 
 func TestK8sBadBase64(t *testing.T) {
-        ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-                json.NewEncoder(w).Encode(map[string]map[string]string{"data": {"foo": "%%%"}})
-        }))
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]map[string]string{"data": {"foo": "%%%"}})
+	}))
 	defer ts.Close()
 	restoreClient := setTestClient(ts)
 	defer restoreClient()
@@ -209,38 +209,40 @@ func TestK8sBadBase64(t *testing.T) {
 	t.Setenv("KUBERNETES_SERVICE_PORT", "443")
 
 	p := k8sPlugin{}
-        if _, err := p.Load(context.Background(), "ns/sec#foo"); err == nil {
-                t.Fatal("expected error")
-        }
+	if _, err := p.Load(context.Background(), "ns/sec#foo"); err == nil {
+		t.Fatal("expected error")
+	}
 }
 
 // TestK8sLoadBadIDMissingKey exercises the invalid id path when the identifier
 // contains a separator but one of the components is empty.
 func TestK8sLoadBadIDMissingKey(t *testing.T) {
-        p := k8sPlugin{}
-        if _, err := p.Load(context.Background(), "ns/sec#"); err == nil {
-                t.Fatal("expected error")
-        }
+	p := k8sPlugin{}
+	if _, err := p.Load(context.Background(), "ns/sec#"); err == nil {
+		t.Fatal("expected error")
+	}
 }
 
 type errorTransport struct{}
 
-func (errorTransport) RoundTrip(*http.Request) (*http.Response, error) { return nil, fmt.Errorf("doerr") }
+func (errorTransport) RoundTrip(*http.Request) (*http.Response, error) {
+	return nil, fmt.Errorf("doerr")
+}
 
 // TestK8sDoError ensures that errors returned from the HTTP client are
 // propagated.
 func TestK8sDoError(t *testing.T) {
-        restoreFiles := writeFiles(t, "tok", "")
-        defer restoreFiles()
-        t.Setenv("KUBERNETES_SERVICE_HOST", "k8s")
-        t.Setenv("KUBERNETES_SERVICE_PORT", "443")
+	restoreFiles := writeFiles(t, "tok", "")
+	defer restoreFiles()
+	t.Setenv("KUBERNETES_SERVICE_HOST", "k8s")
+	t.Setenv("KUBERNETES_SERVICE_PORT", "443")
 
-        oldClient := httpClient
-        httpClient = &http.Client{Transport: errorTransport{}}
-        defer func() { httpClient = oldClient }()
+	oldClient := httpClient
+	httpClient = &http.Client{Transport: errorTransport{}}
+	defer func() { httpClient = oldClient }()
 
-        p := k8sPlugin{}
-        if _, err := p.Load(context.Background(), "ns/sec#foo"); err == nil {
-                t.Fatal("expected error")
-        }
+	p := k8sPlugin{}
+	if _, err := p.Load(context.Background(), "ns/sec#foo"); err == nil {
+		t.Fatal("expected error")
+	}
 }
