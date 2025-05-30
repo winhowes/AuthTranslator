@@ -445,3 +445,29 @@ func TestMainAddBuilderError(t *testing.T) {
 		t.Fatalf("unexpected output: %s", out)
 	}
 }
+
+func TestListIntegrationHelper(t *testing.T) {
+	if os.Getenv("GO_WANT_LIST_HELPER") != "1" {
+		return
+	}
+	cfg := os.Getenv("CFG")
+	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+	file = flag.CommandLine.String("file", cfg, "config file")
+	listIntegrations()
+	os.Exit(0)
+}
+
+func TestListIntegrationsError(t *testing.T) {
+	dir := t.TempDir()
+	cfg := filepath.Join(dir, "cfg.yaml")
+	os.Mkdir(cfg, 0755)
+	cmd := exec.Command(os.Args[0], "-test.run=TestListIntegrationHelper", "--")
+	cmd.Env = append(os.Environ(), "GO_WANT_LIST_HELPER=1", "CFG="+cfg)
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("expected error")
+	}
+	if len(out) == 0 {
+		t.Fatalf("expected error output")
+	}
+}
