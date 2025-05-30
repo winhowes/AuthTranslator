@@ -120,3 +120,96 @@ func TestK8sRequestError(t *testing.T) {
 		t.Fatal("expected error")
 	}
 }
+
+func TestK8sNotInCluster(t *testing.T) {
+	restoreFiles := writeFiles(t, "tok", "")
+	defer restoreFiles()
+	t.Setenv("KUBERNETES_SERVICE_HOST", "")
+	t.Setenv("KUBERNETES_SERVICE_PORT", "")
+
+	p := k8sPlugin{}
+	if _, err := p.Load(context.Background(), "ns/sec#foo"); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestK8sTokenReadError(t *testing.T) {
+	restoreFiles := writeFiles(t, "tok", "")
+	defer restoreFiles()
+	os.Remove(tokenPath)
+	t.Setenv("KUBERNETES_SERVICE_HOST", "k8s")
+	t.Setenv("KUBERNETES_SERVICE_PORT", "443")
+
+	p := k8sPlugin{}
+	if _, err := p.Load(context.Background(), "ns/sec#foo"); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestK8sCAReadError(t *testing.T) {
+	restoreFiles := writeFiles(t, "tok", "ca")
+	defer restoreFiles()
+	os.Remove(caPath)
+	t.Setenv("KUBERNETES_SERVICE_HOST", "k8s")
+	t.Setenv("KUBERNETES_SERVICE_PORT", "443")
+
+	p := k8sPlugin{}
+	if _, err := p.Load(context.Background(), "ns/sec#foo"); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestK8sStatusError(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("fail"))
+	}))
+	defer ts.Close()
+	restoreClient := setTestClient(ts)
+	defer restoreClient()
+	restoreFiles := writeFiles(t, "tok", "")
+	defer restoreFiles()
+	t.Setenv("KUBERNETES_SERVICE_HOST", "k8s")
+	t.Setenv("KUBERNETES_SERVICE_PORT", "443")
+
+	p := k8sPlugin{}
+	if _, err := p.Load(context.Background(), "ns/sec#foo"); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestK8sInvalidJSON(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("{bad"))
+	}))
+	defer ts.Close()
+	restoreClient := setTestClient(ts)
+	defer restoreClient()
+	restoreFiles := writeFiles(t, "tok", "")
+	defer restoreFiles()
+	t.Setenv("KUBERNETES_SERVICE_HOST", "k8s")
+	t.Setenv("KUBERNETES_SERVICE_PORT", "443")
+
+	p := k8sPlugin{}
+	if _, err := p.Load(context.Background(), "ns/sec#foo"); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestK8sBadBase64(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]map[string]string{"data": {"foo": "%%%"}})
+	}))
+	defer ts.Close()
+	restoreClient := setTestClient(ts)
+	defer restoreClient()
+	restoreFiles := writeFiles(t, "tok", "")
+	defer restoreFiles()
+	t.Setenv("KUBERNETES_SERVICE_HOST", "k8s")
+	t.Setenv("KUBERNETES_SERVICE_PORT", "443")
+
+	p := k8sPlugin{}
+	if _, err := p.Load(context.Background(), "ns/sec#foo"); err == nil {
+		t.Fatal("expected error")
+	}
+}
