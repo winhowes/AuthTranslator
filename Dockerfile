@@ -19,4 +19,5 @@ COPY app/config.yaml ./config.yaml
 RUN chown -R app:app /app
 USER app
 EXPOSE 8080
+HEALTHCHECK CMD wget -qO- http://localhost:8080/_at_internal/healthz || exit 1
 CMD ["./authtranslator"]
