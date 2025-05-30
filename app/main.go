@@ -8,7 +8,6 @@ import (
 	"crypto/x509"
 	"flag"
 	"fmt"
-	yaml "gopkg.in/yaml.v3"
 	"io"
 	"log"
 	"log/slog"
@@ -24,16 +23,18 @@ import (
 	"syscall"
 	"time"
 
+	yaml "gopkg.in/yaml.v3"
+
 	"github.com/fsnotify/fsnotify"
 
-	"github.com/winhowes/AuthTranslator/app/auth"
+	http3 "github.com/quic-go/quic-go/http3"
+	authplugins "github.com/winhowes/AuthTranslator/app/auth"
 	_ "github.com/winhowes/AuthTranslator/app/auth/plugins"
 	_ "github.com/winhowes/AuthTranslator/app/integrations/plugins"
 	"github.com/winhowes/AuthTranslator/app/metrics"
 	_ "github.com/winhowes/AuthTranslator/app/metrics/plugins"
 	"github.com/winhowes/AuthTranslator/app/secrets"
 	_ "github.com/winhowes/AuthTranslator/app/secrets/plugins"
-	http3 "golang.org/x/net/http3"
 )
 
 // version is the application version. It can be overridden at build time using
