@@ -75,6 +75,7 @@ var redisAddr = flag.String("redis-addr", "", "redis address for rate limits (ho
 var redisTimeout = flag.Duration("redis-timeout", 5*time.Second, "dial timeout for redis")
 var redisCA = flag.String("redis-ca", "", "path to CA certificate for Redis TLS; disables InsecureSkipVerify")
 var maxBodySizeFlag = flag.Int64("max_body_size", authplugins.MaxBodySize, "maximum bytes buffered from request bodies (0 to disable)")
+var secretRefresh = flag.Duration("secret-refresh", 0, "refresh interval for cached secrets (0 disables)")
 var showVersion = flag.Bool("version", false, "print version and exit")
 var watch = flag.Bool("watch", false, "watch config and allowlist files for changes")
 var metricsUser = flag.String("metrics-user", "", "username for metrics endpoint")
@@ -672,6 +673,7 @@ func main() {
 	}
 
 	authplugins.MaxBodySize = *maxBodySizeFlag
+	secrets.CacheTTL = *secretRefresh
 
 	if *showVersion {
 		fmt.Println(version)

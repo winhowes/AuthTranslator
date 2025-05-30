@@ -5,6 +5,7 @@ image:
 
 redisAddress: ""
 redisCA: ""
+secretRefresh: ""
 
 resources:
   limits:

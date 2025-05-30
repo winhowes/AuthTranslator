@@ -76,7 +76,7 @@ The proxy treats the entire value as opaque until the chosen back‑end returns 
 | On startup | All secret URIs are resolved **once**. Failure → fatal log + exit.                     |
 | Hot reload | On `SIGHUP` / `-watch`, new or changed URIs are fetched; unchanged values are re‑used. |
 | In‑request | Plugins never re‑fetch — avoids per‑call latency and rate limits.                      |
-| TTL        | Currently fixed; future work may add periodic refresh for rotated keys.                |
+| TTL        | Controlled by the `-secret-refresh` flag; `0` disables expiry. |
 
 ---
 

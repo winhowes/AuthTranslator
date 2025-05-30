@@ -38,6 +38,10 @@ spec:
             - "-redis-ca"
             - {{ .Values.redisCA | quote }}
             {{- end }}
+            {{- if .Values.secretRefresh }}
+            - "-secret-refresh"
+            - {{ .Values.secretRefresh | quote }}
+            {{- end }}
           volumeMounts:
             - name: config
               mountPath: /app/config.yaml

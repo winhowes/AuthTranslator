@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"strings"
 	"sync"
+	"time"
 )
 
 // Plugin fetches a secret value for a given identifier.
@@ -16,15 +17,25 @@ type Plugin interface {
 }
 
 var registry = make(map[string]Plugin)
+
+// CacheTTL controls how long resolved secrets remain valid. A zero duration
+// disables expiry so values persist until ClearCache is called.
+var CacheTTL time.Duration
+
+type cachedSecret struct {
+	val    string
+	expiry time.Time
+}
+
 var secretCache = struct {
 	sync.RWMutex
-	m map[string]string
-}{m: make(map[string]string)}
+	m map[string]cachedSecret
+}{m: make(map[string]cachedSecret)}
 
 // ClearCache empties the cached secret values.
 func ClearCache() {
 	secretCache.Lock()
-	secretCache.m = make(map[string]string)
+	secretCache.m = make(map[string]cachedSecret)
 	secretCache.Unlock()
 }
 
@@ -47,9 +58,11 @@ func ValidateSecret(ref string) error {
 // LoadSecret resolves a secret reference using the registered plugins.
 func LoadSecret(ctx context.Context, ref string) (string, error) {
 	secretCache.RLock()
-	if val, ok := secretCache.m[ref]; ok {
-		secretCache.RUnlock()
-		return val, nil
+	if c, ok := secretCache.m[ref]; ok {
+		if CacheTTL <= 0 || time.Now().Before(c.expiry) {
+			secretCache.RUnlock()
+			return c.val, nil
+		}
 	}
 	secretCache.RUnlock()
 
@@ -67,7 +80,11 @@ func LoadSecret(ctx context.Context, ref string) (string, error) {
 		return "", err
 	}
 	secretCache.Lock()
-	secretCache.m[ref] = val
+	exp := time.Time{}
+	if CacheTTL > 0 {
+		exp = time.Now().Add(CacheTTL)
+	}
+	secretCache.m[ref] = cachedSecret{val: val, expiry: exp}
 	secretCache.Unlock()
 	return val, nil
 }
