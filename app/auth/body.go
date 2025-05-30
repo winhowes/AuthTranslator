@@ -31,13 +31,14 @@ func GetBody(r *http.Request) ([]byte, error) {
 	}
 
 	b, err := io.ReadAll(reader)
+	// restore the consumed bytes so callers can read the body even on error
+	r.Body = io.NopCloser(io.MultiReader(bytes.NewReader(b), r.Body))
 	if err != nil {
 		return nil, err
 	}
 	if MaxBodySize > 0 && int64(len(b)) > MaxBodySize {
 		return nil, ErrBodyTooLarge
 	}
-	r.Body = io.NopCloser(bytes.NewReader(b))
 	ctx := context.WithValue(r.Context(), bodyKey{}, b)
 	*r = *r.WithContext(ctx)
 	return b, nil
