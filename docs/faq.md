@@ -71,9 +71,9 @@ Update the value in your vault/provider **and** trigger a hot reload (SIGHUP or 
 
 ---
 
-### 10 Does AuthTranslator support gRPC or WebSockets?
+### 10 Does AuthTranslator support gRPC or WebSockets?
 
-Not today. It operates on plain HTTP(S) requests; gRPC/WebSocket upgrades are currently rejected with **426 Upgrade Required**.
+Yes. Both protocols are proxied transparently so long as the upstream service speaks the same protocol. WebSocket upgrades and HTTP/2 gRPC calls work without extra configuration.
 
 ---
 
