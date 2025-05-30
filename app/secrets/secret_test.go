@@ -4,7 +4,9 @@ import (
 	"context"
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/rand"
 	"encoding/base64"
+	"errors"
 	"os"
 	"path/filepath"
 	"sync"
@@ -163,5 +165,24 @@ func TestLoadSecretInvalidReference(t *testing.T) {
 func TestLoadRandomSecretEmpty(t *testing.T) {
 	if _, err := secrets.LoadRandomSecret(context.Background(), nil); err == nil {
 		t.Fatal("expected error for empty secret list")
+	}
+}
+
+// errReader always returns an error from Read.
+type errReader struct{}
+
+func (errReader) Read(p []byte) (int, error) { return 0, errors.New("fail") }
+
+func TestLoadRandomSecretRandError(t *testing.T) {
+	t.Setenv("A", "first")
+	t.Setenv("B", "second")
+
+	original := rand.Reader
+	rand.Reader = errReader{}
+	defer func() { rand.Reader = original }()
+
+	_, err := secrets.LoadRandomSecret(context.Background(), []string{"env:A", "env:B"})
+	if err == nil {
+		t.Fatal("expected error from rand failure")
 	}
 }
