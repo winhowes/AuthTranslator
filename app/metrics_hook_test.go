@@ -17,7 +17,7 @@ func (h *hookPlugin) OnRequest(integ string, r *http.Request) {
 	h.req++
 }
 
-func (h *hookPlugin) OnResponse(integ string, r *http.Request, resp *http.Response) {
+func (h *hookPlugin) OnResponse(integ, caller string, r *http.Request, resp *http.Response) {
 	h.resp++
 }
 

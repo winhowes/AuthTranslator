@@ -8,7 +8,7 @@ import (
 // Plugin can record custom metrics for each request and response.
 type Plugin interface {
 	OnRequest(integration string, r *http.Request)
-	OnResponse(integration string, r *http.Request, resp *http.Response)
+	OnResponse(integration, caller string, r *http.Request, resp *http.Response)
 }
 
 var (
@@ -41,11 +41,11 @@ func OnRequest(integration string, r *http.Request) {
 }
 
 // OnResponse triggers all registered plugins for a completed response.
-func OnResponse(integration string, r *http.Request, resp *http.Response) {
+func OnResponse(integration, caller string, r *http.Request, resp *http.Response) {
 	mu.RLock()
 	ps := append([]Plugin(nil), plugins...)
 	mu.RUnlock()
 	for _, p := range ps {
-		p.OnResponse(integration, r, resp)
+		p.OnResponse(integration, caller, r, resp)
 	}
 }

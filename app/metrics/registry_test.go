@@ -15,7 +15,7 @@ func (p *testPlugin) OnRequest(integration string, r *http.Request) {
 	p.reqs++
 }
 
-func (p *testPlugin) OnResponse(integration string, r *http.Request, resp *http.Response) {
+func (p *testPlugin) OnResponse(integration, caller string, r *http.Request, resp *http.Response) {
 	p.resps++
 }
 
@@ -36,7 +36,7 @@ func TestRegistry(t *testing.T) {
 
 	req, _ := http.NewRequest(http.MethodGet, "http://example", nil)
 	OnRequest("foo", req)
-	OnResponse("foo", req, &http.Response{})
+	OnResponse("foo", "caller", req, &http.Response{})
 
 	if tp.reqs != 1 {
 		t.Fatalf("expected 1 request call, got %d", tp.reqs)

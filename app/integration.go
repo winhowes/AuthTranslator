@@ -177,7 +177,8 @@ func prepareIntegration(i *Integration) error {
 	i.proxy = httputil.NewSingleHostReverseProxy(u)
 	// Fire metrics hooks after the upstream responds.
 	i.proxy.ModifyResponse = func(resp *http.Response) error {
-		metrics.OnResponse(i.Name, resp.Request, resp)
+		caller := metrics.Caller(resp.Request.Context())
+		metrics.OnResponse(i.Name, caller, resp.Request, resp)
 		return nil
 	}
 
