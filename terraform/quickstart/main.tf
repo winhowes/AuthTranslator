@@ -12,8 +12,14 @@ terraform {
 
 provider "docker" {}
 
+variable "container_image" {
+  type        = string
+  description = "Container image to run"
+  default     = "ghcr.io/winhowes/authtranslator:latest"
+}
+
 resource "docker_image" "authtranslator" {
-  name         = "ghcr.io/winhowes/authtranslator:latest"
+  name = var.container_image
 }
 
 resource "docker_container" "authtranslator" {
