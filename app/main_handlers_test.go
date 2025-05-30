@@ -77,3 +77,38 @@ func TestMetricsHandlerAuthorized(t *testing.T) {
 		t.Fatalf("expected 200, got %d", rr.Code)
 	}
 }
+func TestLoadAllowlistsMissingFile(t *testing.T) {
+	if _, err := loadAllowlists("/no/such/file"); err == nil {
+		t.Fatal("expected error for missing file")
+	}
+}
+
+func TestLoadAllowlistsInvalidYAMLHandlers(t *testing.T) {
+	tmp, err := os.CreateTemp("", "al*.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	name := tmp.Name()
+	tmp.WriteString(":")
+	tmp.Close()
+	defer os.Remove(name)
+
+	if _, err := loadAllowlists(name); err == nil {
+		t.Fatal("expected YAML parse error")
+	}
+}
+
+func TestLoadAllowlistsUnknownFieldHandlers(t *testing.T) {
+	tmp, err := os.CreateTemp("", "al*.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	name := tmp.Name()
+	tmp.WriteString(`[{"bogus":1}]`)
+	tmp.Close()
+	defer os.Remove(name)
+
+	if _, err := loadAllowlists(name); err == nil {
+		t.Fatal("expected unknown field error")
+	}
+}

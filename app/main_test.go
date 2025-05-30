@@ -343,6 +343,41 @@ func TestAllowRedisTokenBucket(t *testing.T) {
 	<-done
 }
 
+func TestAllowRedisTokenBucketReject(t *testing.T) {
+	rl := NewRateLimiter(1, time.Hour, "token_bucket")
+	t.Cleanup(rl.Stop)
+	srv, cli := net.Pipe()
+	done := make(chan struct{})
+	ts := time.Now().UnixNano()
+	go func() {
+		defer func() { srv.Close(); close(done) }()
+		br := bufio.NewReader(srv)
+		if cmd, args := parseRedisCommand(t, br); cmd != "GET" || args[0] != "k" {
+			t.Errorf("unexpected command %s %v", cmd, args)
+			return
+		}
+		val := fmt.Sprintf("0 %d", ts)
+		srv.Write([]byte(fmt.Sprintf("$%d\r\n%s\r\n", len(val), val)))
+		if cmd, args := parseRedisCommand(t, br); cmd != "SET" || args[0] != "k" {
+			t.Errorf("unexpected command %s %v", cmd, args)
+			return
+		}
+		srv.Write([]byte("+OK\r\n"))
+		if cmd, _ := parseRedisCommand(t, br); cmd != "EXPIRE" && cmd != "PEXPIRE" {
+			t.Errorf("unexpected command %s", cmd)
+			return
+		}
+		srv.Write([]byte(":1\r\n"))
+	}()
+	ok, err := rl.allowRedisTokenBucket(cli, "k")
+	if err != nil {
+		t.Fatalf("allowRedisTokenBucket error: %v", err)
+	}
+	if ok {
+		t.Fatal("expected token bucket reject")
+	}
+	<-done
+}
 func TestAllowRedisLeakyBucketReject(t *testing.T) {
 	rl := NewRateLimiter(1, time.Hour, "leaky_bucket")
 	t.Cleanup(rl.Stop)
