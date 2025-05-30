@@ -91,6 +91,16 @@ func TestAddIntegrationInvalidDestination(t *testing.T) {
 	}
 }
 
+func TestAddIntegrationInvalidName(t *testing.T) {
+	i := &Integration{
+		Name:        "bad_name",
+		Destination: "http://example.com",
+	}
+	if err := AddIntegration(i); err == nil || !strings.Contains(err.Error(), "invalid integration name") {
+		t.Fatalf("expected invalid name error, got %v", err)
+	}
+}
+
 func TestAddIntegrationDuplicateName(t *testing.T) {
 	i := &Integration{
 		Name:         "testduplicate",
@@ -176,6 +186,25 @@ func TestDeleteIntegration(t *testing.T) {
 	}
 }
 
+func TestDeleteIntegrationRemovesAllowlist(t *testing.T) {
+	allowlists.Lock()
+	allowlists.m = make(map[string]map[string]CallerConfig)
+	allowlists.Unlock()
+
+	name := "delal"
+	i := &Integration{Name: name, Destination: "http://example.com"}
+	if err := AddIntegration(i); err != nil {
+		t.Fatalf("add: %v", err)
+	}
+	if err := SetAllowlist(name, []CallerConfig{{ID: "*"}}); err != nil {
+		t.Fatalf("set allowlist: %v", err)
+	}
+	DeleteIntegration(name)
+	if got := GetAllowlist(name); len(got) != 0 {
+		t.Fatalf("allowlist not removed: %v", got)
+	}
+}
+
 func TestIntegrationRateLimitWindow(t *testing.T) {
 	i := &Integration{
 		Name:            "window",
@@ -248,6 +277,56 @@ func TestIntegrationTransportSettings(t *testing.T) {
 	}
 	if tr.TLSClientConfig == nil || !tr.TLSClientConfig.InsecureSkipVerify {
 		t.Fatalf("TLS settings not applied")
+	}
+}
+
+func TestAddIntegrationInvalidTimeouts(t *testing.T) {
+	cases := []struct {
+		name string
+		mod  func(*Integration)
+		msg  string
+	}{
+		{
+			name: "idlebadformat",
+			mod:  func(i *Integration) { i.IdleConnTimeout = "bogus" },
+			msg:  "invalid idle_conn_timeout",
+		},
+		{
+			name: "idlebadneg",
+			mod:  func(i *Integration) { i.IdleConnTimeout = "-1s" },
+			msg:  "invalid idle_conn_timeout",
+		},
+		{
+			name: "handbadformat",
+			mod:  func(i *Integration) { i.TLSHandshakeTimeout = "bogus" },
+			msg:  "invalid tls_handshake_timeout",
+		},
+		{
+			name: "handneg",
+			mod:  func(i *Integration) { i.TLSHandshakeTimeout = "-1s" },
+			msg:  "invalid tls_handshake_timeout",
+		},
+		{
+			name: "respbadformat",
+			mod:  func(i *Integration) { i.ResponseHeaderTimeout = "bogus" },
+			msg:  "invalid response_header_timeout",
+		},
+		{
+			name: "respneg",
+			mod:  func(i *Integration) { i.ResponseHeaderTimeout = "-1s" },
+			msg:  "invalid response_header_timeout",
+		},
+	}
+
+	for _, tt := range cases {
+		i := &Integration{
+			Name:        tt.name,
+			Destination: "http://example.com",
+		}
+		tt.mod(i)
+		if err := AddIntegration(i); err == nil || !strings.Contains(err.Error(), tt.msg) {
+			t.Errorf("%s: expected %s error, got %v", tt.name, tt.msg, err)
+		}
 	}
 }
 
