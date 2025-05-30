@@ -709,6 +709,15 @@ func TestGoogleOIDCIdentifyWrongParams(t *testing.T) {
 	}
 }
 
+func TestGoogleOIDCIdentifyPrefixMismatch(t *testing.T) {
+	r := &http.Request{Header: http.Header{"Authorization": []string{"Token abc"}}}
+	g := GoogleOIDCAuth{}
+	cfg, _ := g.ParseParams(map[string]interface{}{"audience": "a"})
+	if id, ok := g.Identify(r, cfg); ok || id != "" {
+		t.Fatalf("expected prefix mismatch failure")
+	}
+}
+
 func TestParseExpiryValues(t *testing.T) {
 	if d := parseExpiry("bad"); time.Until(d) <= 0 {
 		t.Fatalf("unexpected expiry %v", d)
@@ -722,5 +731,45 @@ func TestParseExpiryValues(t *testing.T) {
 	d := parseExpiry("h." + payload)
 	if d.Unix() != expTime {
 		t.Fatalf("unexpected expiry %v", d)
+	}
+}
+
+func TestParseAndVerifyBadToken(t *testing.T) {
+	if _, ok := parseAndVerify("abc"); ok {
+		t.Fatal("expected failure for malformed token")
+	}
+}
+
+func TestFetchTokenBadURL(t *testing.T) {
+	oldHost := MetadataHost
+	MetadataHost = "://"
+	defer func() { MetadataHost = oldHost }()
+	if _, _, err := fetchToken("aud"); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestFetchKeysInvalidKeyData(t *testing.T) {
+	jwks := `{"keys":[{"kty":"RSA","kid":"bad","alg":"RS256","n":"!!","e":"!!"}]}`
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { fmt.Fprint(w, jwks) }))
+	defer ts.Close()
+	oldURL := CertsURL
+	CertsURL = ts.URL
+	defer func() { CertsURL = oldURL }()
+	oldClient := HTTPClient
+	HTTPClient = ts.Client()
+	defer func() { HTTPClient = oldClient }()
+	keyCache.mu.Lock()
+	keyCache.keys = nil
+	keyCache.expiry = time.Time{}
+	keyCache.mu.Unlock()
+	if err := fetchKeys(); err != nil {
+		t.Fatal(err)
+	}
+	keyCache.mu.RLock()
+	_, ok := keyCache.keys["bad"]
+	keyCache.mu.RUnlock()
+	if ok {
+		t.Fatal("invalid key should not be cached")
 	}
 }
