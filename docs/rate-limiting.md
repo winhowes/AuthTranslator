@@ -64,6 +64,12 @@ Example: If a caller peaks at 12 RPS and you choose a 60 s window → `12 × 
 
 ---
 
+## Back‑pressure headers
+
+When a request is throttled the proxy sets a `Retry‑After` header with the number of seconds until the caller may try again.
+
+---
+
 ## Logs & metrics
 
 * **Structured log** when a request is throttled:
@@ -74,11 +80,3 @@ Example: If a caller peaks at 12 RPS and you choose a 60 s window → `12 × 
 * Prometheus: `authtranslator_rate_limit_events_total{integration="slack"}`
 
 Grafana sample dashboard lives in [`docs/ops/grafana-rate-limits.json`](ops/grafana-rate-limits.json).
-
----
-
-## Future work
-
-* Back‑pressure headers (`Retry‑After`).
-* Additional algorithms.
-* Pluggable backends (Memcached / Cloud Spanner).

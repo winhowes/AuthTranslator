@@ -268,7 +268,7 @@ func TestProxyHandlerRateLimiterUsesIP(t *testing.T) {
 	}))
 	defer backend.Close()
 
-	integ := Integration{Name: "rl-ip", Destination: backend.URL, InRateLimit: 1, OutRateLimit: 10}
+	integ := Integration{Name: "rl-ip", Destination: backend.URL, InRateLimit: 1, OutRateLimit: 10, RateLimitWindow: "2s"}
 	if err := AddIntegration(&integ); err != nil {
 		t.Fatalf("failed to add integration: %v", err)
 	}
@@ -293,6 +293,9 @@ func TestProxyHandlerRateLimiterUsesIP(t *testing.T) {
 	proxyHandler(rr2, req2)
 	if rr2.Code != http.StatusTooManyRequests {
 		t.Fatalf("expected rate limit rejection, got %d", rr2.Code)
+	}
+	if rr2.Header().Get("Retry-After") == "" {
+		t.Fatal("missing Retry-After header")
 	}
 }
 
