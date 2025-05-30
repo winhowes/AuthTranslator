@@ -2,9 +2,12 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/fsnotify/fsnotify"
 )
 
 func TestWatchFiles(t *testing.T) {
@@ -101,4 +104,49 @@ func TestWatchFilesCancel(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("watchFiles did not exit after cancel")
 	}
+}
+
+type mockWatcher struct {
+	events chan fsnotify.Event
+	errors chan error
+	addErr error
+}
+
+func (m *mockWatcher) Add(name string) error         { return m.addErr }
+func (m *mockWatcher) Close() error                  { close(m.events); close(m.errors); return nil }
+func (m *mockWatcher) Events() <-chan fsnotify.Event { return m.events }
+func (m *mockWatcher) Errors() <-chan error          { return m.errors }
+
+func TestWatchFilesError(t *testing.T) {
+	mw := &mockWatcher{events: make(chan fsnotify.Event), errors: make(chan error, 1)}
+	old := newWatcher
+	newWatcher = func() (fileWatcher, error) { return mw, nil }
+	defer func() { newWatcher = old }()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { watchFiles(ctx, nil, make(chan struct{})); close(done) }()
+	mw.errors <- fmt.Errorf("boom")
+	cancel()
+	<-done
+}
+
+func TestWatchFilesRenameAddError(t *testing.T) {
+	mw := &mockWatcher{events: make(chan fsnotify.Event, 1), errors: make(chan error), addErr: fmt.Errorf("fail")}
+	old := newWatcher
+	newWatcher = func() (fileWatcher, error) { return mw, nil }
+	defer func() { newWatcher = old }()
+
+	ch := make(chan struct{}, 1)
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { watchFiles(ctx, []string{"f"}, ch); close(done) }()
+	mw.events <- fsnotify.Event{Name: "f", Op: fsnotify.Rename}
+	select {
+	case <-ch:
+	case <-time.After(time.Second):
+		t.Fatal("timeout waiting for event")
+	}
+	cancel()
+	<-done
 }

@@ -871,8 +871,28 @@ func redisCmd(conn net.Conn, args ...string) error {
 	}
 }
 
-func watchFiles(ctx context.Context, files []string, out chan<- struct{}) {
+type fileWatcher interface {
+	Add(string) error
+	Close() error
+	Events() <-chan fsnotify.Event
+	Errors() <-chan error
+}
+
+type fswatcher struct{ *fsnotify.Watcher }
+
+func (f fswatcher) Events() <-chan fsnotify.Event { return f.Watcher.Events }
+func (f fswatcher) Errors() <-chan error          { return f.Watcher.Errors }
+
+var newWatcher = func() (fileWatcher, error) {
 	w, err := fsnotify.NewWatcher()
+	if err != nil {
+		return nil, err
+	}
+	return fswatcher{w}, nil
+}
+
+func watchFiles(ctx context.Context, files []string, out chan<- struct{}) {
+	w, err := newWatcher()
 	if err != nil {
 		logger.Error("failed to create watcher", "error", err)
 		return
@@ -889,7 +909,7 @@ func watchFiles(ctx context.Context, files []string, out chan<- struct{}) {
 		select {
 		case <-ctx.Done():
 			return
-		case ev, ok := <-w.Events:
+		case ev, ok := <-w.Events():
 			if !ok {
 				return
 			}
@@ -920,7 +940,7 @@ func watchFiles(ctx context.Context, files []string, out chan<- struct{}) {
 				default:
 				}
 			}
-		case err, ok := <-w.Errors:
+		case err, ok := <-w.Errors():
 			if !ok {
 				return
 			}
