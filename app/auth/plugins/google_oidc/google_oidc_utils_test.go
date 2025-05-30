@@ -31,6 +31,15 @@ func TestParseExpiryInvalid(t *testing.T) {
 	}
 }
 
+func TestParseExpiryDecodeError(t *testing.T) {
+	now := time.Now()
+	tok := "h.!bad.sig"
+	got := parseExpiry(tok)
+	if got.Before(now) || got.After(now.Add(2*time.Minute)) {
+		t.Fatalf("unexpected expiry %v", got)
+	}
+}
+
 func TestTokenCache(t *testing.T) {
 	tokenCache.Lock()
 	tokenCache.m = make(map[string]cachedToken)
