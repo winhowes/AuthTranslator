@@ -51,6 +51,19 @@ AuthTranslator exposes several command‑line options:
 
 ---
 
+## Integration routing
+
+By default the proxy chooses an integration by matching the request's `Host`
+header to the names declared in `config.yaml`.  When clients cannot change the
+`Host` header, they may supply an `X-AT-Int` header instead.  Its value is treated
+the same as a host name and looked up case-insensitively.
+
+The header is ignored when the service starts with `-disable_x_at_int`.  Use
+`-x_at_int_host` to allow overrides only when the incoming `Host` matches a
+specific value.
+
+---
+
 ## Running tests
 
 Use the Makefile helpers before committing changes:
