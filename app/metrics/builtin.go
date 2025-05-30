@@ -1,4 +1,4 @@
-package main
+package metrics
 
 import (
 	"crypto/subtle"
@@ -19,7 +19,7 @@ var (
 	authFailureCounts    = expvar.NewMap("authtranslator_auth_failures_total")
 	upstreamStatusCounts = expvar.NewMap("authtranslator_upstream_responses_total")
 	requestDurations     = expvar.NewMap("authtranslator_request_duration_seconds")
-	lastReloadTime       = expvar.NewString("authtranslator_last_reload")
+	LastReloadTime       = expvar.NewString("authtranslator_last_reload")
 	durationHistsMu      sync.Mutex
 	durationHists        = make(map[string]*histogram)
 	durationBuckets      = []float64{0.1, 0.25, 0.5, 1, 2.5, 5, 10}
@@ -40,7 +40,7 @@ func newHistogram() *histogram {
 }
 
 func init() {
-	lastReloadTime.Set(time.Now().Format(time.RFC3339))
+	LastReloadTime.Set(time.Now().Format(time.RFC3339))
 }
 
 func (h *histogram) Observe(v float64) {
@@ -96,24 +96,23 @@ func (h *histogram) writeProm(w http.ResponseWriter, integ string) {
 	fmt.Fprintf(w, "authtranslator_request_duration_seconds_count{integration=%q} %d\n", integ, cum)
 }
 
-func incRequest(integration string) {
-	requestCounts.Add(integration, 1)
-}
+// IncRequest increments the request counter for the integration.
+func IncRequest(integration string) { requestCounts.Add(integration, 1) }
 
-func incRateLimit(integration string) {
-	rateLimitCounts.Add(integration, 1)
-}
+// IncRateLimit increments the rate limit counter for the integration.
+func IncRateLimit(integration string) { rateLimitCounts.Add(integration, 1) }
 
-func incAuthFailure(integration string) {
-	authFailureCounts.Add(integration, 1)
-}
+// IncAuthFailure increments the auth failure counter for the integration.
+func IncAuthFailure(integration string) { authFailureCounts.Add(integration, 1) }
 
-func recordStatus(integration string, status int) {
+// RecordStatus records the upstream status code for the integration.
+func RecordStatus(integration string, status int) {
 	key := fmt.Sprintf("%s_%d", integration, status)
 	upstreamStatusCounts.Add(key, 1)
 }
 
-func recordDuration(integration string, d time.Duration) {
+// RecordDuration records the upstream request duration.
+func RecordDuration(integration string, d time.Duration) {
 	durationHistsMu.Lock()
 	h, ok := durationHists[integration]
 	if !ok {
@@ -125,16 +124,8 @@ func recordDuration(integration string, d time.Duration) {
 	h.Observe(d.Seconds())
 }
 
-func metricsHandler(w http.ResponseWriter, r *http.Request) {
-	if *metricsUser != "" && *metricsPass != "" {
-		user, pass, ok := r.BasicAuth()
-		if !ok || subtle.ConstantTimeCompare([]byte(user), []byte(*metricsUser)) != 1 ||
-			subtle.ConstantTimeCompare([]byte(pass), []byte(*metricsPass)) != 1 {
-			w.Header().Set("WWW-Authenticate", `Basic realm="metrics"`)
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			return
-		}
-	}
+// WriteProm emits all Prometheus metrics to w in text format.
+func WriteProm(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "text/plain; version=0.0.4")
 	requestCounts.Do(func(kv expvar.KeyValue) {
 		fmt.Fprintf(w, "authtranslator_requests_total{integration=%q} %s\n", kv.Key, kv.Value.String())
@@ -158,4 +149,18 @@ func metricsHandler(w http.ResponseWriter, r *http.Request) {
 		integ, code := parts[0], parts[1]
 		fmt.Fprintf(w, "authtranslator_upstream_responses_total{integration=%q,code=%q} %s\n", integ, code, kv.Value.String())
 	})
+}
+
+// Handler writes Prometheus metrics to w enforcing optional basic auth.
+func Handler(w http.ResponseWriter, r *http.Request, user, pass string) {
+	if user != "" && pass != "" {
+		u, p, ok := r.BasicAuth()
+		if !ok || subtle.ConstantTimeCompare([]byte(u), []byte(user)) != 1 ||
+			subtle.ConstantTimeCompare([]byte(p), []byte(pass)) != 1 {
+			w.Header().Set("WWW-Authenticate", `Basic realm="metrics"`)
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+	}
+	WriteProm(w)
 }

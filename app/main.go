@@ -28,6 +28,7 @@ import (
 	_ "github.com/winhowes/AuthTranslator/app/auth/plugins"
 	_ "github.com/winhowes/AuthTranslator/app/integrations/plugins"
 	"github.com/winhowes/AuthTranslator/app/metrics"
+	_ "github.com/winhowes/AuthTranslator/app/metrics/plugins"
 	"github.com/winhowes/AuthTranslator/app/secrets"
 	_ "github.com/winhowes/AuthTranslator/app/secrets/plugins"
 )
@@ -216,7 +217,7 @@ func reload() error {
 		}
 	}
 
-	lastReloadTime.Set(time.Now().Format(time.RFC3339))
+	metrics.LastReloadTime.Set(time.Now().Format(time.RFC3339))
 
 	return nil
 }
@@ -620,8 +621,13 @@ func watchFiles(ctx context.Context, files []string, out chan<- struct{}) {
 
 // healthzHandler reports server readiness.
 func healthzHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("X-Last-Reload", lastReloadTime.Value())
+	w.Header().Set("X-Last-Reload", metrics.LastReloadTime.Value())
 	w.WriteHeader(http.StatusOK)
+}
+
+// metricsHandler exposes Prometheus metrics with optional basic auth.
+func metricsHandler(w http.ResponseWriter, r *http.Request) {
+	metrics.Handler(w, r, *metricsUser, *metricsPass)
 }
 
 // proxyHandler handles incoming requests and proxies them according to the integration.
@@ -637,15 +643,10 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 	integ, ok := GetIntegration(hostLookup)
 	if !ok {
 		logger.Warn("no integration configured", "host", host)
-		incRequest("unknown")
+		metrics.IncRequest("unknown")
 		http.Error(w, "Not Found", http.StatusNotFound)
 		return
 	}
-	defer incRequest(integ.Name)
-	start := time.Now()
-	defer func() {
-		recordDuration(integ.Name, time.Since(start))
-	}()
 
 	clientIP, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
@@ -658,7 +659,7 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 		if p != nil {
 			if !p.Authenticate(r.Context(), r, cfg.parsed) {
 				logger.Warn("authentication failed", "host", host, "remote", r.RemoteAddr)
-				incAuthFailure(integ.Name)
+				metrics.IncAuthFailure(integ.Name)
 				http.Error(w, "Unauthorized", http.StatusUnauthorized)
 				return
 			}
@@ -677,13 +678,13 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 
 	if !integ.inLimiter.Allow(rateKey) {
 		logger.Warn("caller exceeded rate limit", "caller", rateKey, "host", host)
-		incRateLimit(integ.Name)
+		metrics.IncRateLimit(integ.Name)
 		http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
 		return
 	}
 	if !integ.outLimiter.Allow(host) {
 		logger.Warn("host exceeded rate limit", "host", host)
-		incRateLimit(integ.Name)
+		metrics.IncRateLimit(integ.Name)
 		http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
 		return
 	}
@@ -719,7 +720,6 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 	if rec.status == 0 {
 		rec.status = http.StatusOK
 	}
-	recordStatus(integ.Name, rec.status)
 	logger.Info("upstream response", "host", host, "status", rec.status)
 }
 
