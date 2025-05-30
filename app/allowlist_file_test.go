@@ -47,3 +47,20 @@ func TestLoadAllowlistsUnknownField(t *testing.T) {
 		t.Fatal("expected error for unknown field")
 	}
 }
+
+func TestLoadAllowlistsEmptyFile(t *testing.T) {
+	tmp, err := os.CreateTemp("", "empty*.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tmp.Name())
+	tmp.Close()
+
+	entries, err := loadAllowlists(tmp.Name())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("expected zero entries, got %d", len(entries))
+	}
+}

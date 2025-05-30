@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -62,6 +63,9 @@ func loadAllowlists(filename string) ([]AllowlistEntry, error) {
 
 	var entries []AllowlistEntry
 	if err := dec.Decode(&entries); err != nil {
+		if errors.Is(err, io.EOF) {
+			return entries, nil
+		}
 		return nil, err
 	}
 
