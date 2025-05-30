@@ -202,3 +202,85 @@ func TestLeakyBucketPartialLeak(t *testing.T) {
 		t.Fatal("next immediate call should be rate limited")
 	}
 }
+
+func TestRetryAfterFixedWindow(t *testing.T) {
+	rl := NewRateLimiter(1, 50*time.Millisecond, "")
+	t.Cleanup(rl.Stop)
+	key := "caller"
+
+	if !rl.Allow(key) {
+		t.Fatal("initial call should be allowed")
+	}
+	if rl.Allow(key) {
+		t.Fatal("second call should be rate limited")
+	}
+	if d := rl.RetryAfter(key); d <= 0 || d > 50*time.Millisecond {
+		t.Fatalf("unexpected retry after %v", d)
+	}
+	time.Sleep(60 * time.Millisecond)
+	if d := rl.RetryAfter(key); d == 0 {
+		// we waited long enough for the window to reset; skip further check if ticker timing reached the next cycle
+	} else if d > 50*time.Millisecond {
+		t.Fatalf("retry after too large: %v", d)
+	}
+}
+
+func TestRetryAfterTokenBucket(t *testing.T) {
+	rl := NewRateLimiter(1, 100*time.Millisecond, "token_bucket")
+	key := "caller"
+	if !rl.Allow(key) {
+		t.Fatal("initial call should be allowed")
+	}
+	if rl.Allow(key) {
+		t.Fatal("second call should be rate limited")
+	}
+	if d := rl.RetryAfter("other"); d != 0 {
+		t.Fatalf("expected 0 for unused key, got %v", d)
+	}
+	if d := rl.RetryAfter(key); d <= 0 || d > 100*time.Millisecond {
+		t.Fatalf("unexpected retry after %v", d)
+	}
+}
+
+func TestRetryAfterLeakyBucket(t *testing.T) {
+	rl := NewRateLimiter(1, 100*time.Millisecond, "leaky_bucket")
+	key := "caller"
+	if !rl.Allow(key) {
+		t.Fatal("initial call should be allowed")
+	}
+	if rl.Allow(key) {
+		t.Fatal("second call should be rate limited")
+	}
+	if d := rl.RetryAfter("other"); d != 0 {
+		t.Fatalf("expected 0 for unused key, got %v", d)
+	}
+	if d := rl.RetryAfter(key); d <= 0 || d > 100*time.Millisecond {
+		t.Fatalf("unexpected retry after %v", d)
+	}
+}
+
+func TestRetryAfterLeakyBucketAfterLeak(t *testing.T) {
+	rl := NewRateLimiter(1, 50*time.Millisecond, "leaky_bucket")
+	key := "caller"
+	if !rl.Allow(key) {
+		t.Fatal("first call should be allowed")
+	}
+	time.Sleep(60 * time.Millisecond)
+	if d := rl.RetryAfter(key); d != 0 {
+		t.Fatalf("expected 0 after leak, got %v", d)
+	}
+}
+
+func TestRetryAfterNoLimit(t *testing.T) {
+	rl := NewRateLimiter(0, time.Hour, "")
+	if d := rl.RetryAfter("k"); d != 0 {
+		t.Fatalf("expected 0 for unlimited limiter, got %v", d)
+	}
+}
+
+func TestRetryAfterUnknownStrategy(t *testing.T) {
+	rl := NewRateLimiter(1, 42*time.Millisecond, "bogus")
+	if d := rl.RetryAfter("k"); d != 42*time.Millisecond {
+		t.Fatalf("expected %v got %v", 42*time.Millisecond, d)
+	}
+}
