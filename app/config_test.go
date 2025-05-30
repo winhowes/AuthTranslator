@@ -47,3 +47,25 @@ func TestLoadConfigUnknownField(t *testing.T) {
 		t.Fatal("expected error for unknown field")
 	}
 }
+
+func TestLoadConfigValid(t *testing.T) {
+	tmp, err := ioutil.TempFile("", "good*.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tmp.Name())
+
+	data := `{"integrations":[{"name":"a","destination":"http://ex"}]}`
+	if _, err := tmp.WriteString(data); err != nil {
+		t.Fatal(err)
+	}
+	tmp.Close()
+
+	cfg, err := loadConfig(tmp.Name())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(cfg.Integrations) != 1 || cfg.Integrations[0].Name != "a" || cfg.Integrations[0].Destination != "http://ex" {
+		t.Fatalf("unexpected config %+v", cfg)
+	}
+}
