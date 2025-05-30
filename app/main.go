@@ -130,6 +130,26 @@ func parseLevel(s string) slog.Level {
 	}
 }
 
+type fileWatcher interface {
+	Add(name string) error
+	Close() error
+	Events() <-chan fsnotify.Event
+	Errors() <-chan error
+}
+
+type fsnotifyWatcher struct{ *fsnotify.Watcher }
+
+func (w *fsnotifyWatcher) Events() <-chan fsnotify.Event { return w.Watcher.Events }
+func (w *fsnotifyWatcher) Errors() <-chan error          { return w.Watcher.Errors }
+
+var newWatcher = func() (fileWatcher, error) {
+	w, err := fsnotify.NewWatcher()
+	if err != nil {
+		return nil, err
+	}
+	return &fsnotifyWatcher{w}, nil
+}
+
 // reload reparses the configuration and allowlist files, replacing all
 // registered integrations and allowlists. Existing rate limiters are
 // stopped before the new configuration is loaded.
@@ -865,7 +885,7 @@ func redisCmd(conn net.Conn, args ...string) error {
 }
 
 func watchFiles(ctx context.Context, files []string, out chan<- struct{}) {
-	w, err := fsnotify.NewWatcher()
+	w, err := newWatcher()
 	if err != nil {
 		logger.Error("failed to create watcher", "error", err)
 		return
@@ -882,7 +902,7 @@ func watchFiles(ctx context.Context, files []string, out chan<- struct{}) {
 		select {
 		case <-ctx.Done():
 			return
-		case ev, ok := <-w.Events:
+		case ev, ok := <-w.Events():
 			if !ok {
 				return
 			}
@@ -913,7 +933,7 @@ func watchFiles(ctx context.Context, files []string, out chan<- struct{}) {
 				default:
 				}
 			}
-		case err, ok := <-w.Errors:
+		case err, ok := <-w.Errors():
 			if !ok {
 				return
 			}
