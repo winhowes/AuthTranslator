@@ -6,7 +6,7 @@
       "title": "Rate Limit Exceeded",
       "targets": [
         {
-          "expr": "sum(rate(authtranslator_rate_limit_exceeded_total[5m])) by (integration)",
+          "expr": "sum(rate(authtranslator_rate_limit_events_total[5m])) by (integration)",
           "legendFormat": "{{integration}}"
         }
       ]
