@@ -602,6 +602,47 @@ func TestRetryAfterRedisNoTTL(t *testing.T) {
 	}
 }
 
+func TestRetryAfterRedisNoPool(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+
+	old := *redisAddr
+	*redisAddr = ln.Addr().String()
+	rl := NewRateLimiter(1, time.Second, "")
+	rl.conns = nil
+	t.Cleanup(func() {
+		*redisAddr = old
+		rl.Stop()
+	})
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		conn, err := ln.Accept()
+		if err != nil {
+			return
+		}
+		br := bufio.NewReader(conn)
+		if cmd, args := parseRedisCommand(t, br); cmd != "PTTL" || args[0] != "k" {
+			t.Errorf("unexpected command %s %v", cmd, args)
+		}
+		conn.Write([]byte(":0\r\n"))
+		conn.Close()
+	}()
+
+	d, err := rl.retryAfterRedis("k")
+	if err != nil {
+		t.Fatalf("retryAfterRedis returned error: %v", err)
+	}
+	if d != 0 {
+		t.Fatalf("expected 0 duration, got %v", d)
+	}
+	<-done
+}
+
 func TestRetryAfterRedisDialError(t *testing.T) {
 	oldAddr, oldTimeout := *redisAddr, *redisTimeout
 	*redisAddr = "127.0.0.1:1"
