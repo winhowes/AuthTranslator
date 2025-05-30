@@ -284,7 +284,46 @@ func matchValue(data, rule interface{}) bool {
 		}
 		return true
 	default:
+		// YAML unmarshals numbers without decimals as ints while JSON
+		// decoding uses float64. Normalize numeric types so the values
+		// compare equal regardless of how they were parsed.
+		if df, ok := toFloat(data); ok {
+			if rf, ok2 := toFloat(rv); ok2 {
+				return df == rf
+			}
+		}
 		return data == rule
+	}
+}
+
+func toFloat(v interface{}) (float64, bool) {
+	switch n := v.(type) {
+	case int:
+		return float64(n), true
+	case int8:
+		return float64(n), true
+	case int16:
+		return float64(n), true
+	case int32:
+		return float64(n), true
+	case int64:
+		return float64(n), true
+	case uint:
+		return float64(n), true
+	case uint8:
+		return float64(n), true
+	case uint16:
+		return float64(n), true
+	case uint32:
+		return float64(n), true
+	case uint64:
+		return float64(n), true
+	case float32:
+		return float64(n), true
+	case float64:
+		return n, true
+	default:
+		return 0, false
 	}
 }
 
