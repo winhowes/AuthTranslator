@@ -14,7 +14,8 @@ AuthTranslator surfaces **health probes, Prometheus metrics, and structured logs
 The health endpoint is always available and returns an `X-Last-Reload` header
 showing the most recent configuration reload time. The metrics endpoint is
 exposed by default but can be disabled with `-enable-metrics=false`. Provide
-`-metrics-user` and `-metrics-pass` to require HTTP Basic credentials.
+**both** `-metrics-user` **and** `-metrics-pass` to require HTTP Basic
+credentials – omitting either one causes the service to exit on startup.
 
 ---
 

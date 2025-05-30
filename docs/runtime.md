@@ -46,8 +46,8 @@ AuthTranslator exposes several command‑line options:
 | `-version` | print the build version and exit |
 | `-watch` | automatically reload when config or allowlist files change |
 | `-enable-metrics` | expose the `/_at_internal/metrics` endpoint (default `true`) |
-| `-metrics-user` | username required to access `/_at_internal/metrics` |
-| `-metrics-pass` | password required to access `/_at_internal/metrics` |
+| `-metrics-user` | username required to access `/_at_internal/metrics` (must be used with `-metrics-pass`) |
+| `-metrics-pass` | password required to access `/_at_internal/metrics` (must be used with `-metrics-user`) |
 
 ---
 
