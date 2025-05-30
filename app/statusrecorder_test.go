@@ -116,3 +116,30 @@ func TestStatusRecorderHijackUnsupported(t *testing.T) {
 		t.Fatal("expected error for unsupported hijacker")
 	}
 }
+
+type notifyingRecorder struct {
+	*httptest.ResponseRecorder
+	ch chan bool
+}
+
+func (n *notifyingRecorder) CloseNotify() <-chan bool { return n.ch }
+
+func TestStatusRecorderCloseNotifyForwarded(t *testing.T) {
+	ch := make(chan bool, 1)
+	rr := &notifyingRecorder{ResponseRecorder: httptest.NewRecorder(), ch: ch}
+	rec := &statusRecorder{ResponseWriter: rr}
+
+	got := rec.CloseNotify()
+	if got != ch {
+		t.Fatalf("expected channel %v, got %v", ch, got)
+	}
+}
+
+func TestStatusRecorderCloseNotifyUnsupported(t *testing.T) {
+	rec := &statusRecorder{ResponseWriter: dummyWriter{}}
+	select {
+	case <-rec.CloseNotify():
+		t.Fatal("unexpected close notification")
+	default:
+	}
+}
