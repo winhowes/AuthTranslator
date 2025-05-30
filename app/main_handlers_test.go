@@ -1,6 +1,8 @@
 package main
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"testing"
 
@@ -41,5 +43,37 @@ func TestParseLevel(t *testing.T) {
 		if got := parseLevel(s); got != want {
 			t.Errorf("parseLevel(%q)=%v want %v", s, got, want)
 		}
+	}
+}
+
+func TestMetricsHandlerUnauthorized(t *testing.T) {
+	oldUser, oldPass := *metricsUser, *metricsPass
+	*metricsUser = "admin"
+	*metricsPass = "secret"
+	defer func() { *metricsUser = oldUser; *metricsPass = oldPass }()
+
+	req := httptest.NewRequest(http.MethodGet, "/_at_internal/metrics", nil)
+	rr := httptest.NewRecorder()
+	metricsHandler(rr, req)
+	if rr.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d", rr.Code)
+	}
+	if rr.Header().Get("WWW-Authenticate") == "" {
+		t.Fatal("missing WWW-Authenticate header")
+	}
+}
+
+func TestMetricsHandlerAuthorized(t *testing.T) {
+	oldUser, oldPass := *metricsUser, *metricsPass
+	*metricsUser = "admin"
+	*metricsPass = "secret"
+	defer func() { *metricsUser = oldUser; *metricsPass = oldPass }()
+
+	req := httptest.NewRequest(http.MethodGet, "/_at_internal/metrics", nil)
+	req.SetBasicAuth("admin", "secret")
+	rr := httptest.NewRecorder()
+	metricsHandler(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rr.Code)
 	}
 }
