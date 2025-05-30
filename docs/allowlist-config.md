@@ -43,6 +43,7 @@ Capabilities serve two goals:
 2. **Auditability** – security reviewers can grep for the label instead of combing through lengthy rule lists. If a suitable capability exists, **prefer it over hand‑rolled granular rules**.
 
 Capabilities are defined **next to each integration plugin**. They expand into one or more granular rules that match that integration’s API surface.
+Look for a `capabilities.go` file under `app/integrations/plugins/<integration>/` to see the code powering each capability.
 
 ```yaml
 - integration: slack
