@@ -128,13 +128,14 @@ type RequestConstraint = integrationplugins.RequestConstraint
 
 // Integration represents a configured proxy integration.
 type Integration struct {
-	Name            string             `json:"name"`
-	Destination     string             `json:"destination"`
-	InRateLimit     int                `json:"in_rate_limit"`
-	OutRateLimit    int                `json:"out_rate_limit"`
-	IncomingAuth    []AuthPluginConfig `json:"incoming_auth"`
-	OutgoingAuth    []AuthPluginConfig `json:"outgoing_auth"`
-	RateLimitWindow string             `json:"rate_limit_window"`
+	Name              string             `json:"name"`
+	Destination       string             `json:"destination"`
+	InRateLimit       int                `json:"in_rate_limit"`
+	OutRateLimit      int                `json:"out_rate_limit"`
+	IncomingAuth      []AuthPluginConfig `json:"incoming_auth"`
+	OutgoingAuth      []AuthPluginConfig `json:"outgoing_auth"`
+	RateLimitWindow   string             `json:"rate_limit_window"`
+	RateLimitStrategy string             `json:"rate_limit_strategy,omitempty"`
 
 	rateLimitDur time.Duration `json:"-"`
 
@@ -191,6 +192,15 @@ func prepareIntegration(i *Integration) error {
 		i.rateLimitDur = d
 	} else {
 		i.rateLimitDur = 0
+	}
+
+	if i.RateLimitStrategy == "" {
+		i.RateLimitStrategy = "fixed_window"
+	}
+	switch i.RateLimitStrategy {
+	case "fixed_window", "token_bucket":
+	default:
+		return fmt.Errorf("invalid rate_limit_strategy %s", i.RateLimitStrategy)
 	}
 
 	// ─── Validate incoming-auth configs ───────────────────────────────────────
@@ -303,8 +313,8 @@ func AddIntegration(i *Integration) error {
 		integrations.Unlock()
 		return fmt.Errorf("integration %s already exists", i.Name)
 	}
-	i.inLimiter = NewRateLimiter(i.InRateLimit, window)
-	i.outLimiter = NewRateLimiter(i.OutRateLimit, window)
+	i.inLimiter = NewRateLimiter(i.InRateLimit, window, i.RateLimitStrategy)
+	i.outLimiter = NewRateLimiter(i.OutRateLimit, window, i.RateLimitStrategy)
 	integrations.m[i.Name] = i
 	integrations.Unlock()
 
@@ -344,8 +354,8 @@ func UpdateIntegration(i *Integration) error {
 		old.inLimiter.Stop()
 		old.outLimiter.Stop()
 	}
-	i.inLimiter = NewRateLimiter(i.InRateLimit, window)
-	i.outLimiter = NewRateLimiter(i.OutRateLimit, window)
+	i.inLimiter = NewRateLimiter(i.InRateLimit, window, i.RateLimitStrategy)
+	i.outLimiter = NewRateLimiter(i.OutRateLimit, window, i.RateLimitStrategy)
 	integrations.m[i.Name] = i
 	integrations.Unlock()
 	return nil

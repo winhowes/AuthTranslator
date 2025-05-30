@@ -6,7 +6,7 @@ import (
 )
 
 func TestRateLimiterExceedLimit(t *testing.T) {
-	rl := NewRateLimiter(2, time.Hour)
+	rl := NewRateLimiter(2, time.Hour, "")
 	t.Cleanup(rl.Stop)
 	key := "caller"
 
@@ -22,7 +22,7 @@ func TestRateLimiterExceedLimit(t *testing.T) {
 }
 
 func TestRateLimiterReset(t *testing.T) {
-	rl := NewRateLimiter(1, 20*time.Millisecond)
+	rl := NewRateLimiter(1, 20*time.Millisecond, "")
 	t.Cleanup(rl.Stop)
 	key := "caller"
 
@@ -42,7 +42,7 @@ func TestRateLimiterReset(t *testing.T) {
 }
 
 func TestRateLimiterUnlimited(t *testing.T) {
-	rl := NewRateLimiter(0, time.Hour)
+	rl := NewRateLimiter(0, time.Hour, "")
 	t.Cleanup(rl.Stop)
 	key := "caller"
 
@@ -54,7 +54,7 @@ func TestRateLimiterUnlimited(t *testing.T) {
 }
 
 func TestRateLimiterUnlimitedNegative(t *testing.T) {
-	rl := NewRateLimiter(-1, time.Hour)
+	rl := NewRateLimiter(-1, time.Hour, "")
 	t.Cleanup(rl.Stop)
 	key := "caller"
 
@@ -70,7 +70,7 @@ func TestRateLimiterRedisFallback(t *testing.T) {
 	*redisAddr = "127.0.0.1:0" // unreachable
 	oldTimeout := *redisTimeout
 	*redisTimeout = time.Millisecond
-	rl := NewRateLimiter(1, 10*time.Millisecond)
+	rl := NewRateLimiter(1, 10*time.Millisecond, "")
 	t.Cleanup(func() {
 		rl.Stop()
 		*redisAddr = old
@@ -120,5 +120,21 @@ func TestRedisTTLArgsSubMillisecond(t *testing.T) {
 	cmd, val := redisTTLArgs(500 * time.Microsecond)
 	if cmd != "PEXPIRE" || val != "1" {
 		t.Fatalf("expected PEXPIRE 1 for sub-millisecond duration, got %s %s", cmd, val)
+	}
+}
+
+func TestTokenBucketRefill(t *testing.T) {
+	rl := NewRateLimiter(1, 100*time.Millisecond, "token_bucket")
+	t.Cleanup(rl.Stop)
+	key := "caller"
+	if !rl.Allow(key) {
+		t.Fatal("first call should be allowed")
+	}
+	if rl.Allow(key) {
+		t.Fatal("second immediate call should be rate limited")
+	}
+	time.Sleep(120 * time.Millisecond)
+	if !rl.Allow(key) {
+		t.Fatal("token should refill after window")
 	}
 }

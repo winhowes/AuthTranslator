@@ -140,7 +140,7 @@ func TestServeError(t *testing.T) {
 func TestRateLimiterStopClosesConnections(t *testing.T) {
 	old := *redisAddr
 	*redisAddr = "dummy"
-	rl := NewRateLimiter(1, time.Hour)
+	rl := NewRateLimiter(1, time.Hour, "")
 	defer func() { *redisAddr = old }()
 
 	c1, c2 := net.Pipe()
@@ -176,7 +176,7 @@ func readRedisRequest(br *bufio.Reader) error {
 func TestAllowRedisUnsupportedScheme(t *testing.T) {
 	old := *redisAddr
 	*redisAddr = "foo://localhost"
-	rl := NewRateLimiter(1, time.Second)
+	rl := NewRateLimiter(1, time.Second, "")
 	t.Cleanup(func() {
 		*redisAddr = old
 		rl.Stop()
@@ -190,7 +190,7 @@ func TestAllowRedisTLSCAError(t *testing.T) {
 	oldAddr, oldCA := *redisAddr, *redisCA
 	*redisAddr = "rediss://localhost:1"
 	*redisCA = "does_not_exist.pem"
-	rl := NewRateLimiter(1, time.Second)
+	rl := NewRateLimiter(1, time.Second, "")
 	t.Cleanup(func() {
 		*redisAddr = oldAddr
 		*redisCA = oldCA
@@ -204,7 +204,7 @@ func TestAllowRedisTLSCAError(t *testing.T) {
 func TestAllowRedisErrorResponse(t *testing.T) {
 	old := *redisAddr
 	*redisAddr = "dummy"
-	rl := NewRateLimiter(1, time.Second)
+	rl := NewRateLimiter(1, time.Second, "")
 	t.Cleanup(func() {
 		*redisAddr = old
 		rl.Stop()
@@ -225,7 +225,7 @@ func TestAllowRedisErrorResponse(t *testing.T) {
 func TestAllowRedisSuccess(t *testing.T) {
 	old := *redisAddr
 	*redisAddr = "dummy"
-	rl := NewRateLimiter(1, time.Second)
+	rl := NewRateLimiter(1, time.Second, "")
 	t.Cleanup(func() {
 		*redisAddr = old
 		rl.Stop()

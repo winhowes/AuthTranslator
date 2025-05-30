@@ -85,7 +85,7 @@ func TestRateLimiterRedisAuth(t *testing.T) {
 	oldTimeout := *redisTimeout
 	*redisAddr = "redis://:pw@" + ln.Addr().String()
 	*redisTimeout = time.Second
-	rl := NewRateLimiter(1, time.Second)
+	rl := NewRateLimiter(1, time.Second, "")
 	defer func() {
 		rl.Stop()
 		*redisAddr = oldAddr
@@ -133,7 +133,7 @@ func TestRateLimiterRedisAuthUsername(t *testing.T) {
 	oldTimeout := *redisTimeout
 	*redisAddr = "redis://user:pw@" + ln.Addr().String()
 	*redisTimeout = time.Second
-	rl := NewRateLimiter(1, time.Second)
+	rl := NewRateLimiter(1, time.Second, "")
 	defer func() {
 		rl.Stop()
 		*redisAddr = oldAddr
@@ -193,7 +193,7 @@ func TestRateLimiterRedisTLSAuth(t *testing.T) {
 	oldTimeout := *redisTimeout
 	*redisAddr = "rediss://:pw@" + ln.Addr().String()
 	*redisTimeout = time.Second
-	rl := NewRateLimiter(1, time.Second)
+	rl := NewRateLimiter(1, time.Second, "")
 	defer func() {
 		rl.Stop()
 		*redisAddr = oldAddr
@@ -269,7 +269,7 @@ func TestRateLimiterRedisTLSVerify(t *testing.T) {
 	*redisAddr = "rediss://:pw@" + ln.Addr().String()
 	*redisTimeout = time.Second
 	*redisCA = caFile
-	rl := NewRateLimiter(1, time.Second)
+	rl := NewRateLimiter(1, time.Second, "")
 	defer func() {
 		rl.Stop()
 		*redisAddr = oldAddr
