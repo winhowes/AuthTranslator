@@ -153,3 +153,15 @@ func TestLoadSecretFileMissing(t *testing.T) {
 		t.Fatal("expected error for missing file")
 	}
 }
+
+func TestLoadSecretInvalidReference(t *testing.T) {
+	if _, err := secrets.LoadSecret(context.Background(), "missingcolon"); err == nil {
+		t.Fatal("expected error for invalid reference")
+	}
+}
+
+func TestLoadRandomSecretEmpty(t *testing.T) {
+	if _, err := secrets.LoadRandomSecret(context.Background(), nil); err == nil {
+		t.Fatal("expected error for empty secret list")
+	}
+}
