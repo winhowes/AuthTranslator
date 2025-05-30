@@ -15,6 +15,7 @@ import (
 
 	"github.com/winhowes/AuthTranslator/app/auth"
 	integrationplugins "github.com/winhowes/AuthTranslator/app/integrations"
+	"github.com/winhowes/AuthTranslator/app/metrics"
 	"github.com/winhowes/AuthTranslator/app/secrets"
 )
 
@@ -173,6 +174,11 @@ func prepareIntegration(i *Integration) error {
 	}
 	i.destinationURL = u
 	i.proxy = httputil.NewSingleHostReverseProxy(u)
+	// Fire metrics hooks after the upstream responds.
+	i.proxy.ModifyResponse = func(resp *http.Response) error {
+		metrics.OnResponse(i.Name, resp.Request, resp)
+		return nil
+	}
 
 	if i.RateLimitWindow != "" {
 		d, err := time.ParseDuration(i.RateLimitWindow)
