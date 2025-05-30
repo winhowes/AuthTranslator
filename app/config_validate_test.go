@@ -68,6 +68,13 @@ func TestValidateConfigBadIdleConns(t *testing.T) {
 	}
 }
 
+func TestValidateConfigMissingDestination(t *testing.T) {
+	c := Config{Integrations: []Integration{{Name: "a"}}}
+	if err := validateConfig(&c); err == nil {
+		t.Fatalf("expected error for missing destination")
+	}
+}
+
 func TestValidateConfigBadRateLimitWindow(t *testing.T) {
 	c := Config{Integrations: []Integration{{Name: "a", Destination: "http://ex", RateLimitWindow: "bad"}}}
 	if err := validateConfig(&c); err == nil {
