@@ -379,6 +379,40 @@ func TestAllowRedisLeakyBucketReject(t *testing.T) {
 	<-done
 }
 
+func TestAllowRedisLeakyBucketAllow(t *testing.T) {
+	rl := NewRateLimiter(1, time.Hour, "leaky_bucket")
+	t.Cleanup(rl.Stop)
+	srv, cli := net.Pipe()
+	done := make(chan struct{})
+	go func() {
+		defer func() { srv.Close(); close(done) }()
+		br := bufio.NewReader(srv)
+		if cmd, args := parseRedisCommand(t, br); cmd != "GET" || args[0] != "k" {
+			t.Errorf("unexpected command %s %v", cmd, args)
+			return
+		}
+		srv.Write([]byte("$-1\r\n"))
+		if cmd, args := parseRedisCommand(t, br); cmd != "SET" || args[0] != "k" {
+			t.Errorf("unexpected command %s %v", cmd, args)
+			return
+		}
+		srv.Write([]byte("+OK\r\n"))
+		if cmd, _ := parseRedisCommand(t, br); cmd != "EXPIRE" && cmd != "PEXPIRE" {
+			t.Errorf("unexpected command %s", cmd)
+			return
+		}
+		srv.Write([]byte(":1\r\n"))
+	}()
+	ok, err := rl.allowRedisLeakyBucket(cli, "k")
+	if err != nil {
+		t.Fatalf("allowRedisLeakyBucket error: %v", err)
+	}
+	if !ok {
+		t.Fatal("expected leaky bucket allow")
+	}
+	<-done
+}
+
 func TestRetryAfterRedisUnsupportedScheme(t *testing.T) {
 	old := *redisAddr
 	*redisAddr = "foo://localhost"
