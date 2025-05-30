@@ -21,3 +21,10 @@ func TestStatusMetric(t *testing.T) {
 		t.Fatalf("status metric missing: %s", rr.Body.String())
 	}
 }
+
+func TestStatusMetricOnRequest(t *testing.T) {
+	sm := &statusMetric{}
+	req, _ := http.NewRequest(http.MethodGet, "/", nil)
+	sm.OnRequest("foo", req)
+	// No metrics are recorded on request; ensure no panic
+}

@@ -20,3 +20,11 @@ func TestRequestCounter(t *testing.T) {
 		t.Fatalf("request metric missing: %s", rr.Body.String())
 	}
 }
+
+func TestRequestCounterOnResponse(t *testing.T) {
+	rc := &requestCounter{}
+	req, _ := http.NewRequest(http.MethodGet, "/", nil)
+	resp := &http.Response{}
+	rc.OnResponse("foo", "", req, resp)
+	// Nothing to assert - function is a no-op, just ensure it doesn't panic
+}
