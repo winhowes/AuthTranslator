@@ -27,9 +27,12 @@ docker run --rm -p 8080:8080 \
   -e SLACK_TOKEN -e SLACK_SIGNING \
   -v $(pwd)/examples:/conf \
   ghcr.io/winhowes/authtranslator:latest \
-    -config /conf/config.yaml \    # integrations definition
-    -allowlist /conf/allowlist.yaml  # caller permissions
+    -config /conf/config.yaml \
+    -allowlist /conf/allowlist.yaml
 ```
+
+`config.yaml` defines which integrations are available, while
+`allowlist.yaml` controls which callers may use them.
 
 You should see a log line like:
 
@@ -42,9 +45,9 @@ INFO  authtranslator started  addr=0.0.0.0:8080 integrations=1
 ## 2 – Send a request through the proxy
 
 ```bash
-curl -H "Host: slack" \                               # tells the proxy which integration
-     -H "X-Auth: demo-user" \                          # caller credential (dummy for now)
-     -G "http://localhost:8080/api/chat.postMessage" \  # Slack REST path
+curl -H "Host: slack" \
+     -H "X-Auth: demo-user" \
+     -G "http://localhost:8080/api/chat.postMessage" \
      --data-urlencode "channel=#general" \
      --data-urlencode "text=Hello from AuthTranslator"
 ```
