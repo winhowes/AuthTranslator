@@ -1,6 +1,6 @@
 .PHONY: fmt vet lint test docker precommit
 
-GOFILES := $(shell find . -name '*.go')
+GOFILES := $(shell find . -name '*.go' -not -path './.git/*')
 
 fmt:
 	gofmt -w $(GOFILES)
