@@ -46,6 +46,10 @@ func TestMetricsHooks(t *testing.T) {
 	rr := httptest.NewRecorder()
 	proxyHandler(rr, req)
 
+	if rr.Header().Get("X-AT-Upstream-Error") != "true" {
+		t.Fatal("missing upstream error header")
+	}
+
 	if hp.req != 1 {
 		t.Fatalf("expected request hook 1, got %d", hp.req)
 	}

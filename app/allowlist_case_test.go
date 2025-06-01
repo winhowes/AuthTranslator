@@ -43,4 +43,7 @@ func TestAllowlistCaseInsensitive(t *testing.T) {
 	if rr.Code != http.StatusForbidden {
 		t.Fatalf("expected 403, got %d", rr.Code)
 	}
+	if rr.Header().Get("X-AT-Upstream-Error") != "false" {
+		t.Fatal("missing auth error header")
+	}
 }

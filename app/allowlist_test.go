@@ -56,6 +56,9 @@ func TestAllowlist(t *testing.T) {
 	if rr2.Code != http.StatusForbidden {
 		t.Fatalf("expected 403, got %d", rr2.Code)
 	}
+	if rr2.Header().Get("X-AT-Upstream-Error") != "false" {
+		t.Fatal("missing auth error header")
+	}
 }
 
 func TestSetAllowlistIndexing(t *testing.T) {

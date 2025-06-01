@@ -55,6 +55,9 @@ func TestProxyHandlerPrefersHeader(t *testing.T) {
 	if rr.Code != http.StatusTeapot {
 		t.Fatalf("expected status from header integration, got %d", rr.Code)
 	}
+	if rr.Header().Get("X-AT-Upstream-Error") != "true" {
+		t.Fatal("missing upstream error header")
+	}
 }
 
 func TestProxyHandlerUsesHost(t *testing.T) {
@@ -297,6 +300,9 @@ func TestProxyHandlerRateLimiterUsesIP(t *testing.T) {
 	if rr2.Header().Get("Retry-After") == "" {
 		t.Fatal("missing Retry-After header")
 	}
+	if rr2.Header().Get("X-AT-Upstream-Error") != "false" {
+		t.Fatal("missing auth error header")
+	}
 }
 
 func TestProxyHandlerRetryAfterOutLimit(t *testing.T) {
@@ -329,6 +335,9 @@ func TestProxyHandlerRetryAfterOutLimit(t *testing.T) {
 	if rr2.Header().Get("Retry-After") == "" {
 		t.Fatal("missing Retry-After header")
 	}
+	if rr2.Header().Get("X-AT-Upstream-Error") != "false" {
+		t.Fatal("missing auth error header")
+	}
 }
 
 func TestProxyHandlerNotFound(t *testing.T) {
@@ -338,6 +347,9 @@ func TestProxyHandlerNotFound(t *testing.T) {
 	proxyHandler(rr, req)
 	if rr.Code != http.StatusNotFound {
 		t.Fatalf("expected 404, got %d", rr.Code)
+	}
+	if rr.Header().Get("X-AT-Upstream-Error") != "false" {
+		t.Fatal("missing auth error header")
 	}
 }
 
@@ -368,6 +380,9 @@ func TestProxyHandlerAuthFailure(t *testing.T) {
 	if rr.Code != http.StatusUnauthorized {
 		t.Fatalf("expected 401, got %d", rr.Code)
 	}
+	if rr.Header().Get("X-AT-Upstream-Error") != "false" {
+		t.Fatal("missing auth error header")
+	}
 }
 
 func TestProxyHandlerBadGateway(t *testing.T) {
@@ -391,5 +406,8 @@ func TestProxyHandlerBadGateway(t *testing.T) {
 	proxyHandler(rr, req)
 	if rr.Code != http.StatusBadGateway {
 		t.Fatalf("expected 502, got %d", rr.Code)
+	}
+	if rr.Header().Get("X-AT-Upstream-Error") != "false" {
+		t.Fatal("missing auth error header")
 	}
 }

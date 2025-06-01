@@ -974,6 +974,7 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		logger.Warn("no integration configured", "host", host)
 		metrics.IncRequest("unknown")
+		w.Header().Set("X-AT-Upstream-Error", "false")
 		http.Error(w, "Not Found", http.StatusNotFound)
 		return
 	}
@@ -990,6 +991,7 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 			if !p.Authenticate(r.Context(), r, cfg.parsed) {
 				logger.Warn("authentication failed", "host", host, "remote", r.RemoteAddr)
 				metrics.IncAuthFailure(integ.Name)
+				w.Header().Set("X-AT-Upstream-Error", "false")
 				http.Error(w, "Unauthorized", http.StatusUnauthorized)
 				return
 			}
@@ -1016,6 +1018,7 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 			}
 			w.Header().Set("Retry-After", strconv.Itoa(secs))
 		}
+		w.Header().Set("X-AT-Upstream-Error", "false")
 		http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
 		return
 	}
@@ -1029,6 +1032,7 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 			}
 			w.Header().Set("Retry-After", strconv.Itoa(secs))
 		}
+		w.Header().Set("X-AT-Upstream-Error", "false")
 		http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
 		return
 	}
@@ -1040,12 +1044,14 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 			reason := "no allowlist match"
 			logger.Warn("request blocked", "integration", integ.Name, "caller_id", callerID, "reason", reason)
 			w.Header().Set("X-AT-Error-Reason", reason)
+      w.Header().Set("X-AT-Upstream-Error", "false")
 			http.Error(w, "Forbidden", http.StatusForbidden)
 			return
 		}
 		if ok2, reason := validateRequestReason(r, cons); !ok2 {
 			logger.Warn("request failed constraints", "integration", integ.Name, "caller_id", callerID, "reason", reason)
 			w.Header().Set("X-AT-Error-Reason", reason)
+      w.Header().Set("X-AT-Upstream-Error", "false")
 			http.Error(w, "Forbidden", http.StatusForbidden)
 			return
 		}
@@ -1059,6 +1065,7 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if integ.proxy == nil {
+		w.Header().Set("X-AT-Upstream-Error", "false")
 		http.Error(w, "Bad Gateway", http.StatusBadGateway)
 		return
 	}

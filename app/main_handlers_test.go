@@ -61,6 +61,9 @@ func TestMetricsHandlerUnauthorized(t *testing.T) {
 	if rr.Header().Get("WWW-Authenticate") == "" {
 		t.Fatal("missing WWW-Authenticate header")
 	}
+	if rr.Header().Get("X-AT-Upstream-Error") != "false" {
+		t.Fatal("missing auth error header")
+	}
 }
 
 func TestMetricsHandlerAuthorized(t *testing.T) {

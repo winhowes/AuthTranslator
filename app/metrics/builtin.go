@@ -158,6 +158,7 @@ func Handler(w http.ResponseWriter, r *http.Request, user, pass string) {
 		if !ok || subtle.ConstantTimeCompare([]byte(u), []byte(user)) != 1 ||
 			subtle.ConstantTimeCompare([]byte(p), []byte(pass)) != 1 {
 			w.Header().Set("WWW-Authenticate", `Basic realm="metrics"`)
+			w.Header().Set("X-AT-Upstream-Error", "false")
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
