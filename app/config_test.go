@@ -3,6 +3,7 @@ package main
 import (
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -67,5 +68,16 @@ func TestLoadConfigValid(t *testing.T) {
 	}
 	if len(cfg.Integrations) != 1 || cfg.Integrations[0].Name != "a" || cfg.Integrations[0].Destination != "http://ex" {
 		t.Fatalf("unexpected config %+v", cfg)
+	}
+}
+
+func TestLoadConfigExample(t *testing.T) {
+	path := filepath.Join("..", "examples", "config.yaml")
+	cfg, err := loadConfig(path)
+	if err != nil {
+		t.Fatalf("unexpected error loading example config: %v", err)
+	}
+	if len(cfg.Integrations) == 0 {
+		t.Fatal("expected at least one integration in example config")
 	}
 }
