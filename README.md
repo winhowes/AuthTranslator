@@ -26,13 +26,16 @@
 ```bash
 # 1. Run the proxy (Docker)
 docker run --rm -p 8080:8080 \
-  -e SLACK_TOKEN=xxxxx \
+  -e SLACK_TOKEN=demo-token \
   -v $(pwd)/examples:/conf \
   ghcr.io/winhowes/authtranslator:latest \
     -config /conf/config.yaml -allowlist /conf/allowlist.yaml
 
 # 2. Curl through the proxy
-curl -H "Host: slack" -H "X-Auth: demo-user" \
+curl -H "Host: slack" \
+     -H "X-Auth: demo-token" \
+     -H "Content-Type: application/json" \
+     --data '{"channel": "#general", "username": "AuthTranslator", "text": "Hello from AuthTranslator"}' \
      http://localhost:8080/api/chat.postMessage
 # alternatively set `X-AT-Int: slack` if you can’t change the Host header
 ```
@@ -43,16 +46,16 @@ go run ./app -config examples/config.yaml -allowlist examples/allowlist.yaml
 
 ---
 
-## 🗺️ How it fits together
+## 🗺️ How it fits together
 
 ```mermaid
 graph LR
-  subgraph Your VPC
+  subgraph Your VPC
     Caller([Caller])
     AuthT[AuthTranslator]
   end
   Caller -->|short‑lived token| AuthT
-  AuthT -->|long‑lived API key| Slack(Slack API)
+  AuthT -->|long‑lived API key| Slack(Slack API)
 ```
 
 1. **Auth plug‑in** validates + strips caller credential → forwards request allowing your services to use short lived credentials when sending requests to or receiving requests from 3rd parties.
@@ -80,10 +83,10 @@ Secrets can be pulled from several providers:
 * **k8s:** Kubernetes secrets
 * **gcp:** Google Cloud KMS
 * **aws:** AWS Secrets Manager
-* **azure:** Azure Key Vault
+* **azure:** Azure Key Vault
 * **vault:** HashiCorp Vault
 
-Need another store? Writing a plug‑in takes \~50 LoC – see [`app/secrets/plugins/env`](app/secrets/plugins/env).
+Need another store? Writing a plug‑in takes \~50 LoC – see [`app/secrets/plugins/env`](app/secrets/plugins/env).
 
 ---
 
@@ -129,14 +132,14 @@ make test       # run unit tests
 make docker     # build container
 ```
 
-* Requires **Go 1.24+**.
+* Requires **Go 1.24+**.
 * Run `golangci‑lint run` to match CI.
 
 ---
 
 ## 🤝 Contributing & security
 
-Found a bug? Have an auth plug‑in idea? Open an issue or PR – but please read [`CONTRIBUTING.md`](CONTRIBUTING.md) first.
+Found a bug? Have an auth plug-in idea? Open an issue or PR – but please read [`CONTRIBUTING.md`](CONTRIBUTING.md) first.
 Security issues? Email **[security@authtranslator.dev](mailto:security@authtranslator.dev)** – see [`SECURITY.md`](SECURITY.md).
 
 ---
