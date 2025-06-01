@@ -480,8 +480,6 @@ func findConstraint(i *Integration, callerID, pth, method string) (RequestConstr
 	c, ok := callers[callerID]
 	allowlists.RUnlock()
 
-	logger.Info("findConstraint", "integration", i.Name, "caller_id", callerID, "path", pth, "method", method, "ok", ok, "hasWildcard", hasWildcard)
-
 	if ok {
 		if len(c.Capabilities) > 0 {
 			c = integrationplugins.ExpandCapabilities(i.Name, []CallerConfig{c})[0]
