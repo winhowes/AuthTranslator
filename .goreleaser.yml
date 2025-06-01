@@ -5,7 +5,7 @@ release:
   github:
     owner: winhowes
     name: AuthTranslator
-    allow_upload_conflicts: true
+    overwrite: true
 
 builds:
   - id: authtranslator
