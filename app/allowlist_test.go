@@ -3,6 +3,7 @@ package main
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	_ "github.com/winhowes/AuthTranslator/app/auth/plugins/basic"
@@ -143,5 +144,49 @@ func TestSetAllowlistLowercaseMethod(t *testing.T) {
 	integ := &Integration{Name: "case"}
 	if _, ok := findConstraint(integ, "*", "/ok", http.MethodGet); !ok {
 		t.Fatal("expected match for uppercase method")
+	}
+}
+
+func TestConstraintFailureHeader(t *testing.T) {
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer backend.Close()
+
+	t.Setenv("TOK", "secret")
+	integ := Integration{
+		Name:         "consfail",
+		Destination:  backend.URL,
+		InRateLimit:  1,
+		OutRateLimit: 1,
+		IncomingAuth: []AuthPluginConfig{{Type: "token", Params: map[string]interface{}{"secrets": []string{"env:TOK"}, "header": "X-Auth"}}},
+	}
+	if err := AddIntegration(&integ); err != nil {
+		t.Fatalf("failed to add integration: %v", err)
+	}
+	if err := SetAllowlist("consfail", []CallerConfig{
+		{ID: "*", Rules: []CallRule{{Path: "/path", Methods: map[string]RequestConstraint{"GET": {Headers: map[string][]string{"X-Need": {"val"}}}}}}},
+	}); err != nil {
+		t.Fatalf("failed to set allowlist: %v", err)
+	}
+	t.Cleanup(func() {
+		integ.inLimiter.Stop()
+		integ.outLimiter.Stop()
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "http://consfail/path", nil)
+	req.Host = "consfail"
+	req.Header.Set("X-Auth", "secret")
+	rr := httptest.NewRecorder()
+
+	proxyHandler(rr, req)
+
+	if rr.Code != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d", rr.Code)
+	}
+	if val := rr.Header().Get("X-AT-Error-Reason"); val == "" {
+		t.Fatal("missing X-AT-Error-Reason header")
+	} else if !strings.Contains(val, "missing header X-Need") {
+		t.Fatalf("unexpected error header: %s", val)
 	}
 }
