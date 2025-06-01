@@ -92,7 +92,12 @@ func TestBuilderErrors(t *testing.T) {
 }
 
 func TestBuilderParseError(t *testing.T) {
-	for _, name := range []string{"asana", "openai", "confluence", "jira", "slack"} {
+	names := []string{
+		"asana", "confluence", "ghe", "github", "gitlab", "jira",
+		"linear", "monday", "okta", "openai", "sendgrid", "servicenow",
+		"slack", "stripe", "trufflehog", "twilio", "workday", "zendesk",
+	}
+	for _, name := range names {
 		b := Get(name)
 		if b == nil {
 			t.Fatalf("%s builder missing", name)
