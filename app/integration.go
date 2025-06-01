@@ -114,8 +114,8 @@ func collectSecretRefs(cfg interface{}) []string {
 // holds the raw configuration from the YAML config while parsed is used at
 // runtime after being validated by the plugin's ParseParams function.
 type AuthPluginConfig struct {
-	Type   string                 `json:"type"`
-	Params map[string]interface{} `json:"params"`
+	Type   string                 `json:"type" yaml:"type"`
+	Params map[string]interface{} `json:"params" yaml:"params"`
 
 	parsed interface{}
 }
@@ -128,30 +128,30 @@ type RequestConstraint = integrationplugins.RequestConstraint
 
 // Integration represents a configured proxy integration.
 type Integration struct {
-	Name              string             `json:"name"`
-	Destination       string             `json:"destination"`
-	InRateLimit       int                `json:"in_rate_limit"`
-	OutRateLimit      int                `json:"out_rate_limit"`
-	IncomingAuth      []AuthPluginConfig `json:"incoming_auth"`
-	OutgoingAuth      []AuthPluginConfig `json:"outgoing_auth"`
-	RateLimitWindow   string             `json:"rate_limit_window"`
-	RateLimitStrategy string             `json:"rate_limit_strategy,omitempty"`
+	Name              string             `json:"name" yaml:"name"`
+	Destination       string             `json:"destination" yaml:"destination"`
+	InRateLimit       int                `json:"in_rate_limit" yaml:"in_rate_limit"`
+	OutRateLimit      int                `json:"out_rate_limit" yaml:"out_rate_limit"`
+	IncomingAuth      []AuthPluginConfig `json:"incoming_auth" yaml:"incoming_auth"`
+	OutgoingAuth      []AuthPluginConfig `json:"outgoing_auth" yaml:"outgoing_auth"`
+	RateLimitWindow   string             `json:"rate_limit_window" yaml:"rate_limit_window,omitempty"`
+	RateLimitStrategy string             `json:"rate_limit_strategy,omitempty" yaml:"rate_limit_strategy,omitempty"`
 
-	rateLimitDur time.Duration `json:"-"`
+	rateLimitDur time.Duration `json:"-" yaml:"-"`
 
-	IdleConnTimeout       string `json:"idle_conn_timeout,omitempty"`
-	TLSHandshakeTimeout   string `json:"tls_handshake_timeout,omitempty"`
-	ResponseHeaderTimeout string `json:"response_header_timeout,omitempty"`
-	TLSInsecureSkipVerify bool   `json:"tls_insecure_skip_verify,omitempty"`
-	DisableKeepAlives     bool   `json:"disable_keep_alives,omitempty"`
-	MaxIdleConns          int    `json:"max_idle_conns,omitempty"`
-	MaxIdleConnsPerHost   int    `json:"max_idle_conns_per_host,omitempty"`
+	IdleConnTimeout       string `json:"idle_conn_timeout,omitempty" yaml:"idle_conn_timeout,omitempty"`
+	TLSHandshakeTimeout   string `json:"tls_handshake_timeout,omitempty" yaml:"tls_handshake_timeout,omitempty"`
+	ResponseHeaderTimeout string `json:"response_header_timeout,omitempty" yaml:"response_header_timeout,omitempty"`
+	TLSInsecureSkipVerify bool   `json:"tls_insecure_skip_verify,omitempty" yaml:"tls_insecure_skip_verify,omitempty"`
+	DisableKeepAlives     bool   `json:"disable_keep_alives,omitempty" yaml:"disable_keep_alives,omitempty"`
+	MaxIdleConns          int    `json:"max_idle_conns,omitempty" yaml:"max_idle_conns,omitempty"`
+	MaxIdleConnsPerHost   int    `json:"max_idle_conns_per_host,omitempty" yaml:"max_idle_conns_per_host,omitempty"`
 
 	inLimiter  *RateLimiter
 	outLimiter *RateLimiter
 
-	destinationURL *url.URL               `json:"-"`
-	proxy          *httputil.ReverseProxy `json:"-"`
+	destinationURL *url.URL               `json:"-" yaml:"-"`
+	proxy          *httputil.ReverseProxy `json:"-" yaml:"-"`
 }
 
 var integrations = struct {

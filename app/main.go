@@ -43,12 +43,12 @@ import (
 var version = "dev"
 
 type AllowlistEntry struct {
-	Integration string         `json:"integration"`
-	Callers     []CallerConfig `json:"callers"`
+	Integration string         `json:"integration" yaml:"integration"`
+	Callers     []CallerConfig `json:"callers" yaml:"callers"`
 }
 
 type Config struct {
-	Integrations []Integration `json:"integrations"`
+	Integrations []Integration `json:"integrations" yaml:"integrations"`
 }
 
 func loadAllowlists(filename string) ([]AllowlistEntry, error) {
