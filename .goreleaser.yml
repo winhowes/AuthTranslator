@@ -2,10 +2,10 @@ version: 2
 project_name: authtranslator
 
 release:
+  overwrite: true
   github:
     owner: winhowes
     name: AuthTranslator
-    overwrite: true
 
 builds:
   - id: authtranslator
