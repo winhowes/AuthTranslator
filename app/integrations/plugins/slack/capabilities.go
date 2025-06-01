@@ -1,8 +1,10 @@
 package slack
 
-import "fmt"
+import (
+	"fmt"
 
-import integrationplugins "github.com/winhowes/AuthTranslator/app/integrations"
+	integrationplugins "github.com/winhowes/AuthTranslator/app/integrations"
+)
 
 func init() {
 	integrationplugins.RegisterCapability("slack", "post_public_as", integrationplugins.CapabilitySpec{
@@ -12,7 +14,7 @@ func init() {
 			if user == "" {
 				return nil, fmt.Errorf("username required")
 			}
-			rule := integrationplugins.CallRule{Path: "/chat.postMessage", Methods: map[string]integrationplugins.RequestConstraint{"POST": {Body: map[string]interface{}{"username": user}}}}
+			rule := integrationplugins.CallRule{Path: "/api/chat.postMessage", Methods: map[string]integrationplugins.RequestConstraint{"POST": {Body: map[string]interface{}{"username": user}}}}
 			return []integrationplugins.CallRule{rule}, nil
 		},
 	})
@@ -29,7 +31,7 @@ func init() {
 			for i, c := range ch {
 				allowed[i] = c
 			}
-			rule := integrationplugins.CallRule{Path: "/chat.postMessage", Methods: map[string]integrationplugins.RequestConstraint{"POST": {Body: map[string]interface{}{"username": user, "channel": allowed}}}}
+			rule := integrationplugins.CallRule{Path: "/api/chat.postMessage", Methods: map[string]integrationplugins.RequestConstraint{"POST": {Body: map[string]interface{}{"username": user, "channel": allowed}}}}
 			return []integrationplugins.CallRule{rule}, nil
 		},
 	})
