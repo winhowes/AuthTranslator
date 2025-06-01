@@ -26,8 +26,8 @@ archives:
     files:
       - LICENSE
       - README.md
-      - app/config.yaml
-      - app/allowlist.yaml
+      - conf/config.yaml
+      - conf/allowlist.yaml
 
 dockers:
   - id: authtranslator_amd64

@@ -25,7 +25,7 @@ export SLACK_SIGNING="8f2b…"
 
 docker run --rm -p 8080:8080 \
   -e SLACK_TOKEN -e SLACK_SIGNING \
-  -v $(pwd)/examples:/conf \
+  -v $(pwd)/conf:/conf \
   ghcr.io/winhowes/authtranslator:latest \
     -config /conf/config.yaml \
     -allowlist /conf/allowlist.yaml

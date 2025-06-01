@@ -24,7 +24,7 @@ services:
       SLACK_SIGNING: "8f2b‑REPLACE"
       # Optional: enable Redis-backed rate limits
     volumes:
-      - ./config:/conf:ro          # bind‑mount configs for hot reload
+      - ./conf:/conf:ro            # bind‑mount configs for hot reload
     command: |
       -config /conf/config.yaml \
       -allowlist /conf/allowlist.yaml \
@@ -49,7 +49,7 @@ volumes:
 **Folder layout** (repo root):
 
 ```
-config/
+conf/
   ├── config.yaml      # integrations
   └── allowlist.yaml   # caller permissions
 docker-compose.yml

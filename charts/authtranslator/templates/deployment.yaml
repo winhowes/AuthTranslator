@@ -44,10 +44,10 @@ spec:
             {{- end }}
           volumeMounts:
             - name: config
-              mountPath: /app/config.yaml
+              mountPath: /conf/config.yaml
               subPath: config.yaml
             - name: config
-              mountPath: /app/allowlist.yaml
+              mountPath: /conf/allowlist.yaml
               subPath: allowlist.yaml
           ports:
             - containerPort: 8080
