@@ -22,7 +22,7 @@ Unknown top‑level keys cause a validation error.
 * **Exact ID** `user-123`, `service-A`, `spiffe://tenant/worker`
 * **Wildcard** `"*"` – used when the incoming auth plugin did **not** return an ID. Handy for anonymous webhooks.
 
-If no matching caller key exists, the proxy returns **403 Forbidden**.
+If no matching caller key exists – or a matched caller fails rule constraints – the proxy returns **403 Forbidden** and sets an `X-AT-Error-Reason` header describing the first mismatch.
 
 ---
 
