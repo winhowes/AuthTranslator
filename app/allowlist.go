@@ -137,10 +137,20 @@ func matchSegments(pattern, path []string) bool {
 
 // validateRequest checks headers and body according to the request constraint.
 func validateRequest(r *http.Request, c RequestConstraint) bool {
+	ok, _ := validateRequestReason(r, c)
+	return ok
+}
+
+// validateRequestReason checks headers, query parameters and body according to
+// the request constraint. It returns a boolean indicating success and a string
+// describing the first failure encountered when the request does not satisfy
+// the constraint.
+func validateRequestReason(r *http.Request, c RequestConstraint) (bool, string) {
 	for name, wantVals := range c.Headers {
-		gotVals, ok := r.Header[http.CanonicalHeaderKey(name)]
+		canon := http.CanonicalHeaderKey(name)
+		gotVals, ok := r.Header[canon]
 		if !ok {
-			return false
+			return false, "missing header " + canon
 		}
 		for _, want := range wantVals {
 			found := false
@@ -151,39 +161,63 @@ func validateRequest(r *http.Request, c RequestConstraint) bool {
 				}
 			}
 			if !found {
-				return false
+				return false, fmt.Sprintf("missing header %s=%s", canon, want)
 			}
 		}
 	}
+
 	if len(c.Query) > 0 {
-		if !matchQuery(r.URL.Query(), c.Query) {
-			return false
+		vals := r.URL.Query()
+		for k, wantVals := range c.Query {
+			present, ok := vals[k]
+			if !ok {
+				return false, "missing query param " + k
+			}
+			for _, want := range wantVals {
+				found := false
+				for _, got := range present {
+					if got == want {
+						found = true
+						break
+					}
+				}
+				if !found {
+					return false, fmt.Sprintf("missing query param %s=%s", k, want)
+				}
+			}
 		}
 	}
+
 	if len(c.Body) == 0 {
-		return true
+		return true, ""
 	}
 	bodyBytes, err := authplugins.GetBody(r)
 	if err != nil {
-		return false
+		return false, "error reading body"
 	}
 	ct := r.Header.Get("Content-Type")
 	if strings.Contains(ct, "application/json") {
 		var data map[string]interface{}
 		if err := json.Unmarshal(bodyBytes, &data); err != nil {
-			return false
+			return false, "invalid json"
 		}
-		return matchBodyMap(data, c.Body)
+		if ok, reason := matchBodyMapReason(data, c.Body); !ok {
+			return false, reason
+		}
+		return true, ""
 	}
 	if strings.Contains(ct, "application/x-www-form-urlencoded") {
 		vals, err := url.ParseQuery(string(bodyBytes))
 		if err != nil {
-			return false
+			return false, "invalid form encoding"
 		}
-		return matchForm(vals, c.Body)
+		if ok, reason := matchFormReason(vals, c.Body); !ok {
+			return false, reason
+		}
+		return true, ""
 	}
 	// unsupported content type -> skip body filtering
-	return true
+	return true, ""
 }
 
 func matchForm(vals url.Values, rule map[string]interface{}) bool {
@@ -228,6 +262,48 @@ func matchForm(vals url.Values, rule map[string]interface{}) bool {
 	return true
 }
 
+func matchFormReason(vals url.Values, rule map[string]interface{}) (bool, string) {
+	for k, v := range rule {
+		present, ok := vals[k]
+		if !ok {
+			return false, "missing form field " + k
+		}
+		switch want := v.(type) {
+		case string:
+			found := false
+			for _, got := range present {
+				if got == want {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return false, fmt.Sprintf("form field %s=%s not found", k, want)
+			}
+		case []interface{}:
+			for _, elem := range want {
+				s, ok := elem.(string)
+				if !ok {
+					return false, "invalid rule"
+				}
+				found := false
+				for _, got := range present {
+					if got == s {
+						found = true
+						break
+					}
+				}
+				if !found {
+					return false, fmt.Sprintf("form field %s=%s not found", k, s)
+				}
+			}
+		default:
+			return false, "invalid rule"
+		}
+	}
+	return true, ""
+}
+
 func matchQuery(vals url.Values, rule map[string][]string) bool {
 	for k, wantVals := range rule {
 		present, ok := vals[k]
@@ -252,6 +328,64 @@ func matchQuery(vals url.Values, rule map[string][]string) bool {
 
 func matchBodyMap(data map[string]interface{}, rule map[string]interface{}) bool {
 	return matchValue(data, rule)
+}
+
+func matchBodyMapReason(data map[string]interface{}, rule map[string]interface{}) (bool, string) {
+	return matchValueReason(data, rule, "")
+}
+
+func matchValueReason(data, rule interface{}, path string) (bool, string) {
+	switch rv := rule.(type) {
+	case map[string]interface{}:
+		dm, ok := data.(map[string]interface{})
+		if !ok {
+			return false, fmt.Sprintf("body field %s not object", path)
+		}
+		for k, v := range rv {
+			dv, ok := dm[k]
+			p := k
+			if path != "" {
+				p = path + "." + k
+			}
+			if !ok {
+				return false, "missing body field " + p
+			}
+			if ok2, reason := matchValueReason(dv, v, p); !ok2 {
+				return false, reason
+			}
+		}
+		return true, ""
+	case []interface{}:
+		da, ok := data.([]interface{})
+		if !ok {
+			return false, fmt.Sprintf("body field %s not array", path)
+		}
+		for _, want := range rv {
+			found := false
+			for _, elem := range da {
+				if ok2, _ := matchValueReason(elem, want, path); ok2 {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return false, fmt.Sprintf("body field %s missing element", path)
+			}
+		}
+		return true, ""
+	default:
+		if df, ok := toFloat(data); ok {
+			if rf, ok2 := toFloat(rv); ok2 {
+				if df == rf {
+					return true, ""
+				}
+			}
+		}
+		if data == rule {
+			return true, ""
+		}
+		return false, fmt.Sprintf("body field %s value mismatch", path)
+	}
 }
 
 func matchValue(data, rule interface{}) bool {

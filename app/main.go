@@ -1037,10 +1037,15 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 	if len(callers) > 0 {
 		cons, ok := findConstraint(integ, callerID, r.URL.Path, r.Method)
 		if !ok {
+			reason := "no allowlist match"
+			logger.Warn("request blocked", "integration", integ.Name, "caller_id", callerID, "reason", reason)
+			w.Header().Set("X-AT-Error-Reason", reason)
 			http.Error(w, "Forbidden", http.StatusForbidden)
 			return
 		}
-		if !validateRequest(r, cons) {
+		if ok2, reason := validateRequestReason(r, cons); !ok2 {
+			logger.Warn("request failed constraints", "integration", integ.Name, "caller_id", callerID, "reason", reason)
+			w.Header().Set("X-AT-Error-Reason", reason)
 			http.Error(w, "Forbidden", http.StatusForbidden)
 			return
 		}
