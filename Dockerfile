@@ -6,4 +6,4 @@ COPY authtranslator .
 USER app
 EXPOSE 8080
 HEALTHCHECK CMD wget -qO- http://localhost:8080/_at_internal/healthz || exit 1
-CMD ["./authtranslator"]
+ENTRYPOINT ["./authtranslator"]
