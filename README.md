@@ -27,7 +27,7 @@
 # 1. Run the proxy (Docker)
 docker run --rm -p 8080:8080 \
   -e SLACK_TOKEN=xxxxx -e SLACK_SIGNING=yyyyy \
-  -v $(pwd)/examples:/conf \
+  -v $(pwd)/conf:/conf \
   ghcr.io/winhowes/authtranslator:latest \
     -config /conf/config.yaml -allowlist /conf/allowlist.yaml
 

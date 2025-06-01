@@ -18,7 +18,7 @@ This chart deploys [AuthTranslator](https://github.com/winhowes/AuthTranslator) 
 | `config` | Contents of `config.yaml` stored in a ConfigMap | sample configuration |
 | `allowlist` | Contents of `allowlist.yaml` stored in a ConfigMap | sample allowlist |
 
-The configuration and allowlist values are written to a ConfigMap that is mounted into the container at `/app/config.yaml` and `/app/allowlist.yaml`.
+The configuration and allowlist values are written to a ConfigMap that is mounted into the container at `/conf/config.yaml` and `/conf/allowlist.yaml`.
 
 ## Installing
 
