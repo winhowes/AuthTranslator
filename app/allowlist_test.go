@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	integrationplugins "github.com/winhowes/AuthTranslator/app/integrations"
+
 	_ "github.com/winhowes/AuthTranslator/app/auth/plugins/basic"
 	_ "github.com/winhowes/AuthTranslator/app/auth/plugins/google_oidc"
 	_ "github.com/winhowes/AuthTranslator/app/auth/plugins/token"
@@ -191,5 +193,52 @@ func TestConstraintFailureHeader(t *testing.T) {
 		t.Fatal("missing X-AT-Error-Reason header")
 	} else if !strings.Contains(val, "missing header X-Need") {
 		t.Fatalf("unexpected error header: %s", val)
+	}
+}
+
+func TestFindConstraintCapability(t *testing.T) {
+	allowlists.Lock()
+	allowlists.m = make(map[string]map[string]CallerConfig)
+	allowlists.Unlock()
+
+	// save and restore capability registry
+	orig := make(map[string]map[string]integrationplugins.CapabilitySpec)
+	for integ, caps := range integrationplugins.AllCapabilities() {
+		m := make(map[string]integrationplugins.CapabilitySpec, len(caps))
+		for name, spec := range caps {
+			m[name] = spec
+		}
+		orig[integ] = m
+	}
+	reg := integrationplugins.AllCapabilities()
+	for k := range reg {
+		delete(reg, k)
+	}
+	t.Cleanup(func() {
+		reg := integrationplugins.AllCapabilities()
+		for k := range reg {
+			delete(reg, k)
+		}
+		for integ, caps := range orig {
+			reg[integ] = caps
+		}
+	})
+
+	integrationplugins.RegisterCapability("capfi", "cap", integrationplugins.CapabilitySpec{
+		Generate: func(map[string]interface{}) ([]integrationplugins.CallRule, error) {
+			return []integrationplugins.CallRule{{Path: "/c", Methods: map[string]integrationplugins.RequestConstraint{"GET": {}}}}, nil
+		},
+	})
+
+	if err := SetAllowlist("capfi", []CallerConfig{{
+		ID:           "id",
+		Capabilities: []integrationplugins.CapabilityConfig{{Name: "cap"}},
+	}}); err != nil {
+		t.Fatalf("failed to set allowlist: %v", err)
+	}
+
+	integ := &Integration{Name: "capfi"}
+	if _, ok := findConstraint(integ, "id", "/c", http.MethodGet); !ok {
+		t.Fatal("expected capability constraint match")
 	}
 }
