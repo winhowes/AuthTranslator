@@ -26,7 +26,7 @@ func TestSlackCapabilities(t *testing.T) {
 		t.Fatalf("expected 1 rule, got %d", len(rules))
 	}
 	rule := rules[0]
-	if rule.Path != "/chat.postMessage" {
+	if rule.Path != "/api/chat.postMessage" {
 		t.Errorf("unexpected path %s", rule.Path)
 	}
 	rc, ok := rule.Methods["POST"]
