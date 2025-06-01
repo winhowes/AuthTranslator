@@ -1,6 +1,6 @@
 - integration: slack
   callers:
-    - id: demo-user
+    - id: "*"
       capabilities:
         - name: post_public_as
           params:
