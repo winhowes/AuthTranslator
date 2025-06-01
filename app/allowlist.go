@@ -479,6 +479,9 @@ func findConstraint(i *Integration, callerID, pth, method string) (RequestConstr
 	allowlists.RUnlock()
 
 	if ok {
+		if len(c.Capabilities) > 0 {
+			c = integrationplugins.ExpandCapabilities(i.Name, []CallerConfig{c})[0]
+		}
 		for _, r := range c.Rules {
 			if matchSegments(r.Segments, segments) {
 				if m, ok := r.Methods[method]; ok {
@@ -488,6 +491,9 @@ func findConstraint(i *Integration, callerID, pth, method string) (RequestConstr
 		}
 	}
 	if hasWildcard {
+		if len(wildcard.Capabilities) > 0 {
+			wildcard = integrationplugins.ExpandCapabilities(i.Name, []CallerConfig{wildcard})[0]
+		}
 		for _, r := range wildcard.Rules {
 			if matchSegments(r.Segments, segments) {
 				if m, ok := r.Methods[method]; ok {
