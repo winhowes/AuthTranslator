@@ -2,7 +2,7 @@ version: 2
 project_name: authtranslator
 
 release:
-  overwrite: true
+  replace_existing_artifacts: true
   github:
     owner: winhowes
     name: AuthTranslator
