@@ -3,6 +3,7 @@ package main
 import (
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 
 	_ "github.com/winhowes/AuthTranslator/app/auth/plugins/token"
@@ -409,5 +410,32 @@ func TestProxyHandlerBadGateway(t *testing.T) {
 	}
 	if rr.Header().Get("X-AT-Upstream-Error") != "false" {
 		t.Fatal("missing auth error header")
+	}
+}
+
+func TestProxyHandlerRewritesHost(t *testing.T) {
+	var upstreamHost string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upstreamHost = r.Host
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	integ := Integration{Name: "hostrewrite", Destination: srv.URL, InRateLimit: 1, OutRateLimit: 1}
+	if err := AddIntegration(&integ); err != nil {
+		t.Fatalf("failed to add integration: %v", err)
+	}
+	t.Cleanup(func() { integ.inLimiter.Stop(); integ.outLimiter.Stop() })
+
+	req := httptest.NewRequest(http.MethodGet, "http://hostrewrite/", nil)
+	req.Host = "hostrewrite"
+	rr := httptest.NewRecorder()
+	proxyHandler(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rr.Code)
+	}
+	u, _ := url.Parse(srv.URL)
+	if upstreamHost != u.Host {
+		t.Fatalf("expected host %s, got %s", u.Host, upstreamHost)
 	}
 }

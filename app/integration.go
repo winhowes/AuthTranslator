@@ -175,6 +175,12 @@ func prepareIntegration(i *Integration) error {
 	}
 	i.destinationURL = u
 	i.proxy = httputil.NewSingleHostReverseProxy(u)
+	// Ensure the upstream sees the correct Host header.
+	oldDirector := i.proxy.Director
+	i.proxy.Director = func(req *http.Request) {
+		oldDirector(req)
+		req.Host = u.Host
+	}
 	// Fire metrics hooks after the upstream responds.
 	i.proxy.ModifyResponse = func(resp *http.Response) error {
 		caller := metrics.Caller(resp.Request.Context())
