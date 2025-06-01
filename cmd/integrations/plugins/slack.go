@@ -9,7 +9,7 @@ import (
 func Slack(name, tokenRef, signingSecretRef string) Integration {
 	return Integration{
 		Name:         name,
-		Destination:  "https://slack.com/api",
+		Destination:  "https://slack.com/",
 		InRateLimit:  100,
 		OutRateLimit: 100,
 		IncomingAuth: []AuthPluginConfig{{
