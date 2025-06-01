@@ -22,9 +22,6 @@ builds:
 archives:
   - id: default
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
-    format_overrides:
-      - goos: windows
-        format: zip
     files:
       - LICENSE
       - README.md
@@ -32,14 +29,23 @@ archives:
       - app/allowlist.yaml
 
 dockers:
-  - ids:
-      - authtranslator
+  - id: authtranslator_amd64
+    goarch: amd64
     image_templates:
-      - ghcr.io/winhowes/authtranslator:{{ .Tag }}-{{ .Arch }}
-      - ghcr.io/winhowes/authtranslator:latest-{{ .Arch }}
+      - ghcr.io/winhowes/authtranslator:{{ .Tag }}-amd64
+      - ghcr.io/winhowes/authtranslator:latest-amd64
     dockerfile: Dockerfile
     build_flag_templates:
-      - --platform=linux/{{ .Arch }}
+      - --platform=linux/amd64
+
+  - id: authtranslator_arm64
+    goarch: arm64
+    image_templates:
+      - ghcr.io/winhowes/authtranslator:{{ .Tag }}-arm64
+      - ghcr.io/winhowes/authtranslator:latest-arm64
+    dockerfile: Dockerfile
+    build_flag_templates:
+      - --platform=linux/arm64
 
 docker_manifests:
   - name_template: ghcr.io/winhowes/authtranslator:{{ .Tag }}
