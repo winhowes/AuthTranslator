@@ -1,23 +1,24 @@
 version: 2
 project_name: authtranslator
+
 release:
   github:
     owner: winhowes
     name: AuthTranslator
+
 builds:
   - id: authtranslator
     main: ./app
     binary: authtranslator
-    ldflags: -s -w -X main.version={{.Version}}
+    ldflags: -s -w -X main.version={{ .Version }}
     env:
       - CGO_ENABLED=0
     goos:
       - linux
-      - darwin
-      - windows
     goarch:
       - amd64
       - arm64
+
 archives:
   - id: default
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
@@ -29,3 +30,23 @@ archives:
       - README.md
       - app/config.yaml
       - app/allowlist.yaml
+
+dockers:
+  - image_templates:
+      - ghcr.io/winhowes/authtranslator:{{ .Tag }}-{{ .Arch }}
+      - ghcr.io/winhowes/authtranslator:latest-{{ .Arch }}
+    build_ids:
+      - authtranslator
+    dockerfile: Dockerfile
+    build_flag_templates:
+      - --platform=linux/{{ .Arch }}
+
+docker_manifests:
+  - name_template: ghcr.io/winhowes/authtranslator:{{ .Tag }}
+    image_templates:
+      - ghcr.io/winhowes/authtranslator:{{ .Tag }}-amd64
+      - ghcr.io/winhowes/authtranslator:{{ .Tag }}-arm64
+  - name_template: ghcr.io/winhowes/authtranslator:latest
+    image_templates:
+      - ghcr.io/winhowes/authtranslator:latest-amd64
+      - ghcr.io/winhowes/authtranslator:latest-arm64
