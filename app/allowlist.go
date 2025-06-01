@@ -474,8 +474,8 @@ func findConstraint(i *Integration, callerID, pth, method string) (RequestConstr
 
 	allowlists.RLock()
 	callers := allowlists.m[i.Name]
-	// We check wildcard callers too incase an allowlist has both defined callers and
-	// a fallback wildcard caller.
+	// NOTE: We check wildcard callers too incase an allowlist has both defined callers
+	// and a fallback wildcard caller.
 	wildcard, hasWildcard := callers["*"]
 	c, ok := callers[callerID]
 	allowlists.RUnlock()
