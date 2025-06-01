@@ -1,20 +1,19 @@
 integrations:
-  - name: example
-    destination: http://backend.example.com
+  - name: slack
+    destination: https://slack.com/api
     in_rate_limit: 100
-    out_rate_limit: 1000
+    out_rate_limit: 100
     rate_limit_window: 1m
-    max_idle_conns: 100
-    max_idle_conns_per_host: 20
     incoming_auth:
       - type: token
         params:
           secrets:
-            - env:IN_TOKEN
+            - env:SLACK_TOKEN
           header: X-Auth
     outgoing_auth:
       - type: token
         params:
           secrets:
-            - env:OUT_TOKEN
-          header: X-Auth
+            - env:SLACK_TOKEN
+          header: Authorization
+          prefix: "Bearer "

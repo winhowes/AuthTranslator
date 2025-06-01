@@ -1,9 +1,7 @@
-- integration: example
+- integration: slack
   callers:
-    - id: sample
-      rules:
-        - path: /search
-          methods:
-            GET:
-              query:
-                q: ["example"]
+    - id: demo-user
+      capabilities:
+        - name: post_public_as
+          params:
+            username: AuthTranslator
