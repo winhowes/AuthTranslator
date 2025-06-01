@@ -197,4 +197,13 @@ func (j *JWTAuth) Identify(r *http.Request, p interface{}) (string, bool) {
 	return sub, true
 }
 
+// StripAuth removes the JWT header from the request.
+func (j *JWTAuth) StripAuth(r *http.Request, p interface{}) {
+	cfg, ok := p.(*inParams)
+	if !ok {
+		return
+	}
+	r.Header.Del(cfg.Header)
+}
+
 func init() { authplugins.RegisterIncoming(&JWTAuth{}) }

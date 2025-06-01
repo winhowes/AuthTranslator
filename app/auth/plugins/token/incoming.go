@@ -55,4 +55,13 @@ func (t *TokenAuth) Authenticate(ctx context.Context, r *http.Request, p interfa
 	return false
 }
 
+// StripAuth removes the token header from the request.
+func (t *TokenAuth) StripAuth(r *http.Request, p interface{}) {
+	cfg, ok := p.(*inParams)
+	if !ok {
+		return
+	}
+	r.Header.Del(cfg.Header)
+}
+
 func init() { authplugins.RegisterIncoming(&TokenAuth{}) }

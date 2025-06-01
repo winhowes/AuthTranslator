@@ -91,4 +91,13 @@ func (b *BasicAuth) Identify(r *http.Request, p interface{}) (string, bool) {
 	return parts[0], true
 }
 
+// StripAuth removes the Basic auth header from the request.
+func (b *BasicAuth) StripAuth(r *http.Request, p interface{}) {
+	cfg, ok := p.(*inParams)
+	if !ok {
+		return
+	}
+	r.Header.Del(cfg.Header)
+}
+
 func init() { authplugins.RegisterIncoming(&BasicAuth{}) }

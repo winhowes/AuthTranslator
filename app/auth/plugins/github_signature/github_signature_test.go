@@ -33,6 +33,10 @@ func TestGitHubSignatureAuth(t *testing.T) {
 	if !p.Authenticate(context.Background(), r, cfg) {
 		t.Fatal("expected authentication to succeed")
 	}
+	p.StripAuth(r, cfg)
+	if h := r.Header.Get("X-Hub-Signature-256"); h != "" {
+		t.Fatalf("expected header stripped, got %s", h)
+	}
 }
 
 func TestGitHubSignatureAuthFail(t *testing.T) {

@@ -42,6 +42,13 @@ func TestSlackSignatureAuth(t *testing.T) {
 	if !p.Authenticate(context.Background(), r, cfg) {
 		t.Fatal("expected authentication to succeed")
 	}
+	p.StripAuth(r, cfg)
+	if h := r.Header.Get("X-Slack-Signature"); h != "" {
+		t.Fatalf("expected signature header stripped, got %s", h)
+	}
+	if ts := r.Header.Get("X-Slack-Request-Timestamp"); ts != "" {
+		t.Fatalf("expected timestamp header stripped, got %s", ts)
+	}
 }
 
 func TestSlackSignatureAuthOldTimestamp(t *testing.T) {

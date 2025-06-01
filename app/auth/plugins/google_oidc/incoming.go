@@ -261,4 +261,13 @@ func (g *GoogleOIDCAuth) Identify(r *http.Request, params interface{}) (string, 
 	return sub, true
 }
 
+// StripAuth removes the Authorization header from the request.
+func (g *GoogleOIDCAuth) StripAuth(r *http.Request, params interface{}) {
+	cfg, ok := params.(*inParams)
+	if !ok {
+		return
+	}
+	r.Header.Del(cfg.Header)
+}
+
 func init() { authplugins.RegisterIncoming(&GoogleOIDCAuth{}) }
