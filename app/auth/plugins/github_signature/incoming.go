@@ -72,4 +72,13 @@ func (g *GitHubSignatureAuth) Authenticate(ctx context.Context, r *http.Request,
 	return false
 }
 
+// StripAuth removes the GitHub signature header from the request.
+func (g *GitHubSignatureAuth) StripAuth(r *http.Request, p interface{}) {
+	cfg, ok := p.(*githubSigParams)
+	if !ok {
+		return
+	}
+	r.Header.Del(cfg.Header)
+}
+
 func init() { authplugins.RegisterIncoming(&GitHubSignatureAuth{}) }

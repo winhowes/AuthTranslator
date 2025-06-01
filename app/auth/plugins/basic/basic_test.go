@@ -55,6 +55,10 @@ func TestBasicIncomingAuth(t *testing.T) {
 	if id, ok := p.Identify(r, cfg); !ok || id != "user" {
 		t.Fatalf("unexpected identifier %s", id)
 	}
+	p.StripAuth(r, cfg)
+	if h := r.Header.Get("Authorization"); h != "" {
+		t.Fatalf("expected header stripped, got %s", h)
+	}
 }
 
 func TestBasicIncomingAuthFail(t *testing.T) {

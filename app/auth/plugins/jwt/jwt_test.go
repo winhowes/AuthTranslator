@@ -50,6 +50,10 @@ func TestJWTAuth(t *testing.T) {
 	if !ok || id != "user1" {
 		t.Fatalf("unexpected identifier %s", id)
 	}
+	p.StripAuth(r, cfg)
+	if h := r.Header.Get("Authorization"); h != "" {
+		t.Fatalf("expected header stripped, got %s", h)
+	}
 }
 
 func TestJWTAuthFail(t *testing.T) {

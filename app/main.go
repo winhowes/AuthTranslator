@@ -1001,6 +1001,9 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 					rateKey = id
 				}
 			}
+			if stripper, ok := p.(authplugins.AuthStripper); ok {
+				stripper.StripAuth(r, cfg.parsed)
+			}
 		}
 	}
 

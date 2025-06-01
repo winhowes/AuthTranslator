@@ -46,6 +46,10 @@ func TestTokenIncomingPrefix(t *testing.T) {
 	if !p.Authenticate(context.Background(), r, cfg) {
 		t.Fatal("expected authentication to succeed with prefix")
 	}
+	p.StripAuth(r, cfg)
+	if h := r.Header.Get("Authorization"); h != "" {
+		t.Fatalf("expected header stripped, got %s", h)
+	}
 }
 
 func TestTokenIncomingPrefixMismatch(t *testing.T) {

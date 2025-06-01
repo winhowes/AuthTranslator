@@ -95,4 +95,13 @@ func (h *HMACSignatureAuth) Authenticate(ctx context.Context, r *http.Request, p
 	return false
 }
 
+// StripAuth removes the signature header from the request.
+func (h *HMACSignatureAuth) StripAuth(r *http.Request, params interface{}) {
+	cfg, ok := params.(*inParams)
+	if !ok {
+		return
+	}
+	r.Header.Del(cfg.Header)
+}
+
 func init() { authplugins.RegisterIncoming(&HMACSignatureAuth{}) }

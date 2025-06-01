@@ -73,13 +73,20 @@ Adds the configured token to the `X-Api-Key` header on each request.
    [`app/auth/registry.go`](../app/auth/registry.go):
 
    ```go
-   type IncomingAuthPlugin interface {
-       Name() string
-       ParseParams(map[string]interface{}) (interface{}, error)
-       Authenticate(ctx context.Context, r *http.Request, params interface{}) bool
-       RequiredParams() []string
-       OptionalParams() []string
-   }
+type IncomingAuthPlugin interface {
+    Name() string
+    ParseParams(map[string]interface{}) (interface{}, error)
+    Authenticate(ctx context.Context, r *http.Request, params interface{}) bool
+    RequiredParams() []string
+    OptionalParams() []string
+}
+
+// Plugins can optionally implement AuthStripper to remove credentials from the
+// request once verified.
+
+type AuthStripper interface {
+    StripAuth(r *http.Request, params interface{})
+}
 
    type OutgoingAuthPlugin interface {
        Name() string

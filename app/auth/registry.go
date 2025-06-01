@@ -22,6 +22,13 @@ type Identifier interface {
 	Identify(r *http.Request, params interface{}) (string, bool)
 }
 
+// AuthStripper is optionally implemented by incoming auth plugins that wish to
+// remove authentication data from the request after it has been verified.
+// The proxy calls this after calling Identify.
+type AuthStripper interface {
+	StripAuth(r *http.Request, params interface{})
+}
+
 // OutgoingAuthPlugin applies authentication to outbound requests.
 type OutgoingAuthPlugin interface {
 	Name() string

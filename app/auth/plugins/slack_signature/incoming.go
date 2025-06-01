@@ -94,6 +94,16 @@ func (s *SlackSignatureAuth) Authenticate(ctx context.Context, r *http.Request, 
 	return false
 }
 
+// StripAuth removes the Slack signature and timestamp headers from the request.
+func (s *SlackSignatureAuth) StripAuth(r *http.Request, p interface{}) {
+	cfg, ok := p.(*slackSigParams)
+	if !ok {
+		return
+	}
+	r.Header.Del(cfg.SigHeader)
+	r.Header.Del(cfg.TimestampHeader)
+}
+
 func abs(i int64) int64 {
 	if i < 0 {
 		if i == math.MinInt64 {
