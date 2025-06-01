@@ -1,6 +1,6 @@
 integrations:
   - name: slack
-    destination: https://slack.com/api
+    destination: https://slack.com/
     in_rate_limit: 100
     out_rate_limit: 100
     rate_limit_window: 1m
