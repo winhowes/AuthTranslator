@@ -10,7 +10,6 @@ Welcome to **AuthTranslator**! In a couple of minutes you’ll have a running pr
 | ------------------------------------------ | ------------------------------------------------------------------------- |
 | **Docker ≥ 24**                            | Easiest way to run the proxy without installing Go.                       |
 | **Slack app token** (`SLACK_TOKEN`)        | Long‑lived token with `chat:write` scope.                                 |
-| **Slack signing secret** (`SLACK_SIGNING`) | Lets the proxy verify inbound Slack requests (if you later use webhooks). |
 | *(Optional)* **Go 1.24+**                  | Only needed if you’d like to run from source.                             |
 
 > **Tip** A personal workspace app is fine for testing.
@@ -21,11 +20,9 @@ Welcome to **AuthTranslator**! In a couple of minutes you’ll have a running pr
 
 ```bash
 export SLACK_TOKEN="xoxb‑123…"
-export SLACK_SIGNING="8f2b…"
-
 docker run --rm -p 8080:8080 \
-  -e SLACK_TOKEN -e SLACK_SIGNING \
-  -v $(pwd)/conf:/conf \
+  -e SLACK_TOKEN \
+  -v $(pwd)/examples:/conf \
   ghcr.io/winhowes/authtranslator:latest \
     -config /conf/config.yaml \
     -allowlist /conf/allowlist.yaml
@@ -67,7 +64,7 @@ go run ./app \
   -allowlist examples/allowlist.yaml
 ```
 
-Make sure `$SLACK_TOKEN` and `$SLACK_SIGNING` are still in your environment.
+Make sure `$SLACK_TOKEN` is still in your environment.
 
 ---
 

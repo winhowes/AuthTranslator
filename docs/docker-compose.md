@@ -21,7 +21,6 @@ services:
     environment:
       # Secret URIs resolve env: …
       SLACK_TOKEN: "xoxb‑REPLACE"
-      SLACK_SIGNING: "8f2b‑REPLACE"
       # Optional: enable Redis-backed rate limits
     volumes:
       - ./conf:/conf:ro            # bind‑mount configs for hot reload

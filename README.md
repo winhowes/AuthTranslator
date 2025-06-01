@@ -26,13 +26,13 @@
 ```bash
 # 1. Run the proxy (Docker)
 docker run --rm -p 8080:8080 \
-  -e SLACK_TOKEN=xxxxx -e SLACK_SIGNING=yyyyy \
-  -v $(pwd)/conf:/conf \
+  -e SLACK_TOKEN=xxxxx \
+  -v $(pwd)/examples:/conf \
   ghcr.io/winhowes/authtranslator:latest \
     -config /conf/config.yaml -allowlist /conf/allowlist.yaml
 
 # 2. Curl through the proxy
-curl -H "Host: slack" -H "X-Auth: <short‑lived>" \
+curl -H "Host: slack" -H "X-Auth: demo-user" \
      http://localhost:8080/api/chat.postMessage
 # alternatively set `X-AT-Int: slack` if you can’t change the Host header
 ```
