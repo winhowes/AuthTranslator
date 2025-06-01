@@ -32,11 +32,11 @@ archives:
       - app/allowlist.yaml
 
 dockers:
-  - image_templates:
+  - ids:
+      - authtranslator
+    image_templates:
       - ghcr.io/winhowes/authtranslator:{{ .Tag }}-{{ .Arch }}
       - ghcr.io/winhowes/authtranslator:latest-{{ .Arch }}
-    build_ids:
-      - authtranslator
     dockerfile: Dockerfile
     build_flag_templates:
       - --platform=linux/{{ .Arch }}
