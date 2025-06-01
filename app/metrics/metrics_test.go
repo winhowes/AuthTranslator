@@ -94,6 +94,9 @@ func TestMetricsHandlerAuth(t *testing.T) {
 	if rr.Code != http.StatusUnauthorized {
 		t.Fatalf("expected 401 for missing creds, got %d", rr.Code)
 	}
+	if rr.Header().Get("X-AT-Upstream-Error") != "false" {
+		t.Fatal("missing auth error header")
+	}
 
 	req = httptest.NewRequest(http.MethodGet, "/metrics", nil)
 	req.SetBasicAuth("admin", "wrong")
@@ -101,6 +104,9 @@ func TestMetricsHandlerAuth(t *testing.T) {
 	Handler(rr, req, "admin", "secret")
 	if rr.Code != http.StatusUnauthorized {
 		t.Fatalf("expected 401 for bad creds, got %d", rr.Code)
+	}
+	if rr.Header().Get("X-AT-Upstream-Error") != "false" {
+		t.Fatal("missing auth error header")
 	}
 
 	req = httptest.NewRequest(http.MethodGet, "/metrics", nil)

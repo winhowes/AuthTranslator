@@ -17,6 +17,10 @@ exposed by default but can be disabled with `-enable-metrics=false`. Provide
 **both** `-metrics-user` **and** `-metrics-pass` to require HTTP Basic
 credentials – omitting either one causes the service to exit on startup.
 
+Any non‑2xx response includes an `X-AT-Upstream-Error` header. `true` means
+the error came from the upstream service. `false` indicates AuthTranslator
+generated the response, typically due to authentication or rate limiting.
+
 ---
 
 ## 2  Metrics cheat‑sheet

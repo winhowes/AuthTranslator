@@ -179,6 +179,9 @@ func prepareIntegration(i *Integration) error {
 	i.proxy.ModifyResponse = func(resp *http.Response) error {
 		caller := metrics.Caller(resp.Request.Context())
 		metrics.OnResponse(i.Name, caller, resp.Request, resp)
+		if resp.StatusCode < http.StatusOK || resp.StatusCode >= 300 {
+			resp.Header.Set("X-AT-Upstream-Error", "true")
+		}
 		return nil
 	}
 
