@@ -23,25 +23,26 @@
 
 ## 🚀 30‑second quick‑start
 
+1. Run the proxy (Docker)
 ```bash
-# 1. Run the proxy (Docker)
 docker run --rm -p 8080:8080 \
   -e SLACK_TOKEN=demo-token \
   -v $(pwd)/examples:/conf \
   ghcr.io/winhowes/authtranslator:latest \
     -config /conf/config.yaml -allowlist /conf/allowlist.yaml
-
-# 2. Curl through the proxy
+```
+Or run from source:
+```bash
+go run ./app -config examples/config.yaml -allowlist examples/allowlist.yaml
+```
+2. Curl through the proxy
+```bash
 curl -H "Host: slack" \
      -H "X-Auth: demo-token" \
      -H "Content-Type: application/json" \
      --data '{"channel": "#general", "username": "AuthTranslator", "text": "Hello from AuthTranslator"}' \
      http://localhost:8080/api/chat.postMessage
 # alternatively set `X-AT-Int: slack` if you can’t change the Host header
-```
-
-```bash
-go run ./app -config examples/config.yaml -allowlist examples/allowlist.yaml
 ```
 
 ---
