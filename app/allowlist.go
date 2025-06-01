@@ -9,7 +9,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/winhowes/AuthTranslator/app/auth"
+	authplugins "github.com/winhowes/AuthTranslator/app/auth"
 	integrationplugins "github.com/winhowes/AuthTranslator/app/integrations"
 )
 
@@ -474,6 +474,8 @@ func findConstraint(i *Integration, callerID, pth, method string) (RequestConstr
 
 	allowlists.RLock()
 	callers := allowlists.m[i.Name]
+	// We check wildcard callers too incase an allowlist has both defined callers and
+	// a fallback wildcard caller.
 	wildcard, hasWildcard := callers["*"]
 	c, ok := callers[callerID]
 	allowlists.RUnlock()
