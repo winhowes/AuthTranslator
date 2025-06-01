@@ -19,9 +19,8 @@ Welcome to **AuthTranslator**! In a couple of minutes you’ll have a running pr
 ## 1 – Run the proxy (Docker)
 
 ```bash
-export SLACK_TOKEN="xoxb‑123…"
 docker run --rm -p 8080:8080 \
-  -e SLACK_TOKEN \
+  -e SLACK_TOKEN=demo-token \
   -v $(pwd)/examples:/conf \
   ghcr.io/winhowes/authtranslator:latest \
     -config /conf/config.yaml \
@@ -43,10 +42,10 @@ INFO  authtranslator started  addr=0.0.0.0:8080 integrations=1
 
 ```bash
 curl -H "Host: slack" \
-     -H "X-Auth: demo-user" \
-     -G "http://localhost:8080/api/chat.postMessage" \
-     --data-urlencode "channel=#general" \
-     --data-urlencode "text=Hello from AuthTranslator"
+     -H "X-Auth: demo-token" \
+     -H "Content-Type: application/json" \
+     --data '{"channel": "#general", "username": "AuthTranslator", "text": "Hello from AuthTranslator"}' \
+     http://localhost:8080/api/chat.postMessage
 ```
 
 If everything is wired up you’ll get back Slack’s normal JSON response and your message appears in **#general**.
