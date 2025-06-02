@@ -24,12 +24,10 @@ func (t *tokenCounter) OnResponse(integ, caller string, r *http.Request, resp *h
 	if integ != "openai" {
 		return
 	}
-	data, err := io.ReadAll(resp.Body)
+	data, err := metrics.GetResponseBody(resp)
 	if err != nil {
 		return
 	}
-	resp.Body = io.NopCloser(bytes.NewReader(data))
-	resp.ContentLength = int64(len(data))
 	var body struct {
 		Usage struct {
 			TotalTokens int `json:"total_tokens"`

@@ -8,6 +8,6 @@ Build or run the proxy with `-tags example` to include this plugin. The
 `WriteProm` hook emits a per-caller `authtranslator_tokens_total` counter which
 shows up in the `/_at_internal/metrics` endpoint.
 
-Because it reads the upstream response body to count tokens, the plugin copies
-the bytes and resets `resp.Body` before returning so the client still receives
-the full payload.
+Because it reads the upstream response body to count tokens, the plugin uses
+`metrics.GetResponseBody` to copy the bytes and reset `resp.Body` before
+returning so the client still receives the full payload.
