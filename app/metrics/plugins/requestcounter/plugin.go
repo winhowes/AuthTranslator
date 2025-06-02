@@ -14,4 +14,6 @@ func (*requestCounter) OnRequest(integration string, r *http.Request) {
 
 func (*requestCounter) OnResponse(string, string, *http.Request, *http.Response) {}
 
+func (*requestCounter) WriteProm(http.ResponseWriter) {}
+
 func init() { metrics.Register(&requestCounter{}) }

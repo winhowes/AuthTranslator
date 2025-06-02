@@ -4,6 +4,7 @@ package example
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"sync"
 
@@ -35,6 +36,14 @@ func (t *tokenCounter) OnResponse(integ, caller string, r *http.Request, resp *h
 	}
 	t.totals[caller] += uint64(body.Usage.TotalTokens)
 	t.mu.Unlock()
+}
+
+func (t *tokenCounter) WriteProm(w http.ResponseWriter) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	for caller, total := range t.totals {
+		fmt.Fprintf(w, "authtranslator_tokens_total{caller=%q} %d\n", caller, total)
+	}
 }
 
 func init() { metrics.Register(&tokenCounter{}) }

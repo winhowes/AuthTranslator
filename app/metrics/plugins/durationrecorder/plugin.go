@@ -23,4 +23,6 @@ func (*durationRecorder) OnResponse(integration, caller string, r *http.Request,
 	}
 }
 
+func (*durationRecorder) WriteProm(http.ResponseWriter) {}
+
 func init() { metrics.Register(&durationRecorder{}) }

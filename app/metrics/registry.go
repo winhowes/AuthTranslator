@@ -9,6 +9,7 @@ import (
 type Plugin interface {
 	OnRequest(integration string, r *http.Request)
 	OnResponse(integration, caller string, r *http.Request, resp *http.Response)
+	WriteProm(w http.ResponseWriter)
 }
 
 var (

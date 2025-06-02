@@ -35,7 +35,7 @@ generated the response, typically due to authentication or rate limiting.
 | `authtranslator_rate_limit_events_total`  | counter   | `integration`         | Incremented when a request is rejected with 429. |
 | `authtranslator_auth_failures_total`      | counter   | `integration`         | Authentication plugin failures.                  |
 
-Missing a metric? Write a small **metrics plugin** to hook into requests and responses or open a PR—new counters are easy to wire in. See [Metrics Plugins](metrics-plugins.md) for a primer.
+Missing a metric? Write a small **metrics plugin** to hook into requests and responses or open a PR—new counters are easy to wire in. `WriteProm` calls every registered plugin's own `WriteProm` method so any custom counters you output will appear alongside the built‑in ones. Plugins must manage their own state (typically in memory). See [Metrics Plugins](metrics-plugins.md) for a primer.
 
 ---
 

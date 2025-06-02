@@ -21,6 +21,8 @@ func (h *hookPlugin) OnResponse(integ, caller string, r *http.Request, resp *htt
 	h.resp++
 }
 
+func (*hookPlugin) WriteProm(http.ResponseWriter) {}
+
 func TestMetricsHooks(t *testing.T) {
 	metrics.Reset()
 

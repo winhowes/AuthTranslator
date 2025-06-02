@@ -149,6 +149,13 @@ func WriteProm(w http.ResponseWriter) {
 		integ, code := parts[0], parts[1]
 		fmt.Fprintf(w, "authtranslator_upstream_responses_total{integration=%q,code=%q} %s\n", integ, code, kv.Value.String())
 	})
+
+	mu.RLock()
+	ps := append([]Plugin(nil), plugins...)
+	mu.RUnlock()
+	for _, p := range ps {
+		p.WriteProm(w)
+	}
 }
 
 // Handler writes Prometheus metrics to w enforcing optional basic auth.

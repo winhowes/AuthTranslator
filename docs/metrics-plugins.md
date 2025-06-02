@@ -10,15 +10,17 @@ request and response but never mutate them.
 
 ```go
 // app/metrics/registry.go
- type Plugin interface {
-     OnRequest(integration string, r *http.Request)
-     OnResponse(integration, caller string, r *http.Request, resp *http.Response)
- }
+type Plugin interface {
+    OnRequest(integration string, r *http.Request)
+    OnResponse(integration, caller string, r *http.Request, resp *http.Response)
+    WriteProm(w http.ResponseWriter)
+}
 ```
 
 `OnRequest` fires just before the proxy forwards a request upstream and
-`OnResponse` runs once the upstream reply is received. The integration name is
-passed so you can apply per-service logic.
+`OnResponse` runs once the upstream reply is received. `WriteProm` lets a plugin
+append custom Prometheus metrics. The integration name is passed so you can
+apply per-service logic.
 
 ---
 
@@ -47,6 +49,7 @@ package example
 
 import (
     "encoding/json"
+    "fmt"
     "net/http"
     "sync"
 
@@ -80,7 +83,18 @@ func (t *tokenCounter) OnResponse(integ, caller string, r *http.Request, resp *h
     t.mu.Unlock()
 }
 
+func (t *tokenCounter) WriteProm(w http.ResponseWriter) {
+    t.mu.Lock()
+    defer t.mu.Unlock()
+    for caller, total := range t.totals {
+        fmt.Fprintf(w, "authtranslator_tokens_total{caller=%q} %d\n", caller, total)
+    }
+}
+
 func init() { metrics.Register(&tokenCounter{}) }
 ```
-
 Use the `totals` map to expose custom Prometheus counters or logs as needed.
+`metrics.WriteProm` automatically iterates over all registered plugins and calls
+their `WriteProm` method, so anything printed here will appear in the
+`/_at_internal/metrics` endpoint. The plugin itself is responsible for storing
+any counters; they live in memory and reset on restart.

@@ -2,12 +2,19 @@ package metrics
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 )
+
+type promPlugin struct{}
+
+func (*promPlugin) OnRequest(string, *http.Request)                          {}
+func (*promPlugin) OnResponse(string, string, *http.Request, *http.Response) {}
+func (*promPlugin) WriteProm(w http.ResponseWriter)                          { fmt.Fprintln(w, "custom_metric 1") }
 
 func resetMetrics() {
 	requestCounts.Init()
@@ -125,5 +132,26 @@ func TestCallerContext(t *testing.T) {
 	}
 	if Caller(context.Background()) != "" {
 		t.Fatal("expected empty caller for background context")
+	}
+}
+
+func TestWritePromPlugins(t *testing.T) {
+	resetMetrics()
+	mu.Lock()
+	saved := plugins
+	mu.Unlock()
+	Reset()
+	t.Cleanup(func() {
+		mu.Lock()
+		plugins = saved
+		mu.Unlock()
+	})
+
+	Register(&promPlugin{})
+
+	rr := httptest.NewRecorder()
+	WriteProm(rr)
+	if !strings.Contains(rr.Body.String(), "custom_metric 1") {
+		t.Fatalf("custom metric missing: %s", rr.Body.String())
 	}
 }
