@@ -31,7 +31,11 @@ apply per-service logic.
 1. Create `app/metrics/plugins/<name>`.
 2. Implement the interface above.
 3. Register it in `init()` with `metrics.Register(&MyPlugin{})`.
-4. Build or run the proxy – registered plugins load automatically.
+4. Add a blank import for your package in
+   `app/metrics/plugins/plugins.go` (or any other file) so the `init()`
+   function runs. Optional plugins can guard the import with a build tag
+   like the example plugin does.
+5. Build or run the proxy – registered plugins load automatically.
 
 A minimal reference implementation lives in
 [`app/metrics/plugins/example`](../app/metrics/plugins/example).
