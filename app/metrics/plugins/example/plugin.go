@@ -3,8 +3,10 @@
 package example
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"sync"
 
