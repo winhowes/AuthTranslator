@@ -22,12 +22,16 @@ func (t *tokenCounter) OnResponse(integ, caller string, r *http.Request, resp *h
 	if integ != "openai" {
 		return
 	}
+	data, err := metrics.GetResponseBody(resp)
+	if err != nil {
+		return
+	}
 	var body struct {
 		Usage struct {
 			TotalTokens int `json:"total_tokens"`
 		} `json:"usage"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+	if err := json.Unmarshal(data, &body); err != nil {
 		return
 	}
 	t.mu.Lock()
