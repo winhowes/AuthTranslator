@@ -4,7 +4,8 @@ AuthTranslator exposes basic Prometheus metrics out of the box. When you need ex
 counters or histograms, write a small **metrics plugin**. Plugins see every
 request and response but never mutate them. If you need to read the response body,
 use `metrics.GetResponseBody` to copy the bytes and reset `resp.Body` so the proxy
-can still send it upstream.
+can still send it upstream. For request bodies, call `authplugins.GetBody(r)` to
+get the bytes while caching and restoring `r.Body`.
 
 ---
 
