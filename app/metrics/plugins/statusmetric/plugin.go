@@ -14,4 +14,6 @@ func (*statusMetric) OnResponse(integration, caller string, r *http.Request, res
 	metrics.RecordStatus(integration, resp.StatusCode)
 }
 
+func (*statusMetric) WriteProm(http.ResponseWriter) {}
+
 func init() { metrics.Register(&statusMetric{}) }

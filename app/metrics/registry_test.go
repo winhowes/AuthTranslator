@@ -19,6 +19,8 @@ func (p *testPlugin) OnResponse(integration, caller string, r *http.Request, res
 	p.resps++
 }
 
+func (*testPlugin) WriteProm(http.ResponseWriter) {}
+
 func TestRegistry(t *testing.T) {
 	// save original state
 	mu.Lock()
