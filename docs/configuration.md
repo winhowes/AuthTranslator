@@ -90,7 +90,8 @@ Two ways to authorise a caller:
   callers:
     - id: demo-user
       # easiest: assign a capability
-      capabilities: [post_public_as]
+      capabilities:
+        - name: post_public_as
 
     - id: service‑42
       # granular example
@@ -126,7 +127,7 @@ Regular expressions are not supported.
 
 | Field          | Type       | Notes                                                   |
 | -------------- | ---------- | ------------------------------------------------------- |
-| `capabilities` | `[]string` | Shortcut labels → expand to rules.                      |
+| `capabilities` | `[]Capability` | Each item has `name` and optional `params`; expands to rules. |
 | `rules`        | `[]Rule`   | Evaluated in order; first match authorises the request. |
 
 #### `Rule`
