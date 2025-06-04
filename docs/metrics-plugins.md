@@ -109,3 +109,5 @@ Use the `totals` map to expose custom Prometheus counters or logs as needed.
 their `WriteProm` method, so anything printed here will appear in the
 `/_at_internal/metrics` endpoint. The plugin itself is responsible for storing
 any counters; they live in memory and reset on restart.
+`metrics.Reset()` will also call `ResetMetrics()` on any registered plugin
+that implements the method so tests can start from a clean slate.
