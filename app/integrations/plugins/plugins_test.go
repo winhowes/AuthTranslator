@@ -12,6 +12,7 @@ import (
 	_ "github.com/winhowes/AuthTranslator/app/integrations/plugins/monday"
 	_ "github.com/winhowes/AuthTranslator/app/integrations/plugins/okta"
 	_ "github.com/winhowes/AuthTranslator/app/integrations/plugins/openai"
+	_ "github.com/winhowes/AuthTranslator/app/integrations/plugins/pagerduty"
 	_ "github.com/winhowes/AuthTranslator/app/integrations/plugins/sendgrid"
 	_ "github.com/winhowes/AuthTranslator/app/integrations/plugins/servicenow"
 	_ "github.com/winhowes/AuthTranslator/app/integrations/plugins/stripe"
@@ -68,6 +69,10 @@ func TestPluginCapabilities(t *testing.T) {
 			{"chat_completion", "/v1/chat/completions", "POST", nil},
 			{"list_models", "/v1/models", "GET", nil},
 			{"create_embedding", "/v1/embeddings", "POST", nil},
+		},
+		"pagerduty": {
+			{"trigger_incident", "/incidents", "POST", nil},
+			{"resolve_incident", "/incidents/*", "PUT", nil},
 		},
 		"sendgrid": {
 			{"send_email", "/v3/mail/send", "POST", nil},

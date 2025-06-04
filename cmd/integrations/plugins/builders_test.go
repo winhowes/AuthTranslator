@@ -30,6 +30,7 @@ func TestBuilders(t *testing.T) {
 		{"twilio", []string{"-name", "tw", "-token", "tok"}, Twilio("tw", "tok")},
 		{"workday", []string{"-name", "wd", "-domain", "work.example.com", "-token", "tok"}, Workday("wd", "work.example.com", "tok")},
 		{"openai", []string{"-name", "oa", "-token", "tok"}, OpenAI("oa", "tok")},
+		{"pagerduty", []string{"-name", "pd", "-token", "tok"}, PagerDuty("pd", "tok")},
 		{"zendesk", []string{"-name", "zd", "-token", "tok"}, Zendesk("zd", "tok")},
 	}
 
@@ -73,6 +74,7 @@ func TestBuilderErrors(t *testing.T) {
 		{"stripe", []string{}},
 		{"trufflehog", []string{}},
 		{"zendesk", []string{}},
+		{"pagerduty", []string{}},
 	}
 	for _, tt := range tests {
 		b := Get(tt.name)
@@ -94,7 +96,7 @@ func TestBuilderErrors(t *testing.T) {
 func TestBuilderParseError(t *testing.T) {
 	names := []string{
 		"asana", "confluence", "ghe", "github", "gitlab", "jira",
-		"linear", "monday", "okta", "openai", "sendgrid", "servicenow",
+		"linear", "monday", "okta", "openai", "pagerduty", "sendgrid", "servicenow",
 		"slack", "stripe", "trufflehog", "twilio", "workday", "zendesk",
 	}
 	for _, name := range names {

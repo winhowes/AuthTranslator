@@ -24,6 +24,7 @@ Think of it as a *cookie‑cutter* that stamps out a ready‑to‑run block in y
 | `monday` | `https://api.monday.com/v2` | `token` |
 | `okta` | `https://<domain>/api/v1` | `token` |
 | `openai` | `https://api.openai.com` | `token` |
+| `pagerduty` | `https://api.pagerduty.com` | `token` |
 | `sendgrid` | `https://api.sendgrid.com` | `token` |
 | `servicenow` | `https://api.servicenow.com` | `token` |
 | `slack` | `https://slack.com/` | `token` |
