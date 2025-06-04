@@ -198,3 +198,36 @@ func TestToFloatVariousTypes(t *testing.T) {
 		}
 	}
 }
+
+func TestMatchBodyMapReasonSuccess(t *testing.T) {
+	data := map[string]interface{}{
+		"a":   "b",
+		"arr": []interface{}{float64(1), float64(2)},
+	}
+	rule := map[string]interface{}{
+		"a":   "b",
+		"arr": []interface{}{float64(1)},
+	}
+	ok, reason := matchBodyMapReason(data, rule)
+	if !ok || reason != "" {
+		t.Fatalf("expected success, got ok=%v reason=%q", ok, reason)
+	}
+}
+
+func TestMatchBodyMapReasonMissingField(t *testing.T) {
+	data := map[string]interface{}{"a": "b"}
+	rule := map[string]interface{}{"a": "b", "c": "d"}
+	ok, reason := matchBodyMapReason(data, rule)
+	if ok || reason != "missing body field c" {
+		t.Fatalf("expected missing field failure, got ok=%v reason=%q", ok, reason)
+	}
+}
+
+func TestMatchBodyMapReasonNestedMismatch(t *testing.T) {
+	data := map[string]interface{}{"a": map[string]interface{}{"b": "c"}}
+	rule := map[string]interface{}{"a": map[string]interface{}{"b": "d"}}
+	ok, reason := matchBodyMapReason(data, rule)
+	if ok || reason != "body field a.b value mismatch" {
+		t.Fatalf("expected mismatch failure, got ok=%v reason=%q", ok, reason)
+	}
+}
