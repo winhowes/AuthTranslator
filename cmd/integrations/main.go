@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"os"
@@ -162,7 +163,9 @@ func readConfig() ([]plugins.Integration, error) {
 	var cfg struct {
 		Integrations []plugins.Integration `yaml:"integrations"`
 	}
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
+	dec := yaml.NewDecoder(bytes.NewReader(data))
+	dec.KnownFields(true)
+	if err := dec.Decode(&cfg); err != nil {
 		return nil, err
 	}
 	return cfg.Integrations, nil
