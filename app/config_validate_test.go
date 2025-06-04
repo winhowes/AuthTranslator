@@ -103,3 +103,19 @@ func TestValidateConfigNegativeTimeouts(t *testing.T) {
 		t.Fatalf("expected error for negative response_header_timeout")
 	}
 }
+
+func TestValidateConfigBadRateLimitStrategy(t *testing.T) {
+	c := Config{Integrations: []Integration{{Name: "a", Destination: "http://ex", RateLimitStrategy: "bogus_strategy"}}}
+	if err := validateConfig(&c); err == nil {
+		t.Fatalf("expected error for invalid rate_limit_strategy")
+	}
+}
+
+func TestValidateConfigGoodRateLimitStrategy(t *testing.T) {
+	for _, strat := range []string{"token_bucket", "leaky_bucket", "fixed_window"} {
+		c := Config{Integrations: []Integration{{Name: "a", Destination: "http://ex", RateLimitStrategy: strat}}}
+		if err := validateConfig(&c); err != nil {
+			t.Fatalf("unexpected error for %s: %v", strat, err)
+		}
+	}
+}
