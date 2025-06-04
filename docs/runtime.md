@@ -48,7 +48,7 @@ AuthTranslator exposes several command‑line options:
 | `-version` | print the build version and exit |
 | `-watch` | automatically reload when config or allowlist files change |
 | `-enable-metrics` | expose the `/_at_internal/metrics` endpoint (default `true`) |
-| `-enable-http3` | serve HTTP/3 in addition to HTTP/1 and HTTP/2 |
+| `-enable-http3` | serve HTTP/3 in addition to HTTP/1 and HTTP/2 (requires `-tls-cert` and `-tls-key`) |
 | `-metrics-user` | username required to access `/_at_internal/metrics` (must be used with `-metrics-pass`) |
 | `-metrics-pass` | password required to access `/_at_internal/metrics` (must be used with `-metrics-user`) |
 
