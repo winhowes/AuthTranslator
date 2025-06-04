@@ -36,6 +36,8 @@ Run `go run ./cmd/allowlist list` to list capabilities from your build. For quic
 | openai | chat_completion | – |
 | openai | create_embedding | – |
 | openai | list_models | – |
+| pagerduty | trigger_incident | – |
+| pagerduty | resolve_incident | – |
 | sendgrid | manage_contacts | – |
 | sendgrid | send_email | – |
 | sendgrid | update_template | – |

@@ -11,6 +11,7 @@ import (
 	_ "github.com/winhowes/AuthTranslator/app/integrations/plugins/monday"
 	_ "github.com/winhowes/AuthTranslator/app/integrations/plugins/okta"
 	_ "github.com/winhowes/AuthTranslator/app/integrations/plugins/openai"
+	_ "github.com/winhowes/AuthTranslator/app/integrations/plugins/pagerduty"
 	_ "github.com/winhowes/AuthTranslator/app/integrations/plugins/sendgrid"
 	_ "github.com/winhowes/AuthTranslator/app/integrations/plugins/servicenow"
 	_ "github.com/winhowes/AuthTranslator/app/integrations/plugins/slack"
