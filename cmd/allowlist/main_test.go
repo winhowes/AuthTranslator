@@ -326,6 +326,50 @@ func TestAddEntryNewCaller(t *testing.T) {
 	}
 }
 
+func TestAddEntryDuplicateCapability(t *testing.T) {
+	tmpDir := t.TempDir()
+	path := filepath.Join(tmpDir, "allow.yaml")
+
+	initial := []plugins.AllowlistEntry{
+		{
+			Integration: "foo",
+			Callers: []plugins.CallerConfig{
+				{ID: "u1", Capabilities: []plugins.CapabilityConfig{{Name: "cap", Params: map[string]interface{}{"k": "v1"}}}},
+			},
+		},
+	}
+	data, _ := yaml.Marshal(initial)
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	old := *file
+	*file = path
+	t.Cleanup(func() { *file = old })
+
+	addEntry([]string{"-integration", "foo", "-caller", "u1", "-capability", "cap", "-params", "k=v2"})
+
+	out, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("failed reading file: %v", err)
+	}
+	var entries []plugins.AllowlistEntry
+	if err := yaml.Unmarshal(out, &entries); err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+	want := []plugins.AllowlistEntry{
+		{
+			Integration: "foo",
+			Callers: []plugins.CallerConfig{
+				{ID: "u1", Capabilities: []plugins.CapabilityConfig{{Name: "cap", Params: map[string]interface{}{"k": "v2"}}}},
+			},
+		},
+	}
+	if !reflect.DeepEqual(entries, want) {
+		t.Fatalf("entries mismatch:\n%v\nwant\n%v", entries, want)
+	}
+}
+
 func TestAddEntryMissingArgs(t *testing.T) {
 	tmpDir := t.TempDir()
 	path := filepath.Join(tmpDir, "allow.yaml")

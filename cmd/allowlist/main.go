@@ -114,7 +114,17 @@ func addEntry(args []string) {
 		entry.Callers = append(entry.Callers, plugins.CallerConfig{ID: *caller})
 		callerCfg = &entry.Callers[len(entry.Callers)-1]
 	}
-	callerCfg.Capabilities = append(callerCfg.Capabilities, plugins.CapabilityConfig{Name: *capName, Params: params})
+	replaced := false
+	for i := range callerCfg.Capabilities {
+		if callerCfg.Capabilities[i].Name == *capName {
+			callerCfg.Capabilities[i].Params = params
+			replaced = true
+			break
+		}
+	}
+	if !replaced {
+		callerCfg.Capabilities = append(callerCfg.Capabilities, plugins.CapabilityConfig{Name: *capName, Params: params})
+	}
 
 	out, err := yaml.Marshal(entries)
 	if err != nil {
