@@ -12,7 +12,7 @@ Unknown top‑level keys cause a validation error.
 - integration: <integration-name>
   callers:
     - id: <callerID>
-      [capabilities: [ ... ] | rules: [ ... ]]
+      [capabilities: [{ name: <capability> }] | rules: [ ... ]]
 ```
 
 ---
