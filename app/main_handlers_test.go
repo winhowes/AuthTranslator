@@ -64,6 +64,9 @@ func TestMetricsHandlerUnauthorized(t *testing.T) {
 	if rr.Header().Get("X-AT-Upstream-Error") != "false" {
 		t.Fatal("missing auth error header")
 	}
+	if ct := rr.Header().Get("Content-Type"); ct != "text/plain; charset=utf-8" {
+		t.Fatalf("unexpected content type %s", ct)
+	}
 }
 
 func TestMetricsHandlerAuthorized(t *testing.T) {
