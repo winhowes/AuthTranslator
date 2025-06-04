@@ -62,10 +62,11 @@ config: |
             prefix: "Bearer "
 
 allowlist: |
-  - integration: slack
-    callers:
-      - id: demo
-        capabilities: [post_public_as]
+    - integration: slack
+      callers:
+        - id: demo
+          capabilities:
+            - name: post_public_as
 
 ```
 
