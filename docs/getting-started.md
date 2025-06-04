@@ -85,6 +85,6 @@ AuthTranslator is extensible via three types of plugins:
 
 * Dive into [Auth Plugins](auth-plugins.md) to wire up other services.
 * Add rate‑limits with the [Rate‑Limiting](rate-limiting.md) guide.
-* Ship to Kubernetes via the [Helm chart](../charts/authtranslator).
+* Ship to Kubernetes via the [Helm guide](helm.md).
 
 Happy translating! 🎉
