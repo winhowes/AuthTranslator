@@ -30,7 +30,7 @@ If no matching caller key exists – or a matched caller fails rule constraints 
 
 | Style              | When to use                                                    | YAML field                          |
 | ------------------ | -------------------------------------------------------------- | ----------------------------------- |
-| **Capabilities**   | You want a friendly, reusable label ("post public Slack msg"). | `capabilities:` *(list of strings)* |
+| **Capabilities**   | You want a friendly, reusable label ("post public Slack msg"). | `capabilities:` *(list of objects)* |
 | **Granular rules** | You need fine‑grained filters (path, query, header, body).     | `rules:` *(list of Rule objects)*   |
 
 You can mix both—capabilities first, fall back to granular.
@@ -49,8 +49,10 @@ Look for a `capabilities.go` file under `app/integrations/plugins/<integration>/
 - integration: slack
   callers:
     - id: bot-123
-      capabilities: [post_public_as]
+      capabilities:
+        - name: post_public_as
 ```
+Each capability item contains a `name` and optional `params` map.
 
 > **Discovering capabilities** Run the CLI helper:
 >
