@@ -70,6 +70,7 @@ Make sure `$SLACK_TOKEN` is still in your environment.
 * The proxy hot‑reloads on **SIGHUP** or when started with `-watch`.
 
 Full schema details: [Configuration](configuration.md).
+For a deeper dive into permissions, see the [Allowlist Configuration](allowlist-config.md) guide.
 
 AuthTranslator is extensible via three types of plugins:
 [Auth Plugins](auth-plugins.md), [Secret Back-Ends](secret-backends.md) and
