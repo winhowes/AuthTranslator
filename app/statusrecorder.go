@@ -32,7 +32,7 @@ func (r *statusRecorder) CloseNotify() <-chan bool {
 	if cn, ok := r.ResponseWriter.(http.CloseNotifier); ok {
 		return cn.CloseNotify()
 	}
-	return make(chan bool)
+	return nil
 }
 
 func (r *statusRecorder) ReadFrom(src io.Reader) (int64, error) {
