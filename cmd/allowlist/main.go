@@ -67,9 +67,15 @@ func addEntry(args []string) {
 	if *paramList != "" {
 		params = make(map[string]interface{})
 		for _, kv := range strings.Split(*paramList, ",") {
+			kv = strings.TrimSpace(kv)
+			if kv == "" {
+				continue
+			}
 			parts := strings.SplitN(kv, "=", 2)
 			if len(parts) == 2 {
-				params[parts[0]] = parts[1]
+				k := strings.TrimSpace(parts[0])
+				v := strings.TrimSpace(parts[1])
+				params[k] = v
 			}
 		}
 	}
