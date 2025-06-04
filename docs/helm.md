@@ -33,6 +33,7 @@ This:
 | `image.pullPolicy` | `IfNotPresent`                    | Image pull policy.                                                 |
 | `redisAddress`     | `""`                              | Address passed to `-redis-addr` – either `host:port` or a `redis://`/`rediss://` URL. |
 | `redisCA`          | `""`                              | CA file verifying Redis TLS passed to `-redis-ca`. |
+| `secretRefresh`    | `""`                              | Value passed to `-secret-refresh`. |
 | `resources`        | *(object)*                        | Pod resource requests/limits. |
 | `imagePullSecrets` | `[]`                              | Names of image pull secrets. |
 | `serviceAccountName` | `""`                            | Pod service account name. |
