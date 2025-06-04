@@ -86,6 +86,8 @@ var redisTimeout = flag.Duration("redis-timeout", 5*time.Second, "dial timeout f
 var redisCA = flag.String("redis-ca", "", "path to CA certificate for Redis TLS; disables InsecureSkipVerify")
 var maxBodySizeFlag = flag.Int64("max_body_size", authplugins.MaxBodySize, "maximum bytes buffered from request bodies (0 to disable)")
 var secretRefresh = flag.Duration("secret-refresh", 0, "refresh interval for cached secrets (0 disables)")
+var readTimeout = flag.Duration("read-timeout", 0, "HTTP server read timeout")
+var writeTimeout = flag.Duration("write-timeout", 0, "HTTP server write timeout")
 var showVersion = flag.Bool("version", false, "print version and exit")
 var watch = flag.Bool("watch", false, "watch config and allowlist files for changes")
 var metricsUser = flag.String("metrics-user", "", "username for metrics endpoint")
@@ -1098,6 +1100,14 @@ func serve(s server, cert, key string) error {
 	}
 }
 
+func newHTTPServer(addr string) *http.Server {
+	return &http.Server{
+		Addr:         addr,
+		ReadTimeout:  *readTimeout,
+		WriteTimeout: *writeTimeout,
+	}
+}
+
 func main() {
 	flag.Usage = usage
 	flag.Parse()
@@ -1133,7 +1143,7 @@ func main() {
 
 	http.HandleFunc("/", proxyHandler)
 
-	srv := &http.Server{Addr: *addr}
+	srv := newHTTPServer(*addr)
 	var h3srv *http3.Server
 
 	go func() {

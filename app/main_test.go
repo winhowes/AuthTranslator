@@ -80,6 +80,40 @@ func TestHTTP3FlagSet(t *testing.T) {
 	}
 }
 
+func TestReadTimeoutFlagDefault(t *testing.T) {
+	if *readTimeout != 0 {
+		t.Fatalf("expected default 0, got %v", *readTimeout)
+	}
+}
+
+func TestReadTimeoutFlagSet(t *testing.T) {
+	old := *readTimeout
+	t.Cleanup(func() { flag.Set("read-timeout", old.String()) })
+	if err := flag.Set("read-timeout", "5s"); err != nil {
+		t.Fatal(err)
+	}
+	if *readTimeout != 5*time.Second {
+		t.Fatalf("expected 5s, got %v", *readTimeout)
+	}
+}
+
+func TestWriteTimeoutFlagDefault(t *testing.T) {
+	if *writeTimeout != 0 {
+		t.Fatalf("expected default 0, got %v", *writeTimeout)
+	}
+}
+
+func TestWriteTimeoutFlagSet(t *testing.T) {
+	old := *writeTimeout
+	t.Cleanup(func() { flag.Set("write-timeout", old.String()) })
+	if err := flag.Set("write-timeout", "6s"); err != nil {
+		t.Fatal(err)
+	}
+	if *writeTimeout != 6*time.Second {
+		t.Fatalf("expected 6s, got %v", *writeTimeout)
+	}
+}
+
 type stubServer struct{ tls bool }
 
 func (s *stubServer) ListenAndServe() error                    { return nil }
@@ -130,6 +164,42 @@ func TestServeNoTLS(t *testing.T) {
 	if srv.tls {
 		t.Fatal("unexpected TLS start")
 	}
+}
+
+func TestNewHTTPServerTimeouts(t *testing.T) {
+	oldR := *readTimeout
+	oldW := *writeTimeout
+	t.Cleanup(func() {
+		flag.Set("read-timeout", oldR.String())
+		flag.Set("write-timeout", oldW.String())
+	})
+	flag.Set("read-timeout", "2s")
+	flag.Set("write-timeout", "3s")
+	srv := newHTTPServer("localhost:0")
+	if srv.ReadTimeout != 2*time.Second {
+		t.Fatalf("expected 2s read timeout, got %v", srv.ReadTimeout)
+	}
+	if srv.WriteTimeout != 3*time.Second {
+		t.Fatalf("expected 3s write timeout, got %v", srv.WriteTimeout)
+	}
+}
+
+func TestNewHTTPServerDefaultTimeouts(t *testing.T) {
+    oldR := *readTimeout
+    oldW := *writeTimeout
+    t.Cleanup(func() {
+        flag.Set("read-timeout", oldR.String())
+        flag.Set("write-timeout", oldW.String())
+    })
+    flag.Set("read-timeout", "0")
+    flag.Set("write-timeout", "0")
+    srv := newHTTPServer("localhost:0")
+    if srv.ReadTimeout != 0 {
+        t.Fatalf("expected 0 read timeout, got %v", srv.ReadTimeout)
+    }
+    if srv.WriteTimeout != 0 {
+        t.Fatalf("expected 0 write timeout, got %v", srv.WriteTimeout)
+    }
 }
 
 func captureUsage() string {
