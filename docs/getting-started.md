@@ -30,11 +30,7 @@ docker run --rm -p 8080:8080 \
 `config.yaml` defines which integrations are available, while
 `allowlist.yaml` controls which callers may use them.
 
-You should see a log line like:
-
-```text
-INFO  authtranslator started  addr=0.0.0.0:8080 integrations=1
-```
+When the service starts it prints its version and log level to standard output.
 
 ---
 
