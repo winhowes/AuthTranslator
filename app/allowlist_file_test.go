@@ -2,6 +2,8 @@ package main
 
 import (
 	"io/ioutil"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"testing"
 )
@@ -62,5 +64,20 @@ func TestLoadAllowlistsEmptyFile(t *testing.T) {
 	}
 	if len(entries) != 0 {
 		t.Fatalf("expected zero entries, got %d", len(entries))
+	}
+}
+
+func TestLoadAllowlistsURL(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`[{"integration":"test","callers":[]}]`))
+	}))
+	defer srv.Close()
+
+	entries, err := loadAllowlists(srv.URL)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(entries) != 1 || entries[0].Integration != "test" {
+		t.Fatalf("unexpected entries %+v", entries)
 	}
 }

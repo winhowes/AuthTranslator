@@ -52,7 +52,7 @@ type Config struct {
 }
 
 func loadAllowlists(filename string) ([]AllowlistEntry, error) {
-	f, err := os.Open(filename)
+	f, err := openSource(filename)
 	if err != nil {
 		return nil, err
 	}
@@ -77,6 +77,8 @@ var xAtIntHost = flag.String("x_at_int_host", "", "only respect X-AT-Int header 
 var addr = flag.String("addr", ":8080", "listen address")
 var allowlistFile = flag.String("allowlist", "allowlist.yaml", "path to allowlist configuration")
 var configFile = flag.String("config", "config.yaml", "path to configuration file")
+var allowlistURL = flag.String("allowlist-url", "", "URL to remote allowlist file")
+var configURL = flag.String("config-url", "", "URL to remote configuration file")
 var tlsCert = flag.String("tls-cert", "", "path to TLS certificate")
 var tlsKey = flag.String("tls-key", "", "path to TLS key")
 var logLevel = flag.String("log-level", "INFO", "log level: DEBUG, INFO, WARN, ERROR")
@@ -102,8 +104,28 @@ func usage() {
 	flag.PrintDefaults()
 }
 
+func isRemote(path string) bool {
+	u, err := url.Parse(path)
+	return err == nil && u.Scheme != "" && u.Scheme != "file"
+}
+
+func openSource(path string) (io.ReadCloser, error) {
+	if isRemote(path) {
+		resp, err := http.Get(path)
+		if err != nil {
+			return nil, err
+		}
+		if resp.StatusCode != http.StatusOK {
+			resp.Body.Close()
+			return nil, fmt.Errorf("remote fetch: %s", resp.Status)
+		}
+		return resp.Body, nil
+	}
+	return os.Open(path)
+}
+
 func loadConfig(filename string) (*Config, error) {
-	f, err := os.Open(filename)
+	f, err := openSource(filename)
 	if err != nil {
 		return nil, err
 	}
@@ -145,7 +167,11 @@ func parseLevel(s string) slog.Level {
 func reload() error {
 	logger.Info("reloading configuration")
 
-	cfg, err := loadConfig(*configFile)
+	src := *configFile
+	if *configURL != "" {
+		src = *configURL
+	}
+	cfg, err := loadConfig(src)
 	if err != nil {
 		return err
 	}
@@ -196,13 +222,17 @@ func reload() error {
 	// Clear secret cache so reloaded integrations use fresh values.
 	secrets.ClearCache()
 
-	entries, err := loadAllowlists(*allowlistFile)
+	alSrc := *allowlistFile
+	if *allowlistURL != "" {
+		alSrc = *allowlistURL
+	}
+	entries, err := loadAllowlists(alSrc)
 	allowlists.RLock()
 	old := allowlists.m
 	allowlists.RUnlock()
 	if err != nil {
 		if os.IsNotExist(err) {
-			logger.Warn("allowlist file missing; keeping existing entries", "file", *allowlistFile)
+			logger.Warn("allowlist file missing; keeping existing entries", "file", alSrc)
 		} else {
 			logger.Error("failed to load allowlist; keeping existing entries", "error", err)
 		}
@@ -1169,9 +1199,18 @@ func main() {
 
 	var cancelWatch context.CancelFunc
 	if *watch {
-		var watchCtx context.Context
-		watchCtx, cancelWatch = context.WithCancel(context.Background())
-		go watchFiles(watchCtx, []string{*configFile, *allowlistFile}, watchSig)
+		files := make([]string, 0, 2)
+		if *configURL == "" && !isRemote(*configFile) {
+			files = append(files, *configFile)
+		}
+		if *allowlistURL == "" && !isRemote(*allowlistFile) {
+			files = append(files, *allowlistFile)
+		}
+		if len(files) > 0 {
+			var watchCtx context.Context
+			watchCtx, cancelWatch = context.WithCancel(context.Background())
+			go watchFiles(watchCtx, files, watchSig)
+		}
 	}
 
 	for {
