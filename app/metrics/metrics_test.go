@@ -16,19 +16,8 @@ func (*promPlugin) OnRequest(string, *http.Request)                          {}
 func (*promPlugin) OnResponse(string, string, *http.Request, *http.Response) {}
 func (*promPlugin) WriteProm(w http.ResponseWriter)                          { fmt.Fprintln(w, "custom_metric 1") }
 
-func resetMetrics() {
-	requestCounts.Init()
-	rateLimitCounts.Init()
-	authFailureCounts.Init()
-	upstreamStatusCounts.Init()
-	durationHistsMu.Lock()
-	durationHists = make(map[string]*histogram)
-	durationHistsMu.Unlock()
-	requestDurations.Init()
-}
-
 func TestMetricsHandlerEmpty(t *testing.T) {
-	resetMetrics()
+	Reset()
 	req := httptest.NewRequest(http.MethodGet, "/_at_internal/metrics", nil)
 	rr := httptest.NewRecorder()
 	Handler(rr, req, "", "")
@@ -42,7 +31,7 @@ func TestMetricsHandlerEmpty(t *testing.T) {
 }
 
 func TestMetricsHandlerOutput(t *testing.T) {
-	resetMetrics()
+	Reset()
 	IncRequest("foo")
 	IncRequest("foo")
 	IncRateLimit("foo")
@@ -94,7 +83,7 @@ func TestMetricsHandlerOutput(t *testing.T) {
 }
 
 func TestMetricsHandlerAuth(t *testing.T) {
-	resetMetrics()
+	Reset()
 	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
 	rr := httptest.NewRecorder()
 	Handler(rr, req, "admin", "secret")
@@ -136,7 +125,7 @@ func TestCallerContext(t *testing.T) {
 }
 
 func TestWritePromPlugins(t *testing.T) {
-	resetMetrics()
+	Reset()
 	mu.Lock()
 	saved := plugins
 	mu.Unlock()

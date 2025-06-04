@@ -52,4 +52,11 @@ func (t *tokenCounter) WriteProm(w http.ResponseWriter) {
 	}
 }
 
+// ResetMetrics clears the in-memory counters. Mainly used in tests.
+func (t *tokenCounter) ResetMetrics() {
+	t.mu.Lock()
+	t.totals = nil
+	t.mu.Unlock()
+}
+
 func init() { metrics.Register(&tokenCounter{}) }

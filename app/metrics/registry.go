@@ -12,6 +12,9 @@ type Plugin interface {
 	WriteProm(w http.ResponseWriter)
 }
 
+// resetter optionally clears a plugin's internal metrics state.
+type resetter interface{ ResetMetrics() }
+
 var (
 	mu      sync.RWMutex
 	plugins []Plugin
@@ -20,8 +23,26 @@ var (
 // Reset removes all registered plugins. Primarily used in tests.
 func Reset() {
 	mu.Lock()
+	ps := plugins
 	plugins = nil
 	mu.Unlock()
+
+	// Allow plugins to clear their own state if they implement ResetMetrics.
+	for _, p := range ps {
+		if r, ok := p.(resetter); ok {
+			r.ResetMetrics()
+		}
+	}
+
+	// Clear built-in metrics so tests start with a clean slate.
+	requestCounts.Init()
+	rateLimitCounts.Init()
+	authFailureCounts.Init()
+	upstreamStatusCounts.Init()
+	durationHistsMu.Lock()
+	durationHists = make(map[string]*histogram)
+	durationHistsMu.Unlock()
+	requestDurations.Init()
 }
 
 // Register adds a metrics plugin.
