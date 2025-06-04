@@ -16,6 +16,7 @@ import (
 	"math/big"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"strconv"
@@ -215,6 +216,50 @@ func TestUsageOutput(t *testing.T) {
 	out := captureUsage()
 	if !strings.Contains(out, "Usage: authtranslator") || !strings.Contains(out, "Options:") {
 		t.Fatalf("unexpected usage output: %s", out)
+	}
+}
+
+func TestOpenSourceHTTP(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("ok"))
+	}))
+	defer srv.Close()
+
+	rc, err := openSource(srv.URL)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer rc.Close()
+	data, err := io.ReadAll(rc)
+	if err != nil {
+		t.Fatalf("read error: %v", err)
+	}
+	if string(data) != "ok" {
+		t.Fatalf("unexpected body %q", data)
+	}
+}
+
+func TestOpenSourceHTTPStatus(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "fail", http.StatusTeapot)
+	}))
+	defer srv.Close()
+
+	rc, err := openSource(srv.URL)
+	if err == nil {
+		rc.Close()
+		t.Fatal("expected error")
+	}
+	want := "remote fetch: 418 I'm a teapot"
+	if err.Error() != want {
+		t.Fatalf("unexpected error %v", err)
+	}
+}
+
+func TestOpenSourceHTTPDialError(t *testing.T) {
+	addr := freeAddr(t)
+	if _, err := openSource("http://" + addr + "/"); err == nil {
+		t.Fatal("expected error")
 	}
 }
 
