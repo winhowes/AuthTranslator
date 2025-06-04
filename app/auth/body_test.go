@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 )
 
@@ -97,5 +98,28 @@ func TestGetBodyUnlimited(t *testing.T) {
 	}
 	if len(b) != len(large) {
 		t.Fatalf("expected body length %d, got %d", len(large), len(b))
+	}
+}
+
+// closeTracker records whether Close was called on the underlying body.
+type closeTracker struct{ closed bool }
+
+func (ct *closeTracker) Read(p []byte) (int, error) { return 0, io.EOF }
+func (ct *closeTracker) Close() error               { ct.closed = true; return nil }
+
+func TestGetBodyPreservesClose(t *testing.T) {
+	ct := &closeTracker{}
+	r := &http.Request{Method: http.MethodPost, URL: &url.URL{Scheme: "http", Host: "example.com"}, Body: ct, Header: http.Header{}}
+	if _, err := GetBody(r); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if ct.closed {
+		t.Fatal("body closed prematurely")
+	}
+	if err := r.Body.Close(); err != nil {
+		t.Fatalf("close error: %v", err)
+	}
+	if !ct.closed {
+		t.Fatal("underlying body not closed")
 	}
 }
