@@ -111,7 +111,7 @@ Also see [`cmd/allowlist`](cmd/allowlist) for CRUD operations on the allowlist.
 | Endpoint                | Purpose                                                                |
 | ----------------------- | ---------------------------------------------------------------------- |
 | `/_at_internal/healthz` | Liveness probe – returns **200 OK** when the proxy is running.         |
-| `/_at_internal/metrics` | Prometheus metrics (Go runtime + per‑integration rate‑limit counters). |
+| `/_at_internal/metrics` | Prometheus metrics (request totals, status codes, latency, rate‑limit and auth failures plus Go runtime metrics). |
 | Structured logs         | Text by default; pass `-log-format json` for JSON via `slog`. Includes method, integration, path, status; adds `caller_id` when known. |
 
 Official container images include a Docker HEALTHCHECK that polls the health endpoint; the container reports **healthy** once it returns 200.
