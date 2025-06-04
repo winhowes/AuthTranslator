@@ -166,7 +166,8 @@ func Handler(w http.ResponseWriter, r *http.Request, user, pass string) {
 			subtle.ConstantTimeCompare([]byte(p), []byte(pass)) != 1 {
 			w.Header().Set("WWW-Authenticate", `Basic realm="metrics"`)
 			w.Header().Set("X-AT-Upstream-Error", "false")
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+			http.Error(w, "Unauthorized: invalid metrics credentials", http.StatusUnauthorized)
 			return
 		}
 	}

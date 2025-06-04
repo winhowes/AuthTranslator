@@ -113,11 +113,11 @@ func openSource(path string) (io.ReadCloser, error) {
 	if isRemote(path) {
 		resp, err := http.Get(path)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("fetch %s: %w", path, err)
 		}
 		if resp.StatusCode != http.StatusOK {
 			resp.Body.Close()
-			return nil, fmt.Errorf("remote fetch: %s", resp.Status)
+			return nil, fmt.Errorf("remote fetch %s: %s", path, resp.Status)
 		}
 		return resp.Body, nil
 	}
@@ -1007,7 +1007,8 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 		logger.Warn("no integration configured", "host", host)
 		metrics.IncRequest("unknown")
 		w.Header().Set("X-AT-Upstream-Error", "false")
-		http.Error(w, "Not Found", http.StatusNotFound)
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		http.Error(w, fmt.Sprintf("integration for host %s not found", host), http.StatusNotFound)
 		return
 	}
 
@@ -1024,7 +1025,8 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 				logger.Warn("authentication failed", "host", host, "remote", r.RemoteAddr)
 				metrics.IncAuthFailure(integ.Name)
 				w.Header().Set("X-AT-Upstream-Error", "false")
-				http.Error(w, "Unauthorized", http.StatusUnauthorized)
+				w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+				http.Error(w, fmt.Sprintf("Unauthorized: authentication failed for integration %s", integ.Name), http.StatusUnauthorized)
 				return
 			}
 			if idp, ok := p.(authplugins.Identifier); ok {
@@ -1054,7 +1056,8 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Retry-After", strconv.Itoa(secs))
 		}
 		w.Header().Set("X-AT-Upstream-Error", "false")
-		http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		http.Error(w, fmt.Sprintf("Too Many Requests: caller %s exceeded rate limit", rateKey), http.StatusTooManyRequests)
 		return
 	}
 	if !integ.outLimiter.Allow(host) {
@@ -1068,7 +1071,8 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Retry-After", strconv.Itoa(secs))
 		}
 		w.Header().Set("X-AT-Upstream-Error", "false")
-		http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		http.Error(w, fmt.Sprintf("Too Many Requests: host %s exceeded rate limit", host), http.StatusTooManyRequests)
 		return
 	}
 
@@ -1080,14 +1084,16 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 			logger.Warn("request blocked", "integration", integ.Name, "caller_id", callerID, "reason", reason)
 			w.Header().Set("X-AT-Error-Reason", reason)
 			w.Header().Set("X-AT-Upstream-Error", "false")
-			http.Error(w, "Forbidden", http.StatusForbidden)
+			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+			http.Error(w, fmt.Sprintf("Forbidden: %s", reason), http.StatusForbidden)
 			return
 		}
 		if ok2, reason := validateRequestReason(r, cons); !ok2 {
 			logger.Warn("request failed constraints", "integration", integ.Name, "caller_id", callerID, "reason", reason)
 			w.Header().Set("X-AT-Error-Reason", reason)
 			w.Header().Set("X-AT-Upstream-Error", "false")
-			http.Error(w, "Forbidden", http.StatusForbidden)
+			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+			http.Error(w, fmt.Sprintf("Forbidden: %s", reason), http.StatusForbidden)
 			return
 		}
 	}
@@ -1101,7 +1107,8 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 
 	if integ.proxy == nil {
 		w.Header().Set("X-AT-Upstream-Error", "false")
-		http.Error(w, "Bad Gateway", http.StatusBadGateway)
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		http.Error(w, fmt.Sprintf("Bad Gateway: no proxy configured for integration %s", integ.Name), http.StatusBadGateway)
 		return
 	}
 

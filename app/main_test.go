@@ -250,7 +250,7 @@ func TestOpenSourceHTTPStatus(t *testing.T) {
 		rc.Close()
 		t.Fatal("expected error")
 	}
-	want := "remote fetch: 418 I'm a teapot"
+	want := fmt.Sprintf("remote fetch %s: 418 I'm a teapot", srv.URL)
 	if err.Error() != want {
 		t.Fatalf("unexpected error %v", err)
 	}
