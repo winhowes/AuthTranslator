@@ -139,6 +139,24 @@ func TestReadConfigNonexistent(t *testing.T) {
 	}
 }
 
+func TestReadConfigEmptyFile(t *testing.T) {
+	dir := t.TempDir()
+	cfg := filepath.Join(dir, "cfg.yaml")
+	if err := os.WriteFile(cfg, nil, 0644); err != nil {
+		t.Fatalf("setup write error: %v", err)
+	}
+	old := *file
+	*file = cfg
+	t.Cleanup(func() { *file = old })
+	list, err := readConfig()
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if len(list) != 0 {
+		t.Fatalf("expected empty list, got %v", list)
+	}
+}
+
 func TestReadConfigInvalidYAML(t *testing.T) {
 	dir := t.TempDir()
 	cfg := filepath.Join(dir, "cfg.yaml")
