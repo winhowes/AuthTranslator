@@ -44,9 +44,10 @@ AuthTranslator’s behaviour is extended by **plugins** – small Go packages th
 incoming_auth:
   - type: jwt
     params:
+      secrets:
+        - env:JWT_KEY
       issuer:   https://auth.example.com
       audience: slack-proxy
-      jwks_url: https://auth.example.com/.well-known/jwks.json
 ```
 
 *Verifies* the JWT’s signature and sets `callerID` to the token's `sub` claim.
