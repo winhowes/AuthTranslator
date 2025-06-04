@@ -54,7 +54,7 @@ Look for a `capabilities.go` file under `app/integrations/plugins/<integration>/
 ```
 Each capability item contains a `name` and optional `params` map.
 
-> **Discovering capabilities** Run the CLI helper:
+> **Discovering capabilities** Run the CLI helper (see [Command-Line Helpers](cli.md)):
 >
 > ```bash
 > go run ./cmd/allowlist list
