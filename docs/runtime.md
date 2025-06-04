@@ -32,7 +32,9 @@ AuthTranslator exposes several command‑line options:
 | ---- | ----------- |
 | `-addr` | listen address (default `:8080`) |
 | `-config` | path to the configuration file (`config.yaml` by default) |
+| `-config-url` | URL for a remote configuration file |
 | `-allowlist` | path to the allowlist file (`allowlist.yaml` by default) |
+| `-allowlist-url` | URL for a remote allowlist file |
 | `-disable_x_at_int` | ignore the `X-AT-Int` header |
 | `-x_at_int_host` | only respect `X-AT-Int` when this host is requested |
 | `-tls-cert` and `-tls-key` | TLS certificate and key to serve HTTPS |

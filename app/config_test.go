@@ -2,6 +2,8 @@ package main
 
 import (
 	"io/ioutil"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -79,5 +81,20 @@ func TestLoadConfigExample(t *testing.T) {
 	}
 	if len(cfg.Integrations) == 0 {
 		t.Fatal("expected at least one integration in example config")
+	}
+}
+
+func TestLoadConfigURL(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"integrations":[{"name":"remote","destination":"http://ex"}]}`))
+	}))
+	defer srv.Close()
+
+	cfg, err := loadConfig(srv.URL)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(cfg.Integrations) != 1 || cfg.Integrations[0].Name != "remote" {
+		t.Fatalf("unexpected config %+v", cfg)
 	}
 }
