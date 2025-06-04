@@ -151,6 +151,18 @@ func TestReadConfigInvalidYAML(t *testing.T) {
 	}
 }
 
+func TestReadConfigUnknownField(t *testing.T) {
+	dir := t.TempDir()
+	cfg := filepath.Join(dir, "cfg.yaml")
+	os.WriteFile(cfg, []byte("{foo: 1}"), 0644)
+	old := *file
+	*file = cfg
+	t.Cleanup(func() { *file = old })
+	if _, err := readConfig(); err == nil {
+		t.Fatalf("expected error for unknown field")
+	}
+}
+
 func TestReadConfigError(t *testing.T) {
 	dir := t.TempDir()
 	cfg := filepath.Join(dir, "cfg.yaml")
