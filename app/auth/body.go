@@ -20,19 +20,32 @@ type bodyKey struct{}
 
 // GetBody returns the request body bytes while caching the result for
 // subsequent calls. It also resets r.Body so callers can read it again.
+type readCloseMulti struct {
+	io.Reader
+	io.Closer
+}
+
+func (rcm readCloseMulti) Close() error {
+	if rcm.Closer != nil {
+		return rcm.Closer.Close()
+	}
+	return nil
+}
+
 func GetBody(r *http.Request) ([]byte, error) {
 	if b, ok := r.Context().Value(bodyKey{}).([]byte); ok {
 		return b, nil
 	}
 
-	var reader io.Reader = r.Body
+	orig := r.Body
+	var reader io.Reader = orig
 	if MaxBodySize > 0 {
-		reader = io.LimitReader(r.Body, MaxBodySize+1)
+		reader = io.LimitReader(orig, MaxBodySize+1)
 	}
 
 	b, err := io.ReadAll(reader)
 	// restore the consumed bytes so callers can read the body even on error
-	r.Body = io.NopCloser(io.MultiReader(bytes.NewReader(b), r.Body))
+	r.Body = &readCloseMulti{Reader: io.MultiReader(bytes.NewReader(b), orig), Closer: orig}
 	if err != nil {
 		return nil, err
 	}
