@@ -26,7 +26,7 @@ Think of it as a *cookie‑cutter* that stamps out a ready‑to‑run block in y
 | `openai` | `https://api.openai.com` | `token` |
 | `sendgrid` | `https://api.sendgrid.com` | `token` |
 | `servicenow` | `https://api.servicenow.com` | `token` |
-| `slack` | `https://slack.com/api` | `token` |
+| `slack` | `https://slack.com/` | `token` |
 | `stripe` | `https://api.stripe.com` | `token` |
 | `trufflehog` | `https://trufflehog.cloud/api` | `token` |
 | `twilio` | `https://api.twilio.com` | `basic` |
