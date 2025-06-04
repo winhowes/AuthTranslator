@@ -370,6 +370,30 @@ func TestAddEntryDuplicateCapability(t *testing.T) {
 	}
 }
 
+func TestAddEntryParamTrim(t *testing.T) {
+	tmpDir := t.TempDir()
+	path := filepath.Join(tmpDir, "allow.yaml")
+
+	old := *file
+	*file = path
+	t.Cleanup(func() { *file = old })
+
+	addEntry([]string{"-integration", "foo", "-caller", "u1", "-capability", "cap", "-params", "k=v1, bar = baz "})
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("failed reading file: %v", err)
+	}
+	var entries []plugins.AllowlistEntry
+	if err := yaml.Unmarshal(data, &entries); err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+	params := entries[0].Callers[0].Capabilities[0].Params
+	if params["k"] != "v1" || params["bar"] != "baz" {
+		t.Fatalf("params not trimmed: %#v", params)
+	}
+}
+
 func TestAddEntryMissingArgs(t *testing.T) {
 	tmpDir := t.TempDir()
 	path := filepath.Join(tmpDir, "allow.yaml")
