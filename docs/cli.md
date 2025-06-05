@@ -35,7 +35,7 @@ integrations <command> [flags]
 | Command    | Purpose                                                             |
 | ---------- | ------------------------------------------------------------------- |
 | `list`     | Print the names of integrations defined in `config.yaml`.     |
-| `update`   | Replace an existing integration using one of the plugin builders.   |
+| `update`   | Add or replace an integration using one of the plugin builders.   |
 | `delete`   | Remove an integration by name.   |
 | `<plugin>` | Generate a new integration using that plugin's flags and append it to the file.   |
 
