@@ -38,6 +38,9 @@ func GetBody(r *http.Request) ([]byte, error) {
 	}
 
 	orig := r.Body
+	if orig == nil {
+		orig = http.NoBody
+	}
 	var reader io.Reader = orig
 	if MaxBodySize > 0 {
 		reader = io.LimitReader(orig, MaxBodySize+1)

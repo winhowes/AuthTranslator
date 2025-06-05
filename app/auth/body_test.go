@@ -130,3 +130,14 @@ func TestReadCloseMultiNilCloser(t *testing.T) {
 		t.Fatalf("expected nil error, got %v", err)
 	}
 }
+
+func TestGetBodyNilBody(t *testing.T) {
+	r := &http.Request{Method: http.MethodGet, URL: &url.URL{Scheme: "http", Host: "example.com"}}
+	b, err := GetBody(r)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(b) != 0 {
+		t.Fatalf("expected empty body, got %q", string(b))
+	}
+}
