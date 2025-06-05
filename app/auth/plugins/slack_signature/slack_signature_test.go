@@ -297,3 +297,16 @@ func TestSlackSignatureSecretError(t *testing.T) {
 		t.Fatal("expected failure when secret load errors")
 	}
 }
+func TestSlackSignatureStripAuthInvalidParams(t *testing.T) {
+	hdr := http.Header{"X-Slack-Signature": []string{"sig"}, "X-Slack-Request-Timestamp": []string{"1"}}
+	r := &http.Request{Header: hdr}
+	p := SlackSignatureAuth{}
+	p.StripAuth(r, nil)
+	if r.Header.Get("X-Slack-Signature") == "" || r.Header.Get("X-Slack-Request-Timestamp") == "" {
+		t.Fatal("headers should remain when params invalid")
+	}
+	p.StripAuth(r, struct{}{})
+	if r.Header.Get("X-Slack-Signature") == "" || r.Header.Get("X-Slack-Request-Timestamp") == "" {
+		t.Fatal("headers should remain when params wrong type")
+	}
+}

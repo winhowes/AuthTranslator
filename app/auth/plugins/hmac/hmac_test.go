@@ -296,3 +296,23 @@ func TestHMACParseParamsTypeMismatch(t *testing.T) {
 		t.Fatal("expected error")
 	}
 }
+func TestHMACStripAuthInvalidParams(t *testing.T) {
+	r := &http.Request{Header: http.Header{"X-Signature": []string{"sig"}}}
+	h := HMACSignatureAuth{}
+	h.StripAuth(r, nil)
+	if r.Header.Get("X-Signature") == "" {
+		t.Fatal("header should remain when params nil")
+	}
+	h.StripAuth(r, struct{}{})
+	if r.Header.Get("X-Signature") == "" {
+		t.Fatal("header should remain when params wrong type")
+	}
+}
+
+func TestHMACOutgoingParseParamsBadAlgo(t *testing.T) {
+	p := HMACSignature{}
+	t.Setenv("S", "k")
+	if _, err := p.ParseParams(map[string]interface{}{"secrets": []string{"env:S"}, "algo": "bad"}); err == nil {
+		t.Fatal("expected error for unsupported algo")
+	}
+}

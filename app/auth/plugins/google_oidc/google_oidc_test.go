@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -106,6 +107,11 @@ func (ft *failTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	ft.called = true
 	return nil, fmt.Errorf("called")
 }
+
+type errReadCloser struct{}
+
+func (errReadCloser) Read([]byte) (int, error) { return 0, fmt.Errorf("err") }
+func (errReadCloser) Close() error             { return nil }
 
 func TestGoogleOIDCAddAuthCache(t *testing.T) {
 	tokenCache.Lock()
@@ -453,7 +459,7 @@ func TestGoogleOIDCAuthParseParamsCustomAndMissing(t *testing.T) {
 	}
 }
 
-func TestFetchKeysExpiresHeader(t *testing.T) {
+func TestFetchKeysExpiresHeader2(t *testing.T) {
 	key, _ := rsa.GenerateKey(rand.Reader, 1024)
 	kid := "exp1"
 	jwks := jwksForKey(&key.PublicKey, kid)
@@ -817,5 +823,148 @@ func TestFetchKeysInvalidKeyData(t *testing.T) {
 	keyCache.mu.RUnlock()
 	if ok {
 		t.Fatal("invalid key should not be cached")
+	}
+}
+func TestGoogleOIDCStripAuthInvalidParams(t *testing.T) {
+	r := &http.Request{Header: http.Header{"Authorization": []string{"tok"}}}
+	g := GoogleOIDCAuth{}
+	g.StripAuth(r, nil)
+	if r.Header.Get("Authorization") == "" {
+		t.Fatal("header should remain when params nil")
+	}
+	g.StripAuth(r, struct{}{})
+	if r.Header.Get("Authorization") == "" {
+		t.Fatal("header should remain when params wrong type")
+	}
+}
+
+func TestGoogleOIDCIdentifyParseFail(t *testing.T) {
+	r := &http.Request{Header: http.Header{"Authorization": []string{"Bearer bad"}}}
+	g := GoogleOIDCAuth{}
+	cfg, _ := g.ParseParams(map[string]interface{}{"audience": "a"})
+	if id, ok := g.Identify(r, cfg); ok || id != "" {
+		t.Fatalf("expected failure, got %s", id)
+	}
+}
+
+func TestGoogleOIDCAuthenticateExpired(t *testing.T) {
+	key, _ := rsa.GenerateKey(rand.Reader, 1024)
+	kid := "ex"
+	jwks := jwksForKey(&key.PublicKey, kid)
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { fmt.Fprint(w, jwks) }))
+	defer ts.Close()
+	oldURL := CertsURL
+	CertsURL = ts.URL
+	defer func() { CertsURL = oldURL }()
+	oldClient := HTTPClient
+	HTTPClient = ts.Client()
+	defer func() { HTTPClient = oldClient }()
+	tok := makeToken("aud", "u", time.Now().Add(-time.Hour).Unix(), key, kid)
+	r := &http.Request{Header: http.Header{"Authorization": []string{"Bearer " + tok}}}
+	g := GoogleOIDCAuth{}
+	cfg, _ := g.ParseParams(map[string]interface{}{"audience": "aud"})
+	if g.Authenticate(context.Background(), r, cfg) {
+		t.Fatal("expected failure for expired token")
+	}
+}
+
+type bodyErrTransport struct{}
+
+func (bodyErrTransport) RoundTrip(*http.Request) (*http.Response, error) {
+	return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(errReadCloser{})}, nil
+}
+
+func TestFetchTokenReadError(t *testing.T) {
+	oldClient := HTTPClient
+	HTTPClient = &http.Client{Transport: bodyErrTransport{}}
+	defer func() { HTTPClient = oldClient }()
+	MetadataHost = "http://example.com"
+	if _, _, err := fetchToken("aud"); err == nil {
+		t.Fatal("expected read error")
+	}
+}
+
+func TestFetchKeysBadExponent(t *testing.T) {
+	key, _ := rsa.GenerateKey(rand.Reader, 1024)
+	n := base64.RawURLEncoding.EncodeToString(key.N.Bytes())
+	jwks := fmt.Sprintf(`{"keys":[{"kid":"bad","alg":"RS256","n":"%s","e":"!!"}]}`, n)
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { fmt.Fprint(w, jwks) }))
+	defer ts.Close()
+	oldURL := CertsURL
+	CertsURL = ts.URL
+	defer func() { CertsURL = oldURL }()
+	oldClient := HTTPClient
+	HTTPClient = ts.Client()
+	defer func() { HTTPClient = oldClient }()
+	keyCache.mu.Lock()
+	keyCache.keys = nil
+	keyCache.expiry = time.Time{}
+	keyCache.mu.Unlock()
+	if err := fetchKeys(); err != nil {
+		t.Fatal(err)
+	}
+	keyCache.mu.RLock()
+	_, ok := keyCache.keys["bad"]
+	keyCache.mu.RUnlock()
+	if ok {
+		t.Fatal("bad key should not be cached")
+	}
+}
+
+type fetchErrTransport struct{}
+
+func (fetchErrTransport) RoundTrip(*http.Request) (*http.Response, error) {
+	return &http.Response{StatusCode: http.StatusOK, Body: errReadCloser{}}, nil
+}
+
+func TestFetchKeysBodyError(t *testing.T) {
+	oldClient := HTTPClient
+	HTTPClient = &http.Client{Transport: fetchErrTransport{}}
+	defer func() { HTTPClient = oldClient }()
+	oldURL := CertsURL
+	CertsURL = "http://example.com"
+	defer func() { CertsURL = oldURL }()
+	keyCache.mu.Lock()
+	keyCache.keys = nil
+	keyCache.expiry = time.Time{}
+	keyCache.mu.Unlock()
+	if err := fetchKeys(); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestFetchKeysExpiresHeader(t *testing.T) {
+	exp := time.Now().Add(2 * time.Hour).UTC().Format(http.TimeFormat)
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Expires", exp)
+		fmt.Fprint(w, `{"keys":[]}`)
+	}))
+	defer ts.Close()
+	oldURL := CertsURL
+	CertsURL = ts.URL
+	defer func() { CertsURL = oldURL }()
+	oldClient := HTTPClient
+	HTTPClient = ts.Client()
+	defer func() { HTTPClient = oldClient }()
+	keyCache.mu.Lock()
+	keyCache.keys = nil
+	keyCache.expiry = time.Time{}
+	keyCache.mu.Unlock()
+	if err := fetchKeys(); err != nil {
+		t.Fatal(err)
+	}
+	keyCache.mu.RLock()
+	expTime := keyCache.expiry
+	keyCache.mu.RUnlock()
+	if expTime.Before(time.Now().Add(119*time.Minute)) || expTime.After(time.Now().Add(121*time.Minute)) {
+		t.Fatalf("unexpected expiry %v", expTime)
+	}
+}
+func TestGoogleOIDCAuthenticateParseFail(t *testing.T) {
+	g := GoogleOIDCAuth{}
+	cfg, _ := g.ParseParams(map[string]interface{}{"audience": "a"})
+	r := &http.Request{Header: http.Header{"Authorization": []string{"Bearer bad"}}}
+	if g.Authenticate(context.Background(), r, cfg) {
+		t.Fatal("expected failure for bad token")
 	}
 }

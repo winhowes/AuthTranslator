@@ -3,6 +3,8 @@ package jwt
 import (
 	"context"
 	"crypto"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/rsa"
@@ -440,5 +442,63 @@ func TestJWTOutgoingParseParamsUnknownField(t *testing.T) {
 	p := JWTAuthOut{}
 	if _, err := p.ParseParams(map[string]interface{}{"secrets": []string{"env:X"}, "extra": true}); err == nil {
 		t.Fatal("expected error")
+	}
+}
+func TestJWTStripAuthInvalidParams(t *testing.T) {
+	r := &http.Request{Header: http.Header{"Authorization": []string{"tok"}}}
+	j := JWTAuth{}
+	j.StripAuth(r, nil)
+	if r.Header.Get("Authorization") == "" {
+		t.Fatal("header should remain when params nil")
+	}
+	j.StripAuth(r, struct{}{})
+	if r.Header.Get("Authorization") == "" {
+		t.Fatal("header should remain when params wrong type")
+	}
+}
+
+func TestJWTAuthenticatePrefixMismatchAndParseError(t *testing.T) {
+	key := "k"
+	tok := makeHS256Token("a", "u", key, time.Now().Add(time.Hour).Unix())
+	r := &http.Request{Header: http.Header{"Authorization": []string{"Token " + tok}}}
+	j := JWTAuth{}
+	t.Setenv("K", key)
+	cfg, _ := j.ParseParams(map[string]interface{}{"secrets": []string{"env:K"}, "prefix": "Bearer ", "header": "Authorization"})
+	if j.Authenticate(context.Background(), r, cfg) {
+		t.Fatal("expected prefix mismatch to fail")
+	}
+	r.Header.Set("Authorization", "Bearer badtoken")
+	if j.Authenticate(context.Background(), r, cfg) {
+		t.Fatal("expected malformed token to fail")
+	}
+}
+
+func TestVerifyRS256FailurePaths(t *testing.T) {
+	parts := []string{"a", "b", "sig"}
+	if verifyRS256(parts, []byte("notpem")) {
+		t.Fatal("expected false for bad pem")
+	}
+	pemData := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: []byte("bad")})
+	if verifyRS256(parts, pemData) {
+		t.Fatal("expected false for parse error")
+	}
+	eckey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	pubBytes, _ := x509.MarshalPKIXPublicKey(&eckey.PublicKey)
+	pemData = pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: pubBytes})
+	if verifyRS256(parts, pemData) {
+		t.Fatal("expected false for non-RSA key")
+	}
+	rsaKey, err := rsa.GenerateKey(rand.Reader, 1024)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pubBytes, err = x509.MarshalPKIXPublicKey(&rsaKey.PublicKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pemData = pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: pubBytes})
+	badParts := []string{parts[0], parts[1], "!!"}
+	if verifyRS256(badParts, pemData) {
+		t.Fatal("expected false for bad signature")
 	}
 }

@@ -178,3 +178,15 @@ func TestGitHubSignatureName(t *testing.T) {
 		t.Fatalf("unexpected name %s", p.Name())
 	}
 }
+func TestGitHubSignatureStripAuthInvalidParams(t *testing.T) {
+	r := &http.Request{Header: http.Header{"X-Hub-Signature-256": []string{"sig"}}}
+	g := GitHubSignatureAuth{}
+	g.StripAuth(r, nil)
+	if r.Header.Get("X-Hub-Signature-256") == "" {
+		t.Fatal("header should remain when params nil")
+	}
+	g.StripAuth(r, struct{}{})
+	if r.Header.Get("X-Hub-Signature-256") == "" {
+		t.Fatal("header should remain when params wrong type")
+	}
+}
