@@ -340,6 +340,48 @@ func TestFetchKeysCacheControl(t *testing.T) {
 	}
 }
 
+func TestFetchKeysCacheControlInvalid(t *testing.T) {
+	key, _ := rsa.GenerateKey(rand.Reader, 1024)
+	kid := "kbad"
+	jwks := jwksForKey(&key.PublicKey, kid)
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "max-age=nope")
+		fmt.Fprint(w, jwks)
+	}))
+	defer ts.Close()
+
+	oldURL := CertsURL
+	CertsURL = ts.URL
+	defer func() { CertsURL = oldURL }()
+	oldClient := HTTPClient
+	HTTPClient = ts.Client()
+	defer func() { HTTPClient = oldClient }()
+
+	keyCache.mu.Lock()
+	keyCache.keys = nil
+	keyCache.mu.Unlock()
+	defer func() {
+		keyCache.mu.Lock()
+		keyCache.keys = nil
+		keyCache.mu.Unlock()
+	}()
+
+	now := time.Now()
+	if err := fetchKeys(); err != nil {
+		t.Fatal(err)
+	}
+	keyCache.mu.RLock()
+	_, ok := keyCache.keys[kid]
+	exp := keyCache.expiry
+	keyCache.mu.RUnlock()
+	if !ok {
+		t.Fatalf("expected key %s to be cached", kid)
+	}
+	if exp.Before(now.Add(59*time.Minute)) || exp.After(now.Add(time.Hour+time.Minute)) {
+		t.Fatalf("unexpected expiry %v", exp)
+	}
+}
+
 func TestParseAndVerifyBadHeaders(t *testing.T) {
 	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"HS256","kid":"k"}`))
 	payload := base64.RawURLEncoding.EncodeToString([]byte(`{"aud":"a"}`))

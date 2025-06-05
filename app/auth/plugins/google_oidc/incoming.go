@@ -143,8 +143,9 @@ func fetchKeys() error {
 	if cc := resp.Header.Get("Cache-Control"); strings.Contains(cc, "max-age=") {
 		if i := strings.Index(cc, "max-age="); i >= 0 {
 			var secs int
-			fmt.Sscanf(cc[i:], "max-age=%d", &secs)
-			exp = time.Now().Add(time.Duration(secs) * time.Second)
+			if _, err := fmt.Sscanf(cc[i:], "max-age=%d", &secs); err == nil {
+				exp = time.Now().Add(time.Duration(secs) * time.Second)
+			}
 		}
 	} else if e := resp.Header.Get("Expires"); e != "" {
 		if t, err := http.ParseTime(e); err == nil {
