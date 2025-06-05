@@ -284,3 +284,15 @@ func TestRetryAfterUnknownStrategy(t *testing.T) {
 		t.Fatalf("expected %v got %v", 42*time.Millisecond, d)
 	}
 }
+
+func TestAllowUnknownStrategy(t *testing.T) {
+	rl := NewRateLimiter(1, time.Hour, "bogus")
+	t.Cleanup(rl.Stop)
+	key := "caller"
+	if !rl.Allow(key) {
+		t.Fatal("first call should be allowed")
+	}
+	if !rl.Allow(key) {
+		t.Fatal("second call should still be allowed for unknown strategy")
+	}
+}

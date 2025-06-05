@@ -309,6 +309,37 @@ func TestProxyHandlerRateLimiterUsesIP(t *testing.T) {
 	}
 }
 
+func TestProxyHandlerRateLimiterNoPort(t *testing.T) {
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer backend.Close()
+
+	integ := Integration{Name: "rl-np", Destination: backend.URL, InRateLimit: 1, OutRateLimit: 10, RateLimitWindow: "2s"}
+	if err := AddIntegration(&integ); err != nil {
+		t.Fatalf("failed to add integration: %v", err)
+	}
+	t.Cleanup(func() { integ.inLimiter.Stop(); integ.outLimiter.Stop() })
+
+	req1 := httptest.NewRequest(http.MethodGet, "http://rl-np/", nil)
+	req1.Host = "rl-np"
+	req1.RemoteAddr = "1.2.3.4"
+	rr1 := httptest.NewRecorder()
+	proxyHandler(rr1, req1)
+	if rr1.Code != http.StatusOK {
+		t.Fatalf("first request got %d", rr1.Code)
+	}
+
+	req2 := httptest.NewRequest(http.MethodGet, "http://rl-np/", nil)
+	req2.Host = "rl-np"
+	req2.RemoteAddr = "1.2.3.4"
+	rr2 := httptest.NewRecorder()
+	proxyHandler(rr2, req2)
+	if rr2.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected rate limit rejection, got %d", rr2.Code)
+	}
+}
+
 func TestProxyHandlerRetryAfterOutLimit(t *testing.T) {
 	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)

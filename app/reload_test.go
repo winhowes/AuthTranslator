@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"flag"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"testing"
 
@@ -329,5 +331,38 @@ func TestReloadDuplicateIntegration(t *testing.T) {
 	}
 	if len(ListIntegrations()) != 0 {
 		t.Fatal("integration map should remain empty on failure")
+	}
+}
+
+func TestReloadRemoteSources(t *testing.T) {
+	integrations.Lock()
+	integrations.m = make(map[string]*Integration)
+	integrations.Unlock()
+	allowlists.Lock()
+	allowlists.m = make(map[string]map[string]CallerConfig)
+	allowlists.Unlock()
+
+	cfg := `{"integrations":[{"name":"remote","destination":"http://example.com"}]}`
+	al := `[]`
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/cfg" {
+			w.Write([]byte(cfg))
+		} else {
+			w.Write([]byte(al))
+		}
+	}))
+	defer srv.Close()
+
+	oldCfgURL, oldALURL := *configURL, *allowlistURL
+	t.Cleanup(func() { flag.Set("config-url", oldCfgURL); flag.Set("allowlist-url", oldALURL) })
+	flag.Set("config-url", srv.URL+"/cfg")
+	flag.Set("allowlist-url", srv.URL+"/al")
+
+	if err := reload(); err != nil {
+		t.Fatalf("reload failed: %v", err)
+	}
+	if _, ok := GetIntegration("remote"); !ok {
+		t.Fatal("remote integration not loaded")
 	}
 }
