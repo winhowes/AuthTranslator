@@ -1007,6 +1007,7 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 		logger.Warn("no integration configured", "host", host)
 		metrics.IncRequest("unknown")
 		w.Header().Set("X-AT-Upstream-Error", "false")
+		w.Header().Set("X-AT-Error-Reason", "integration not found")
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		http.Error(w, fmt.Sprintf("integration for host %s not found", host), http.StatusNotFound)
 		return
@@ -1025,6 +1026,7 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 				logger.Warn("authentication failed", "host", host, "remote", r.RemoteAddr)
 				metrics.IncAuthFailure(integ.Name)
 				w.Header().Set("X-AT-Upstream-Error", "false")
+				w.Header().Set("X-AT-Error-Reason", "authentication failed")
 				w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 				http.Error(w, fmt.Sprintf("Unauthorized: authentication failed for integration %s", integ.Name), http.StatusUnauthorized)
 				return
@@ -1056,6 +1058,7 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Retry-After", strconv.Itoa(secs))
 		}
 		w.Header().Set("X-AT-Upstream-Error", "false")
+		w.Header().Set("X-AT-Error-Reason", "caller rate limited")
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		http.Error(w, fmt.Sprintf("Too Many Requests: caller %s exceeded rate limit", rateKey), http.StatusTooManyRequests)
 		return
@@ -1071,6 +1074,7 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Retry-After", strconv.Itoa(secs))
 		}
 		w.Header().Set("X-AT-Upstream-Error", "false")
+		w.Header().Set("X-AT-Error-Reason", "integration rate limited")
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		http.Error(w, fmt.Sprintf("Too Many Requests: host %s exceeded rate limit", host), http.StatusTooManyRequests)
 		return
@@ -1107,6 +1111,7 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 
 	if integ.proxy == nil {
 		w.Header().Set("X-AT-Upstream-Error", "false")
+		w.Header().Set("X-AT-Error-Reason", "no proxy configured")
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		http.Error(w, fmt.Sprintf("Bad Gateway: no proxy configured for integration %s", integ.Name), http.StatusBadGateway)
 		return
