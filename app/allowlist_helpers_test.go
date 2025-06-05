@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 )
 
@@ -102,6 +103,41 @@ func TestValidateRequestTable(t *testing.T) {
 	for _, tt := range tests {
 		if got := validateRequest(tt.r, tt.cons); got != tt.wantOK {
 			t.Errorf("%s: validateRequest=%v want %v", tt.name, got, tt.wantOK)
+		}
+	}
+}
+
+func TestValidateRequestReasonFailures(t *testing.T) {
+	body := []byte(`{"a":"1"}`)
+	tests := []struct {
+		name string
+		r    *http.Request
+		cons RequestConstraint
+		want string
+	}{
+		{
+			name: "header missing",
+			r:    httptest.NewRequest(http.MethodGet, "http://x", nil),
+			cons: RequestConstraint{Headers: map[string][]string{"X-Test": {"v"}}},
+			want: "missing header X-Test",
+		},
+		{
+			name: "query missing",
+			r:    httptest.NewRequest(http.MethodGet, "http://x?a=1", nil),
+			cons: RequestConstraint{Query: map[string][]string{"a": {"1"}, "b": {"2"}}},
+			want: "missing query param b",
+		},
+		{
+			name: "body mismatch",
+			r:    buildReq(http.MethodPost, "http://x", "application/json", body),
+			cons: RequestConstraint{Body: map[string]interface{}{"a": "2"}},
+			want: "body field a value mismatch",
+		},
+	}
+	for _, tt := range tests {
+		ok, reason := validateRequestReason(tt.r, tt.cons)
+		if ok || !strings.Contains(reason, tt.want) {
+			t.Errorf("%s: got (%v,%q) want contains %q", tt.name, ok, reason, tt.want)
 		}
 	}
 }
