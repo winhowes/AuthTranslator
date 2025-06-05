@@ -123,3 +123,10 @@ func TestGetBodyPreservesClose(t *testing.T) {
 		t.Fatal("underlying body not closed")
 	}
 }
+
+func TestReadCloseMultiNilCloser(t *testing.T) {
+	rcm := readCloseMulti{}
+	if err := rcm.Close(); err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+}

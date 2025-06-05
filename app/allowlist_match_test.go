@@ -231,3 +231,25 @@ func TestMatchBodyMapReasonNestedMismatch(t *testing.T) {
 		t.Fatalf("expected mismatch failure, got ok=%v reason=%q", ok, reason)
 	}
 }
+
+func TestMatchBodyMapSuccess(t *testing.T) {
+	data := map[string]interface{}{
+		"a":   "b",
+		"arr": []interface{}{float64(1), float64(2)},
+	}
+	rule := map[string]interface{}{
+		"a":   "b",
+		"arr": []interface{}{float64(1)},
+	}
+	if !matchBodyMap(data, rule) {
+		t.Fatal("expected matchBodyMap to succeed")
+	}
+}
+
+func TestMatchBodyMapFailure(t *testing.T) {
+	data := map[string]interface{}{"a": "b"}
+	rule := map[string]interface{}{"a": "b", "c": "d"}
+	if matchBodyMap(data, rule) {
+		t.Fatal("expected matchBodyMap to fail")
+	}
+}
