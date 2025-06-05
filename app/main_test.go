@@ -782,6 +782,58 @@ func TestRetryAfterRedisDialError(t *testing.T) {
 	}
 }
 
+func TestRetryAfterRedisAuth(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		c, err := ln.Accept()
+		if err != nil {
+			return
+		}
+		br := bufio.NewReader(c)
+		if cmd, args := parseRedisCommand(t, br); cmd != "AUTH" || len(args) != 2 || args[0] != "user" || args[1] != "pw" {
+			t.Errorf("unexpected auth command %s %v", cmd, args)
+			return
+		}
+		c.Write([]byte("+OK\r\n"))
+		if cmd, args := parseRedisCommand(t, br); cmd != "PTTL" || args[0] != "k" {
+			t.Errorf("unexpected command %s %v", cmd, args)
+			return
+		}
+		c.Write([]byte(":42\r\n"))
+	}()
+
+	oldAddr, oldTimeout := *redisAddr, *redisTimeout
+	*redisAddr = "redis://user:pw@" + ln.Addr().String()
+	*redisTimeout = time.Second
+	rl := NewRateLimiter(1, time.Second, "")
+	t.Cleanup(func() {
+		*redisAddr = oldAddr
+		*redisTimeout = oldTimeout
+		rl.Stop()
+	})
+
+	d, err := rl.retryAfterRedis("k")
+	if err != nil {
+		t.Fatalf("retryAfterRedis error: %v", err)
+	}
+	if d != 42*time.Millisecond {
+		t.Fatalf("expected 42ms, got %v", d)
+	}
+	<-done
+	select {
+	case c := <-rl.conns:
+		c.Close()
+	default:
+		t.Fatal("connection was not returned to pool")
+	}
+}
+
 func TestAllowRedisDialError(t *testing.T) {
 	oldAddr, oldTimeout := *redisAddr, *redisTimeout
 	*redisAddr = "127.0.0.1:1"
