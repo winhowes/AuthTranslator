@@ -13,6 +13,7 @@ Running without an allowlist effectively gives all authenticated callers unrestr
 The proxy currently infers its schema directly from Go structs. Unknown top‑level keys cause a validation error.
 
 > **Tip** The Go YAML parser accepts JSON too, so curl pipes / CI steps can build your config in whichever syntax is easier to template.
+For command-line tooling, see the [Command-Line Helpers](cli.md) guide.
 
 ---
 
