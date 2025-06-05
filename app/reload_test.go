@@ -3,9 +3,11 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/winhowes/AuthTranslator/app/secrets"
@@ -364,5 +366,63 @@ func TestReloadRemoteSources(t *testing.T) {
 	}
 	if _, ok := GetIntegration("remote"); !ok {
 		t.Fatal("remote integration not loaded")
+	}
+}
+
+func TestReloadSetAllowlistError(t *testing.T) {
+	integrations.Lock()
+	integrations.m = make(map[string]*Integration)
+	integrations.Unlock()
+	allowlists.Lock()
+	allowlists.m = make(map[string]map[string]CallerConfig)
+	allowlists.Unlock()
+
+	cfgFile, err := os.CreateTemp("", "cfg*.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(cfgFile.Name())
+	cfg := `{"integrations":[{"name":"test","destination":"http://example.com"}]}`
+	if _, err := cfgFile.WriteString(cfg); err != nil {
+		t.Fatal(err)
+	}
+	cfgFile.Close()
+
+	alFile, err := os.CreateTemp("", "al*.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(alFile.Name())
+	al := `[{"integration":"test","callers":[{"id":"a","rules":[{"path":"/","methods":{"GET":{}}}]}]}]`
+	if _, err := alFile.WriteString(al); err != nil {
+		t.Fatal(err)
+	}
+	alFile.Close()
+
+	flag.Set("config", cfgFile.Name())
+	flag.Set("allowlist", alFile.Name())
+
+	old := setAllowlist
+	setAllowlist = func(string, []CallerConfig) error { return fmt.Errorf("boom") }
+	defer func() { setAllowlist = old }()
+
+	err = reload()
+	if err == nil || !strings.Contains(err.Error(), "boom") {
+		t.Fatalf("expected boom error, got %v", err)
+	}
+
+	if _, ok := GetIntegration("test"); !ok {
+		t.Fatal("integration not loaded")
+	}
+	allowlists.RLock()
+	_, ok := allowlists.m["test"]
+	allowlists.RUnlock()
+	if ok {
+		t.Fatal("allowlist should not be set on error")
+	}
+
+	for _, i := range ListIntegrations() {
+		t.Cleanup(i.inLimiter.Stop)
+		t.Cleanup(i.outLimiter.Stop)
 	}
 }
