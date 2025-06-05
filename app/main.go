@@ -98,6 +98,10 @@ var enableMetrics = flag.Bool("enable-metrics", true, "expose /metrics endpoint"
 var enableHTTP3 = flag.Bool("enable-http3", false, "serve HTTP/3 in addition to HTTP/1 and HTTP/2")
 var logger = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 
+// setAllowlist is used by reload to register caller allowlists. It is declared
+// as a variable so tests can override it.
+var setAllowlist = SetAllowlist
+
 func usage() {
 	fmt.Fprintf(flag.CommandLine.Output(), "Usage: authtranslator [options]\n\n")
 	fmt.Fprintf(flag.CommandLine.Output(), "Options:\n")
@@ -249,7 +253,7 @@ func reload() error {
 		allowlists.Unlock()
 
 		for _, al := range entries {
-			if err := SetAllowlist(al.Integration, al.Callers); err != nil {
+			if err := setAllowlist(al.Integration, al.Callers); err != nil {
 				allowlists.Lock()
 				allowlists.m = old
 				allowlists.Unlock()
