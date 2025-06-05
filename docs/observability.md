@@ -19,7 +19,9 @@ credentials – omitting either one causes the service to exit on startup.
 
 Any non‑2xx response includes an `X-AT-Upstream-Error` header. `true` means
 the error came from the upstream service. `false` indicates AuthTranslator
-generated the response, typically due to authentication or rate limiting.
+generated the response. When the proxy generates a 4xx or 5xx reply it also
+sets `X-AT-Error-Reason` with a short explanation such as "integration not found",
+"authentication failed", "caller rate limited", "integration rate limited", or "no proxy configured".
 
 ---
 

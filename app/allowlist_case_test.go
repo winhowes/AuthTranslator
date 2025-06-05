@@ -46,4 +46,7 @@ func TestAllowlistCaseInsensitive(t *testing.T) {
 	if rr.Header().Get("X-AT-Upstream-Error") != "false" {
 		t.Fatal("missing auth error header")
 	}
+	if rr.Header().Get("X-AT-Error-Reason") == "" {
+		t.Fatal("missing X-AT-Error-Reason header")
+	}
 }

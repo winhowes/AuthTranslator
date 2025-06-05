@@ -304,6 +304,9 @@ func TestProxyHandlerRateLimiterUsesIP(t *testing.T) {
 	if rr2.Header().Get("X-AT-Upstream-Error") != "false" {
 		t.Fatal("missing auth error header")
 	}
+	if rr2.Header().Get("X-AT-Error-Reason") != "caller rate limited" {
+		t.Fatalf("unexpected error reason: %s", rr2.Header().Get("X-AT-Error-Reason"))
+	}
 }
 
 func TestProxyHandlerRetryAfterOutLimit(t *testing.T) {
@@ -339,6 +342,9 @@ func TestProxyHandlerRetryAfterOutLimit(t *testing.T) {
 	if rr2.Header().Get("X-AT-Upstream-Error") != "false" {
 		t.Fatal("missing auth error header")
 	}
+	if rr2.Header().Get("X-AT-Error-Reason") != "integration rate limited" {
+		t.Fatalf("unexpected error reason: %s", rr2.Header().Get("X-AT-Error-Reason"))
+	}
 }
 
 func TestProxyHandlerNotFound(t *testing.T) {
@@ -351,6 +357,9 @@ func TestProxyHandlerNotFound(t *testing.T) {
 	}
 	if rr.Header().Get("X-AT-Upstream-Error") != "false" {
 		t.Fatal("missing auth error header")
+	}
+	if rr.Header().Get("X-AT-Error-Reason") != "integration not found" {
+		t.Fatalf("unexpected error reason: %s", rr.Header().Get("X-AT-Error-Reason"))
 	}
 	if ct := rr.Header().Get("Content-Type"); ct != "text/plain; charset=utf-8" {
 		t.Fatalf("unexpected content type %s", ct)
@@ -387,6 +396,9 @@ func TestProxyHandlerAuthFailure(t *testing.T) {
 	if rr.Header().Get("X-AT-Upstream-Error") != "false" {
 		t.Fatal("missing auth error header")
 	}
+	if rr.Header().Get("X-AT-Error-Reason") != "authentication failed" {
+		t.Fatalf("unexpected error reason: %s", rr.Header().Get("X-AT-Error-Reason"))
+	}
 	if ct := rr.Header().Get("Content-Type"); ct != "text/plain; charset=utf-8" {
 		t.Fatalf("unexpected content type %s", ct)
 	}
@@ -416,6 +428,9 @@ func TestProxyHandlerBadGateway(t *testing.T) {
 	}
 	if rr.Header().Get("X-AT-Upstream-Error") != "false" {
 		t.Fatal("missing auth error header")
+	}
+	if rr.Header().Get("X-AT-Error-Reason") != "no proxy configured" {
+		t.Fatalf("unexpected error reason: %s", rr.Header().Get("X-AT-Error-Reason"))
 	}
 	if ct := rr.Header().Get("Content-Type"); ct != "text/plain; charset=utf-8" {
 		t.Fatalf("unexpected content type %s", ct)
