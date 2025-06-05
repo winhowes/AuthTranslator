@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/url"
+	"strings"
 	"testing"
 )
 
@@ -128,5 +129,29 @@ func TestMatchValueNested(t *testing.T) {
 	}
 	if !matchValue(data, rule) {
 		t.Fatal("expected nested match")
+	}
+}
+
+func TestMatchFormReasonVariants(t *testing.T) {
+	vals := url.Values{"a": {"1"}}
+
+	if ok, reason := matchFormReason(vals, map[string]interface{}{"a": "1"}); !ok || reason != "" {
+		t.Fatalf("expected success, got %v %q", ok, reason)
+	}
+
+	if ok, reason := matchFormReason(vals, map[string]interface{}{"b": "2"}); ok || !strings.Contains(reason, "missing form field b") {
+		t.Fatalf("missing field: %v %q", ok, reason)
+	}
+
+	if ok, reason := matchFormReason(vals, map[string]interface{}{"a": []interface{}{"1", "2"}}); ok || !strings.Contains(reason, "form field a=2 not found") {
+		t.Fatalf("missing value: %v %q", ok, reason)
+	}
+
+	if ok, reason := matchFormReason(vals, map[string]interface{}{"a": []interface{}{"1", 2}}); ok || reason != "invalid rule" {
+		t.Fatalf("bad slice element: %v %q", ok, reason)
+	}
+
+	if ok, reason := matchFormReason(vals, map[string]interface{}{"a": 1}); ok || reason != "invalid rule" {
+		t.Fatalf("bad type: %v %q", ok, reason)
 	}
 }

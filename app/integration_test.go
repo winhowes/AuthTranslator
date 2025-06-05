@@ -522,3 +522,34 @@ func TestAddIntegrationBadRateLimitWindowParse(t *testing.T) {
 		t.Fatalf("expected rate limit window parse error, got %v", err)
 	}
 }
+
+func TestAddIntegrationInvalidStrategy(t *testing.T) {
+	i := &Integration{
+		Name:              "badstrat",
+		Destination:       "http://example.com",
+		RateLimitStrategy: "bogus",
+	}
+	if err := AddIntegration(i); err == nil || !strings.Contains(err.Error(), "invalid rate_limit_strategy") {
+		t.Fatalf("expected invalid strategy error, got %v", err)
+	}
+}
+
+func TestAddIntegrationDefaultStrategy(t *testing.T) {
+	i := &Integration{
+		Name:         "defstrat",
+		Destination:  "http://example.com",
+		InRateLimit:  1,
+		OutRateLimit: 1,
+	}
+	if err := AddIntegration(i); err != nil {
+		t.Fatalf("add: %v", err)
+	}
+	t.Cleanup(func() {
+		i.inLimiter.Stop()
+		i.outLimiter.Stop()
+		DeleteIntegration("defstrat")
+	})
+	if i.RateLimitStrategy != "fixed_window" {
+		t.Fatalf("expected default strategy fixed_window, got %s", i.RateLimitStrategy)
+	}
+}
