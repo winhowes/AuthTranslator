@@ -276,3 +276,15 @@ func TestTokenParseParamsTypeMismatch(t *testing.T) {
 		t.Fatal("expected type mismatch error")
 	}
 }
+func TestTokenStripAuthInvalidParams(t *testing.T) {
+	r := &http.Request{Header: http.Header{"H": []string{"tok"}}}
+	p := TokenAuth{}
+	p.StripAuth(r, nil)
+	if r.Header.Get("H") == "" {
+		t.Fatal("header should remain when params nil")
+	}
+	p.StripAuth(r, struct{}{})
+	if r.Header.Get("H") == "" {
+		t.Fatal("header should remain when params wrong type")
+	}
+}

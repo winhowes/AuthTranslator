@@ -311,3 +311,15 @@ func TestBasicAuthenticateSecretError(t *testing.T) {
 		t.Fatal("expected authentication to fail")
 	}
 }
+func TestBasicStripAuthInvalidParams(t *testing.T) {
+	r := &http.Request{Header: http.Header{"Authorization": []string{"x"}}}
+	b := BasicAuth{}
+	b.StripAuth(r, nil)
+	if r.Header.Get("Authorization") == "" {
+		t.Fatal("header should remain when params invalid")
+	}
+	b.StripAuth(r, struct{}{})
+	if r.Header.Get("Authorization") == "" {
+		t.Fatal("header should remain when params wrong type")
+	}
+}
