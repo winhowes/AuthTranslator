@@ -83,5 +83,8 @@ AuthTranslator is extensible via three types of plugins:
 * Dive into [Auth Plugins](auth-plugins.md) to wire up other services.
 * Add rate‑limits with the [Rate‑Limiting](rate-limiting.md) guide.
 * Ship to Kubernetes via the [Helm guide](helm.md).
+* Spin up everything locally with [Docker Compose](docker-compose.md).
+* Review common questions in the [FAQ](faq.md).
+* Tweak flags and service behaviour via [Runtime & Operations](runtime.md).
 
 Happy translating! 🎉
