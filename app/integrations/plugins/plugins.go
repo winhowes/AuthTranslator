@@ -3,6 +3,7 @@ package plugins
 import (
 	_ "github.com/winhowes/AuthTranslator/app/integrations/plugins/asana"
 	_ "github.com/winhowes/AuthTranslator/app/integrations/plugins/confluence"
+	_ "github.com/winhowes/AuthTranslator/app/integrations/plugins/datadog"
 	_ "github.com/winhowes/AuthTranslator/app/integrations/plugins/ghe"
 	_ "github.com/winhowes/AuthTranslator/app/integrations/plugins/github"
 	_ "github.com/winhowes/AuthTranslator/app/integrations/plugins/gitlab"
