@@ -12,6 +12,8 @@ Run `go run ./cmd/allowlist list` to list capabilities from your build. For quic
 | confluence | add_comment | – |
 | confluence | create_page | – |
 | confluence | update_page | – |
+| datadog | post_event | – |
+| datadog | submit_metrics | – |
 | ghe | comment | repo |
 | ghe | create_issue | repo |
 | ghe | update_issue | repo |

@@ -5,6 +5,7 @@ import (
 
 	integrationplugins "github.com/winhowes/AuthTranslator/app/integrations"
 	_ "github.com/winhowes/AuthTranslator/app/integrations/plugins/asana"
+	_ "github.com/winhowes/AuthTranslator/app/integrations/plugins/datadog"
 	_ "github.com/winhowes/AuthTranslator/app/integrations/plugins/ghe"
 	_ "github.com/winhowes/AuthTranslator/app/integrations/plugins/github"
 	_ "github.com/winhowes/AuthTranslator/app/integrations/plugins/gitlab"
@@ -34,6 +35,10 @@ func TestPluginCapabilities(t *testing.T) {
 			{"create_task", "/tasks", "POST", nil},
 			{"update_status", "/tasks/*", "PUT", nil},
 			{"add_comment", "/tasks/*/stories", "POST", nil},
+		},
+		"datadog": {
+			{"post_event", "/api/v2/events", "POST", nil},
+			{"submit_metrics", "/api/v2/series", "POST", nil},
 		},
 		"ghe": {
 			{"comment", "/repos/r/issues/*/comments", "POST", map[string]interface{}{"repo": "r"}},

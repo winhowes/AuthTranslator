@@ -16,6 +16,7 @@ Think of it as a *cookie‑cutter* that stamps out a ready‑to‑run block in y
 | ---- | ----------------- | -------------------- |
 | `asana` | `https://app.asana.com/api/1.0` | `token` |
 | `confluence` | `https://api.atlassian.com` (configurable) | `token` |
+| `datadog` | `https://api.datadoghq.com` | `token` |
 | `ghe` | `https://<domain>/api/v3` | `token` |
 | `github` | `https://api.github.com` | `token` |
 | `gitlab` | `https://gitlab.com/api/v4` | `token` |

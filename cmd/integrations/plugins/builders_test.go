@@ -19,6 +19,7 @@ func TestBuilders(t *testing.T) {
 		{"jira", []string{"-name", "j2", "-domain", "jira.example.com", "-token", "tok"}, Jira("j2", "tok", "jira.example.com")},
 		{"confluence", []string{"-name", "c1", "-token", "tok"}, Confluence("c1", "tok", "api.atlassian.com")},
 		{"confluence", []string{"-name", "c2", "-domain", "confluence.example.com", "-token", "tok"}, Confluence("c2", "tok", "confluence.example.com")},
+		{"datadog", []string{"-name", "dd", "-api-key", "ak", "-app-key", "app"}, Datadog("dd", "ak", "app")},
 		{"linear", []string{"-name", "lin", "-token", "tok"}, Linear("lin", "tok")},
 		{"monday", []string{"-name", "mon", "-token", "tok"}, Monday("mon", "tok")},
 		{"okta", []string{"-name", "ok", "-domain", "okta.example.com", "-token", "tok"}, Okta("ok", "okta.example.com", "tok")},
@@ -71,6 +72,7 @@ func TestBuilderErrors(t *testing.T) {
 		{"jira", []string{}},
 		{"okta", []string{"-token", "t"}},
 		{"linear", []string{}},
+		{"datadog", []string{}},
 		{"stripe", []string{}},
 		{"trufflehog", []string{}},
 		{"zendesk", []string{}},
@@ -95,7 +97,7 @@ func TestBuilderErrors(t *testing.T) {
 
 func TestBuilderParseError(t *testing.T) {
 	names := []string{
-		"asana", "confluence", "ghe", "github", "gitlab", "jira",
+		"asana", "confluence", "datadog", "ghe", "github", "gitlab", "jira",
 		"linear", "monday", "okta", "openai", "pagerduty", "sendgrid", "servicenow",
 		"slack", "stripe", "trufflehog", "twilio", "workday", "zendesk",
 	}
