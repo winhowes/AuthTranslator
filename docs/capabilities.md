@@ -41,7 +41,7 @@ Run `go run ./cmd/allowlist list` to list capabilities from your build. For quic
 | pagerduty | trigger_incident | – |
 | pagerduty | resolve_incident | – |
 | sendgrid | manage_contacts | – |
-| sendgrid | send_email | – |
+| sendgrid | send_email | from, replyTo |
 | sendgrid | update_template | – |
 | servicenow | open_ticket | – |
 | servicenow | query_status | – |
