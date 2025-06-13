@@ -80,7 +80,7 @@ func TestPluginCapabilities(t *testing.T) {
 			{"resolve_incident", "/incidents/*", "PUT", nil},
 		},
 		"sendgrid": {
-			{"send_email", "/v3/mail/send", "POST", nil},
+			{"send_email", "/v3/mail/send", "POST", map[string]interface{}{"from": "me@example.com"}},
 			{"manage_contacts", "/v3/marketing/contacts", "PUT", nil},
 			{"update_template", "/v3/templates/*", "PATCH", nil},
 		},
