@@ -356,27 +356,23 @@ func matchValueReason(data, rule interface{}, path string) (bool, string) {
 		}
 		return true, ""
 	case []interface{}:
-		if da, ok := data.([]interface{}); ok {
-			for _, want := range rv {
-				found := false
-				for _, elem := range da {
-					if ok2, _ := matchValueReason(elem, want, path); ok2 {
-						found = true
-						break
-					}
-				}
-				if !found {
-					return false, fmt.Sprintf("body field %s missing element", path)
-				}
-			}
-			return true, ""
+		da, ok := data.([]interface{})
+		if !ok {
+			return false, fmt.Sprintf("body field %s not array", path)
 		}
 		for _, want := range rv {
-			if ok, _ := matchValueReason(data, want, path); ok {
-				return true, ""
+			found := false
+			for _, elem := range da {
+				if ok2, _ := matchValueReason(elem, want, path); ok2 {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return false, fmt.Sprintf("body field %s missing element", path)
 			}
 		}
-		return false, fmt.Sprintf("body field %s value mismatch", path)
+		return true, ""
 	default:
 		if df, ok := toFloat(data); ok {
 			if rf, ok2 := toFloat(rv); ok2 {
@@ -410,27 +406,23 @@ func matchValue(data, rule interface{}) bool {
 		}
 		return true
 	case []interface{}:
-		if da, ok := data.([]interface{}); ok {
-			for _, want := range rv {
-				found := false
-				for _, elem := range da {
-					if matchValue(elem, want) {
-						found = true
-						break
-					}
-				}
-				if !found {
-					return false
-				}
-			}
-			return true
+		da, ok := data.([]interface{})
+		if !ok {
+			return false
 		}
 		for _, want := range rv {
-			if matchValue(data, want) {
-				return true
+			found := false
+			for _, elem := range da {
+				if matchValue(elem, want) {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return false
 			}
 		}
-		return false
+		return true
 	default:
 		// YAML unmarshals numbers without decimals as ints while JSON
 		// decoding uses float64. Normalize numeric types so the values

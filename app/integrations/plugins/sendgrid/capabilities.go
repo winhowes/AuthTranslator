@@ -19,7 +19,7 @@ func init() {
 			if replyOK {
 				body["reply_to"] = reply
 			} else {
-				body["reply_to"] = []interface{}{from, nil}
+				body["reply_to"] = nil
 			}
 			rule := integrationplugins.CallRule{Path: "/v3/mail/send", Methods: map[string]integrationplugins.RequestConstraint{"POST": {Body: body}}}
 			return []integrationplugins.CallRule{rule}, nil

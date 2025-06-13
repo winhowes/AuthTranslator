@@ -52,9 +52,8 @@ func TestSendgridCapabilities(t *testing.T) {
 			if rc.Body["from"] != "me@example.com" {
 				t.Errorf("from not propagated")
 			}
-			v, ok := rc.Body["reply_to"].([]interface{})
-			if !ok || len(v) != 2 || v[0] != "me@example.com" || v[1] != nil {
-				t.Errorf("reply_to union unexpected: %#v", rc.Body["reply_to"])
+			if rc.Body["reply_to"] != nil {
+				t.Errorf("reply_to default unexpected: %#v", rc.Body["reply_to"])
 			}
 		}
 	}

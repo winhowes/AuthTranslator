@@ -61,5 +61,5 @@ Run `go run ./cmd/allowlist list` to list capabilities from your build. For quic
 | zendesk | query_status | – |
 | zendesk | update_ticket | – |
 
-For SendGrid `send_email`, if `replyTo` is omitted the reply address defaults to the `from` value. Passing `null` allows an empty reply-to header.
+For SendGrid `send_email`, if `replyTo` is omitted the reply address is empty. Provide `null` explicitly to leave the reply-to header unset.
 Capabilities not listed above may be added by custom plugins. Use the CLI to discover them in your build.
