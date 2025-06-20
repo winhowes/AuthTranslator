@@ -51,19 +51,20 @@ func (m *MTLSAuthOut) ParseParams(mp map[string]interface{}) (interface{}, error
 // AddAuth exposes the configured client certificate's common name to the backend
 // via the "X-TLS-Client-CN" header. This allows upstream services to easily
 // identify the client certificate used for the mTLS connection.
-func (m *MTLSAuthOut) AddAuth(ctx context.Context, r *http.Request, p interface{}) {
+func (m *MTLSAuthOut) AddAuth(ctx context.Context, r *http.Request, p interface{}) error {
 	cfg, ok := p.(*outParams)
 	if !ok || cfg.transport == nil || cfg.transport.TLSClientConfig == nil {
-		return
+		return fmt.Errorf("invalid config")
 	}
 	if len(cfg.transport.TLSClientConfig.Certificates) == 0 || len(cfg.transport.TLSClientConfig.Certificates[0].Certificate) == 0 {
-		return
+		return fmt.Errorf("missing cert")
 	}
 	cert, err := x509.ParseCertificate(cfg.transport.TLSClientConfig.Certificates[0].Certificate[0])
 	if err != nil {
-		return
+		return err
 	}
 	r.Header.Set("X-TLS-Client-CN", cert.Subject.CommonName)
+	return nil
 }
 
 // Transport exposes the configured mTLS transport for integration usage.

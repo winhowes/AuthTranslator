@@ -19,7 +19,9 @@ func TestBasicOutgoingAddAuth(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	p.AddAuth(context.Background(), r, cfg)
+	if err := p.AddAuth(context.Background(), r, cfg); err != nil {
+		t.Fatal(err)
+	}
 	expected := "Basic " + base64.StdEncoding.EncodeToString([]byte("user:pass"))
 	if got := r.Header.Get("Authorization"); got != expected {
 		t.Fatalf("expected %q, got %s", expected, got)
@@ -33,7 +35,9 @@ func TestBasicOutgoingAddAuthMissingSecret(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	p.AddAuth(context.Background(), r, cfg)
+	if err := p.AddAuth(context.Background(), r, cfg); err == nil {
+		t.Fatal("expected error")
+	}
 	if got := r.Header.Get("Authorization"); got != "" {
 		t.Fatalf("expected empty header, got %s", got)
 	}
@@ -166,7 +170,9 @@ func TestBasicCustomHeaderAndPrefix(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	out.AddAuth(context.Background(), r, ocfg)
+	if err := out.AddAuth(context.Background(), r, ocfg); err != nil {
+		t.Fatal(err)
+	}
 	enc := base64.StdEncoding.EncodeToString([]byte("u:p"))
 	expected := "Pre " + enc
 	if got := r.Header.Get("X-Auth"); got != expected {
@@ -193,11 +199,15 @@ func TestBasicCustomHeaderAndPrefix(t *testing.T) {
 func TestBasicAddAuthInvalidParams(t *testing.T) {
 	r := &http.Request{Header: http.Header{}}
 	out := BasicAuthOut{}
-	out.AddAuth(context.Background(), r, nil)
+	if err := out.AddAuth(context.Background(), r, nil); err == nil {
+		t.Fatal("expected error")
+	}
 	if h := r.Header.Get("Authorization"); h != "" {
 		t.Fatalf("expected empty header, got %s", h)
 	}
-	out.AddAuth(context.Background(), r, struct{}{})
+	if err := out.AddAuth(context.Background(), r, struct{}{}); err == nil {
+		t.Fatal("expected error")
+	}
 	if h := r.Header.Get("Authorization"); h != "" {
 		t.Fatalf("expected empty header, got %s", h)
 	}
@@ -225,7 +235,9 @@ func TestBasicAddAuthSecretError(t *testing.T) {
 	r := &http.Request{Header: http.Header{}}
 	out := BasicAuthOut{}
 	cfg := &outParams{Secrets: []string{"fail:o"}, Header: "Authorization"}
-	out.AddAuth(context.Background(), r, cfg)
+	if err := out.AddAuth(context.Background(), r, cfg); err == nil {
+		t.Fatal("expected error")
+	}
 	if h := r.Header.Get("Authorization"); h != "" {
 		t.Fatalf("expected empty header, got %s", h)
 	}
@@ -247,7 +259,9 @@ func TestBasicOutgoingAddAuthMultipleSecrets(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	p.AddAuth(context.Background(), r, cfg)
+	if err := p.AddAuth(context.Background(), r, cfg); err != nil {
+		t.Fatal(err)
+	}
 	got := r.Header.Get("Authorization")
 	exp1 := "Basic " + base64.StdEncoding.EncodeToString([]byte("u1:p1"))
 	exp2 := "Basic " + base64.StdEncoding.EncodeToString([]byte("u2:p2"))

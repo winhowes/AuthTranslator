@@ -85,7 +85,9 @@ func TestMTLSOutgoingParse(t *testing.T) {
 		t.Fatalf("unexpected config %+v", cfg)
 	}
 	r := &http.Request{Header: http.Header{}}
-	p.AddAuth(context.Background(), r, cfg)
+	if err := p.AddAuth(context.Background(), r, cfg); err != nil {
+		t.Fatal(err)
+	}
 	if got := r.Header.Get("X-TLS-Client-CN"); got != "client" {
 		t.Fatalf("expected client CN header, got %s", got)
 	}
@@ -111,7 +113,9 @@ func TestMTLSOutgoingAddAuth(t *testing.T) {
 		t.Fatal(err)
 	}
 	r := &http.Request{Header: http.Header{}}
-	p.AddAuth(context.Background(), r, cfg)
+	if err := p.AddAuth(context.Background(), r, cfg); err != nil {
+		t.Fatal(err)
+	}
 	if got := r.Header.Get("X-TLS-Client-CN"); got != "client" {
 		t.Fatalf("expected client CN header, got %s", got)
 	}
@@ -268,11 +272,15 @@ func TestMTLSOutgoingParseMissingFields(t *testing.T) {
 func TestMTLSOutgoingAddAuthInvalidCfg(t *testing.T) {
 	r := &http.Request{Header: http.Header{}}
 	p := MTLSAuthOut{}
-	p.AddAuth(context.Background(), r, nil)
+	if err := p.AddAuth(context.Background(), r, nil); err == nil {
+		t.Fatal("expected error")
+	}
 	if got := r.Header.Get("X-TLS-Client-CN"); got != "" {
 		t.Fatalf("expected empty header, got %s", got)
 	}
-	p.AddAuth(context.Background(), r, &outParams{})
+	if err := p.AddAuth(context.Background(), r, &outParams{}); err == nil {
+		t.Fatal("expected error")
+	}
 	if got := r.Header.Get("X-TLS-Client-CN"); got != "" {
 		t.Fatalf("expected empty header, got %s", got)
 	}
@@ -307,7 +315,9 @@ func TestMTLSOutgoingAddAuthBadCert(t *testing.T) {
 	cfg := &outParams{transport: &http.Transport{TLSClientConfig: &tls.Config{Certificates: []tls.Certificate{{Certificate: [][]byte{[]byte("bad")}}}}}}
 	r := &http.Request{Header: http.Header{}}
 	p := MTLSAuthOut{}
-	p.AddAuth(context.Background(), r, cfg)
+	if err := p.AddAuth(context.Background(), r, cfg); err == nil {
+		t.Fatal("expected error")
+	}
 	if got := r.Header.Get("X-TLS-Client-CN"); got != "" {
 		t.Fatalf("expected empty header, got %s", got)
 	}
@@ -317,7 +327,9 @@ func TestMTLSOutgoingAddAuthNoCerts(t *testing.T) {
 	cfg := &outParams{transport: &http.Transport{TLSClientConfig: &tls.Config{}}}
 	r := &http.Request{Header: http.Header{}}
 	p := MTLSAuthOut{}
-	p.AddAuth(context.Background(), r, cfg)
+	if err := p.AddAuth(context.Background(), r, cfg); err == nil {
+		t.Fatal("expected error")
+	}
 	if got := r.Header.Get("X-TLS-Client-CN"); got != "" {
 		t.Fatalf("expected empty header, got %s", got)
 	}

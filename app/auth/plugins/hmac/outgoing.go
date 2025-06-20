@@ -63,27 +63,28 @@ func (h *HMACSignature) ParseParams(m map[string]interface{}) (interface{}, erro
 	return p, nil
 }
 
-func (h *HMACSignature) AddAuth(ctx context.Context, r *http.Request, params interface{}) {
+func (h *HMACSignature) AddAuth(ctx context.Context, r *http.Request, params interface{}) error {
 	cfg, ok := params.(*outParams)
 	if !ok || len(cfg.Secrets) == 0 {
-		return
+		return fmt.Errorf("invalid config")
 	}
 	newHash, err := hashFuncOut(cfg.Algo)
 	if err != nil {
-		return
+		return err
 	}
 	body, err := authplugins.GetBody(r)
 	if err != nil {
-		return
+		return err
 	}
 	secret, err := secrets.LoadRandomSecret(ctx, cfg.Secrets)
 	if err != nil {
-		return
+		return err
 	}
 	mac := hmac.New(newHash, []byte(secret))
 	mac.Write(body)
 	sig := cfg.Prefix + hex.EncodeToString(mac.Sum(nil))
 	r.Header.Set(cfg.Header, sig)
+	return nil
 }
 
 func init() { authplugins.RegisterOutgoing(&HMACSignature{}) }

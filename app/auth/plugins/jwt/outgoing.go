@@ -39,16 +39,17 @@ func (j *JWTAuthOut) ParseParams(m map[string]interface{}) (interface{}, error) 
 	return p, nil
 }
 
-func (j *JWTAuthOut) AddAuth(ctx context.Context, r *http.Request, p interface{}) {
+func (j *JWTAuthOut) AddAuth(ctx context.Context, r *http.Request, p interface{}) error {
 	cfg, ok := p.(*outParams)
 	if !ok || len(cfg.Secrets) == 0 {
-		return
+		return fmt.Errorf("invalid config")
 	}
 	tok, err := secrets.LoadRandomSecret(ctx, cfg.Secrets)
 	if err != nil {
-		return
+		return err
 	}
 	r.Header.Set(cfg.Header, cfg.Prefix+tok)
+	return nil
 }
 
 func init() { authplugins.RegisterOutgoing(&JWTAuthOut{}) }

@@ -45,7 +45,9 @@ func TestGoogleOIDCAddAuth(t *testing.T) {
 	}
 
 	r := &http.Request{Header: http.Header{}}
-	p.AddAuth(context.Background(), r, cfg)
+	if err := p.AddAuth(context.Background(), r, cfg); err != nil {
+		t.Fatal(err)
+	}
 	if got := r.Header.Get("Authorization"); got != "Bearer tok123" {
 		t.Fatalf("expected 'Bearer tok123', got %s", got)
 	}
@@ -70,7 +72,9 @@ func TestGoogleOIDCDefaults(t *testing.T) {
 		t.Fatal(err)
 	}
 	r := &http.Request{Header: http.Header{}}
-	p.AddAuth(context.Background(), r, cfg)
+	if err := p.AddAuth(context.Background(), r, cfg); err != nil {
+		t.Fatal(err)
+	}
 	if got := r.Header.Get("Authorization"); got != "Bearer tok" {
 		t.Fatalf("unexpected header %s", got)
 	}
@@ -95,7 +99,9 @@ func TestGoogleOIDCAddAuthFailure(t *testing.T) {
 		t.Fatal(err)
 	}
 	r := &http.Request{Header: http.Header{}}
-	p.AddAuth(context.Background(), r, cfg)
+	if err := p.AddAuth(context.Background(), r, cfg); err == nil {
+		t.Fatal("expected error")
+	}
 	if got := r.Header.Get("Authorization"); got != "" {
 		t.Fatalf("expected empty header, got %s", got)
 	}
@@ -136,7 +142,9 @@ func TestGoogleOIDCAddAuthCache(t *testing.T) {
 		t.Fatal(err)
 	}
 	r := &http.Request{Header: http.Header{}}
-	p.AddAuth(context.Background(), r, cfg)
+	if err := p.AddAuth(context.Background(), r, cfg); err != nil {
+		t.Fatal(err)
+	}
 	if got := r.Header.Get("Authorization"); got != "Bearer cachedtok" {
 		t.Fatalf("unexpected header %s", got)
 	}
@@ -175,7 +183,9 @@ func TestGoogleOIDCAddAuthExpiredCache(t *testing.T) {
 		t.Fatal(err)
 	}
 	r := &http.Request{Header: http.Header{}}
-	p.AddAuth(context.Background(), r, cfg)
+	if err := p.AddAuth(context.Background(), r, cfg); err != nil {
+		t.Fatal(err)
+	}
 	if !called {
 		t.Fatal("expected HTTP call for expired cache")
 	}
@@ -667,7 +677,9 @@ func TestVerifyRS256DecodeError(t *testing.T) {
 func TestGoogleOIDCAddAuthWrongConfigType(t *testing.T) {
 	r := &http.Request{Header: http.Header{}}
 	p := GoogleOIDC{}
-	p.AddAuth(context.Background(), r, 5)
+	if err := p.AddAuth(context.Background(), r, 5); err == nil {
+		t.Fatal("expected error")
+	}
 	if val := r.Header.Get("Authorization"); val != "" {
 		t.Fatalf("expected no header set, got %s", val)
 	}

@@ -2,6 +2,7 @@ package plugins
 
 import (
 	_ "github.com/winhowes/AuthTranslator/app/auth/plugins/basic"
+	_ "github.com/winhowes/AuthTranslator/app/auth/plugins/gcp_token"
 	_ "github.com/winhowes/AuthTranslator/app/auth/plugins/github_signature"
 	_ "github.com/winhowes/AuthTranslator/app/auth/plugins/google_oidc"
 	_ "github.com/winhowes/AuthTranslator/app/auth/plugins/hmac"

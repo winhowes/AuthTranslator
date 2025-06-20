@@ -23,8 +23,9 @@ func (p *PassThruAuthOut) ParseParams(m map[string]interface{}) (interface{}, er
 	return struct{}{}, nil
 }
 
-func (p *PassThruAuthOut) AddAuth(ctx context.Context, r *http.Request, _ interface{}) {
+func (p *PassThruAuthOut) AddAuth(ctx context.Context, r *http.Request, _ interface{}) error {
 	// No-op
+	return nil
 }
 
 func init() { authplugins.RegisterOutgoing(&PassThruAuthOut{}) }

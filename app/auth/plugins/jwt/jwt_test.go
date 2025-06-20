@@ -81,7 +81,9 @@ func TestJWTOutgoingAddAuth(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	p.AddAuth(context.Background(), r, cfg)
+	if err := p.AddAuth(context.Background(), r, cfg); err != nil {
+		t.Fatal(err)
+	}
 	if got := r.Header.Get("Authorization"); got != "Bearer tok123" {
 		t.Fatalf("expected 'Bearer tok123', got %s", got)
 	}
@@ -208,19 +210,25 @@ func TestJWTOutgoingEdgeCases(t *testing.T) {
 	p := JWTAuthOut{}
 	r := &http.Request{Header: http.Header{}}
 	// bad params type
-	p.AddAuth(context.Background(), r, struct{}{})
+	if err := p.AddAuth(context.Background(), r, struct{}{}); err == nil {
+		t.Fatal("expected error")
+	}
 	if h := r.Header.Get("Authorization"); h != "" {
 		t.Fatalf("expected empty header, got %s", h)
 	}
 	// missing secrets
 	r = &http.Request{Header: http.Header{}}
-	p.AddAuth(context.Background(), r, &outParams{})
+	if err := p.AddAuth(context.Background(), r, &outParams{}); err == nil {
+		t.Fatal("expected error")
+	}
 	if h := r.Header.Get("Authorization"); h != "" {
 		t.Fatalf("expected empty header, got %s", h)
 	}
 	// secret load error
 	r = &http.Request{Header: http.Header{}}
-	p.AddAuth(context.Background(), r, &outParams{Secrets: []string{"fail:oops"}})
+	if err := p.AddAuth(context.Background(), r, &outParams{Secrets: []string{"fail:oops"}}); err == nil {
+		t.Fatal("expected error")
+	}
 	if h := r.Header.Get("Authorization"); h != "" {
 		t.Fatalf("expected empty header, got %s", h)
 	}
@@ -228,7 +236,9 @@ func TestJWTOutgoingEdgeCases(t *testing.T) {
 	t.Setenv("TOK", "t1")
 	r = &http.Request{Header: http.Header{}}
 	cfg := &outParams{Secrets: []string{"env:TOK"}, Header: "Authz", Prefix: "pre "}
-	p.AddAuth(context.Background(), r, cfg)
+	if err := p.AddAuth(context.Background(), r, cfg); err != nil {
+		t.Fatal(err)
+	}
 	if got := r.Header.Get("Authz"); got != "pre t1" {
 		t.Fatalf("expected 'pre t1', got %s", got)
 	}
@@ -381,7 +391,9 @@ func TestJWTOutgoingAddAuthMultipleSecrets(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	p.AddAuth(context.Background(), r, cfg)
+	if err := p.AddAuth(context.Background(), r, cfg); err != nil {
+		t.Fatal(err)
+	}
 	got := r.Header.Get("Authorization")
 	if got != "Bearer tok1" && got != "Bearer tok2" {
 		t.Fatalf("unexpected header %s", got)

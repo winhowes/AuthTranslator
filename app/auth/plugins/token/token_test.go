@@ -16,7 +16,9 @@ func TestTokenOutgoingPrefix(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	p.AddAuth(context.Background(), r, cfg)
+	if err := p.AddAuth(context.Background(), r, cfg); err != nil {
+		t.Fatal(err)
+	}
 	if got := r.Header.Get("Authorization"); got != "Bearer secret" {
 		t.Fatalf("expected 'Bearer secret', got %s", got)
 	}
@@ -29,7 +31,9 @@ func TestTokenOutgoingMissingSecret(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	p.AddAuth(context.Background(), r, cfg)
+	if err := p.AddAuth(context.Background(), r, cfg); err == nil {
+		t.Fatal("expected error")
+	}
 	if got := r.Header.Get("H"); got != "" {
 		t.Fatalf("expected empty header, got %s", got)
 	}
@@ -94,7 +98,9 @@ func TestTokenAddAuthDefaultPrefix(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	p.AddAuth(context.Background(), r, cfg)
+	if err := p.AddAuth(context.Background(), r, cfg); err != nil {
+		t.Fatal(err)
+	}
 	if got := r.Header.Get("H"); got != "tok" {
 		t.Fatalf("expected token, got %s", got)
 	}
@@ -121,7 +127,9 @@ func TestTokenAddAuthWrongConfigType(t *testing.T) {
 	r := &http.Request{Header: http.Header{}}
 	p := TokenAuthOut{}
 	// pass wrong config type; should not panic or set header
-	p.AddAuth(context.Background(), r, struct{}{})
+	if err := p.AddAuth(context.Background(), r, struct{}{}); err == nil {
+		t.Fatal("expected error")
+	}
 	if val := r.Header.Get("Authorization"); val != "" {
 		t.Fatalf("expected no header set, got %s", val)
 	}
@@ -147,7 +155,9 @@ func TestTokenAddAuthMultipleSecrets(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	p.AddAuth(context.Background(), r, cfg)
+	if err := p.AddAuth(context.Background(), r, cfg); err != nil {
+		t.Fatal(err)
+	}
 	got := r.Header.Get("H")
 	if got != "a" && got != "b" {
 		t.Fatalf("expected one of the secrets, got %s", got)
@@ -223,7 +233,9 @@ func TestTokenAddAuthNoSecrets(t *testing.T) {
 	r := &http.Request{Header: http.Header{}}
 	p := TokenAuthOut{}
 	cfg := &outParams{Header: "H"}
-	p.AddAuth(context.Background(), r, cfg)
+	if err := p.AddAuth(context.Background(), r, cfg); err == nil {
+		t.Fatal("expected error")
+	}
 	if val := r.Header.Get("H"); val != "" {
 		t.Fatalf("expected no header set, got %s", val)
 	}

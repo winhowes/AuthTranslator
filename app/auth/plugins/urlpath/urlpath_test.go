@@ -19,7 +19,9 @@ func TestURLPathOutgoingAddAuth(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	p.AddAuth(context.Background(), r, cfg)
+	if err := p.AddAuth(context.Background(), r, cfg); err != nil {
+		t.Fatal(err)
+	}
 	if got := r.URL.Path; got != "/api/secret" {
 		t.Fatalf("expected '/api/secret', got %s", got)
 	}
@@ -72,7 +74,9 @@ func TestURLPathTrailingSlash(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	p.AddAuth(context.Background(), r, cfg)
+	if err := p.AddAuth(context.Background(), r, cfg); err != nil {
+		t.Fatal(err)
+	}
 	if got := r.URL.Path; got != "/api/s" {
 		t.Fatalf("expected '/api/s', got %s", got)
 	}
@@ -117,20 +121,26 @@ func TestURLPathOutgoingEdgeCases(t *testing.T) {
 	p := URLPathAuthOut{}
 	// invalid params type
 	r := &http.Request{URL: &url.URL{Path: "/api"}}
-	p.AddAuth(context.Background(), r, struct{}{})
+	if err := p.AddAuth(context.Background(), r, struct{}{}); err == nil {
+		t.Fatal("expected error")
+	}
 	if r.URL.Path != "/api" {
 		t.Fatalf("path changed for invalid params: %s", r.URL.Path)
 	}
 	// missing secrets
 	r = &http.Request{URL: &url.URL{Path: "/api"}}
-	p.AddAuth(context.Background(), r, &outParams{})
+	if err := p.AddAuth(context.Background(), r, &outParams{}); err == nil {
+		t.Fatal("expected error")
+	}
 	if r.URL.Path != "/api" {
 		t.Fatalf("path changed for empty secrets: %s", r.URL.Path)
 	}
 	// secret loading error
 	r = &http.Request{URL: &url.URL{Path: "/api"}}
 	cfg := &outParams{Secrets: []string{"fail:oops"}}
-	p.AddAuth(context.Background(), r, cfg)
+	if err := p.AddAuth(context.Background(), r, cfg); err == nil {
+		t.Fatal("expected error")
+	}
 	if r.URL.Path != "/api" {
 		t.Fatalf("path changed on load failure: %s", r.URL.Path)
 	}
