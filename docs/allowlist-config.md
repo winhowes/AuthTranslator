@@ -50,7 +50,7 @@ Look for a `capabilities.go` file under `app/integrations/plugins/<integration>/
   callers:
     - id: bot-123
       capabilities:
-        - name: post_public_as
+        - name: post_as
 ```
 Each capability item contains a `name` and optional `params` map.
 
@@ -118,6 +118,6 @@ A request passes if **any** rule (or capability‑expanded rule) matches.
 
 ## 3  Tips & conventions
 
-* **One capability ≈ one business use‑case** (e.g. `post_public_as`).
+* **One capability ≈ one business use‑case** (e.g. `post_as`).
 * Prefer **uppercase** HTTP methods (`GET`, `POST`) for consistency.
 * Log level `debug` will print which rule matched; helpful in staging.

@@ -15,10 +15,10 @@ func TestRegistryInitialization(t *testing.T) {
 	if !ok {
 		t.Fatalf("slack capabilities missing")
 	}
-	if spec, ok := slack["post_public_as"]; !ok {
-		t.Fatalf("post_public_as capability missing")
+	if spec, ok := slack["post_as"]; !ok {
+		t.Fatalf("post_as capability missing")
 	} else if !reflect.DeepEqual(spec.Params, []string{"username"}) {
-		t.Fatalf("unexpected post_public_as params: %v", spec.Params)
+		t.Fatalf("unexpected post_as params: %v", spec.Params)
 	}
 	if spec, ok := slack["post_channels_as"]; !ok {
 		t.Fatalf("post_channels_as capability missing")

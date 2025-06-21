@@ -91,7 +91,7 @@ func TestValidateAllowlistEntriesCapabilityParamErrors(t *testing.T) {
 		Callers: []CallerConfig{{
 			ID: "c",
 			Capabilities: []integrationplugins.CapabilityConfig{{
-				Name:   "post_public_as",
+				Name:   "post_as",
 				Params: map[string]interface{}{"username": "u", "extra": "bad"},
 			}},
 		}},
@@ -105,7 +105,7 @@ func TestValidateAllowlistEntriesCapabilityParamErrors(t *testing.T) {
 		Callers: []CallerConfig{{
 			ID: "c",
 			Capabilities: []integrationplugins.CapabilityConfig{{
-				Name:   "post_public_as",
+				Name:   "post_as",
 				Params: map[string]interface{}{"username": ""},
 			}},
 		}},

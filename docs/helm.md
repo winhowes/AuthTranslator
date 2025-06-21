@@ -67,7 +67,7 @@ allowlist: |
       callers:
         - id: demo
           capabilities:
-            - name: post_public_as
+            - name: post_as
 
 ```
 

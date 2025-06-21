@@ -2,6 +2,6 @@
   callers:
     - id: "*"
       capabilities:
-        - name: post_public_as
+        - name: post_as
           params:
             username: AuthTranslator

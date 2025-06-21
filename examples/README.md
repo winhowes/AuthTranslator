@@ -5,7 +5,7 @@ This folder holds **runnable snippets** you can copy‑paste while reading the d
 | File             | Purpose                                                                          |
 | ---------------- | -------------------------------------------------------------------------------- |
 | `config.yaml`    | Defines one Slack integration (destination, outgoing auth, 1‑minute rate‑limit). |
-| `allowlist.yaml` | Grants caller `demo-user` the `post_public_as` capability.              |
+| `allowlist.yaml` | Grants caller `demo-user` the `post_as` capability.              |
 
 ## Quick try‑out
 
