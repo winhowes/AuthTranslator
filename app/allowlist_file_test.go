@@ -1,7 +1,6 @@
 package main
 
 import (
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -16,7 +15,7 @@ func TestLoadAllowlistsInvalidFile(t *testing.T) {
 }
 
 func TestLoadAllowlistsInvalidYAML(t *testing.T) {
-	tmp, err := ioutil.TempFile("", "bad*.yaml")
+	tmp, err := os.CreateTemp("", "bad*.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -34,7 +33,7 @@ func TestLoadAllowlistsInvalidYAML(t *testing.T) {
 }
 
 func TestLoadAllowlistsUnknownField(t *testing.T) {
-	tmp, err := ioutil.TempFile("", "unknown*.yaml")
+	tmp, err := os.CreateTemp("", "unknown*.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}
