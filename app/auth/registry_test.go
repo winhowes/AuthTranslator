@@ -18,11 +18,11 @@ func (testIncoming) OptionalParams() []string                                   
 // minimal outgoing plugin
 type testOutgoing struct{ name string }
 
-func (p testOutgoing) Name() string                                          { return p.name }
-func (testOutgoing) ParseParams(map[string]interface{}) (interface{}, error) { return nil, nil }
-func (testOutgoing) AddAuth(context.Context, *http.Request, interface{})     {}
-func (testOutgoing) RequiredParams() []string                                { return nil }
-func (testOutgoing) OptionalParams() []string                                { return nil }
+func (p testOutgoing) Name() string                                            { return p.name }
+func (testOutgoing) ParseParams(map[string]interface{}) (interface{}, error)   { return nil, nil }
+func (testOutgoing) AddAuth(context.Context, *http.Request, interface{}) error { return nil }
+func (testOutgoing) RequiredParams() []string                                  { return nil }
+func (testOutgoing) OptionalParams() []string                                  { return nil }
 
 func TestRegistryIncomingOutgoing(t *testing.T) {
 	// Save original registries and restore after test

@@ -1109,7 +1109,14 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 	for _, cfg := range integ.OutgoingAuth {
 		p := authplugins.GetOutgoing(cfg.Type)
 		if p != nil {
-			p.AddAuth(r.Context(), r, cfg.parsed)
+			if err := p.AddAuth(r.Context(), r, cfg.parsed); err != nil {
+				logger.Warn("outgoing auth failed", "integration", integ.Name, "plugin", cfg.Type, "error", err)
+				w.Header().Set("X-AT-Upstream-Error", "false")
+				w.Header().Set("X-AT-Error-Reason", "authentication failed")
+				w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+				http.Error(w, fmt.Sprintf("Unauthorized: authentication failed for integration %s", integ.Name), http.StatusUnauthorized)
+				return
+			}
 		}
 	}
 

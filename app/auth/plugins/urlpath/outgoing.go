@@ -32,14 +32,14 @@ func (u *URLPathAuthOut) ParseParams(m map[string]interface{}) (interface{}, err
 	return p, nil
 }
 
-func (u *URLPathAuthOut) AddAuth(ctx context.Context, r *http.Request, p interface{}) {
+func (u *URLPathAuthOut) AddAuth(ctx context.Context, r *http.Request, p interface{}) error {
 	cfg, ok := p.(*outParams)
 	if !ok || len(cfg.Secrets) == 0 {
-		return
+		return fmt.Errorf("invalid config")
 	}
 	sec, err := secrets.LoadRandomSecret(ctx, cfg.Secrets)
 	if err != nil {
-		return
+		return err
 	}
 	if !strings.HasSuffix(r.URL.Path, "/") {
 		r.URL.Path += "/" + sec
@@ -47,6 +47,7 @@ func (u *URLPathAuthOut) AddAuth(ctx context.Context, r *http.Request, p interfa
 		r.URL.Path += sec
 	}
 	r.RequestURI = r.URL.RequestURI()
+	return nil
 }
 
 func init() { authplugins.RegisterOutgoing(&URLPathAuthOut{}) }

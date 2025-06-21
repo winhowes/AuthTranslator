@@ -25,7 +25,9 @@ func TestPassThruOutgoingNoop(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	p.AddAuth(context.Background(), r, cfg)
+	if err := p.AddAuth(context.Background(), r, cfg); err != nil {
+		t.Fatal(err)
+	}
 	if got := r.Header.Get("X-Test"); got != "value" {
 		t.Fatalf("expected header to remain unchanged, got %s", got)
 	}

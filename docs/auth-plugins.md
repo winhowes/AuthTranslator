@@ -28,6 +28,7 @@ AuthTranslator’s behaviour is extended by **plugins** – small Go packages th
 | Inbound   | `passthrough`      | Accepts every request with no authentication. |
 | Outbound  | `basic`            | Adds HTTP Basic credentials to the upstream request. |
 | Outbound  | `google_oidc`      | Attaches a Google identity token from the metadata service. |
+| Outbound  | `gcp_token`        | Uses a metadata service access token. |
 | Outbound  | `hmac_signature`   | Computes an HMAC for the request. |
 | Outbound  | `jwt`              | Adds a signed JWT to the request. |
 | Outbound  | `mtls`             | Sends a client certificate and exposes the CN via header. |
@@ -89,10 +90,10 @@ type AuthStripper interface {
     StripAuth(r *http.Request, params interface{})
 }
 
-   type OutgoingAuthPlugin interface {
+type OutgoingAuthPlugin interface {
        Name() string
        ParseParams(map[string]interface{}) (interface{}, error)
-       AddAuth(ctx context.Context, r *http.Request, params interface{})
+       AddAuth(ctx context.Context, r *http.Request, params interface{}) error
        RequiredParams() []string
        OptionalParams() []string
    }

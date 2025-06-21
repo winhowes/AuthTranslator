@@ -35,16 +35,17 @@ func (t *TokenAuthOut) ParseParams(m map[string]interface{}) (interface{}, error
 	return p, nil
 }
 
-func (t *TokenAuthOut) AddAuth(ctx context.Context, r *http.Request, p interface{}) {
+func (t *TokenAuthOut) AddAuth(ctx context.Context, r *http.Request, p interface{}) error {
 	cfg, ok := p.(*outParams)
 	if !ok || len(cfg.Secrets) == 0 {
-		return
+		return fmt.Errorf("invalid config")
 	}
 	token, err := secrets.LoadRandomSecret(ctx, cfg.Secrets)
 	if err != nil {
-		return
+		return err
 	}
 	r.Header.Set(cfg.Header, cfg.Prefix+token)
+	return nil
 }
 
 func init() { authplugins.RegisterOutgoing(&TokenAuthOut{}) }

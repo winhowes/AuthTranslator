@@ -33,7 +33,7 @@ type AuthStripper interface {
 type OutgoingAuthPlugin interface {
 	Name() string
 	ParseParams(map[string]interface{}) (interface{}, error)
-	AddAuth(ctx context.Context, r *http.Request, params interface{})
+	AddAuth(ctx context.Context, r *http.Request, params interface{}) error
 	RequiredParams() []string
 	OptionalParams() []string
 }

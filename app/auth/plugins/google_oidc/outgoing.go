@@ -67,21 +67,22 @@ func (g *GoogleOIDC) ParseParams(m map[string]interface{}) (interface{}, error) 
 	return p, nil
 }
 
-func (g *GoogleOIDC) AddAuth(ctx context.Context, r *http.Request, params interface{}) {
+func (g *GoogleOIDC) AddAuth(ctx context.Context, r *http.Request, params interface{}) error {
 	cfg, ok := params.(*googleOIDCParams)
 	if !ok {
-		return
+		return fmt.Errorf("invalid config")
 	}
 	tok, exp := getCachedToken(cfg.Audience)
-	if tok == "" || time.Now().After(exp) {
+	if tok == "" || time.Now().After(exp.Add(-1*time.Minute)) {
 		var err error
 		tok, exp, err = fetchToken(cfg.Audience)
 		if err != nil {
-			return
+			return err
 		}
 		setCachedToken(cfg.Audience, tok, exp)
 	}
 	r.Header.Set(cfg.Header, cfg.Prefix+tok)
+	return nil
 }
 
 func fetchToken(aud string) (string, time.Time, error) {

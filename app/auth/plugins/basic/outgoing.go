@@ -40,17 +40,18 @@ func (b *BasicAuthOut) ParseParams(m map[string]interface{}) (interface{}, error
 	return p, nil
 }
 
-func (b *BasicAuthOut) AddAuth(ctx context.Context, r *http.Request, p interface{}) {
+func (b *BasicAuthOut) AddAuth(ctx context.Context, r *http.Request, p interface{}) error {
 	cfg, ok := p.(*outParams)
 	if !ok || len(cfg.Secrets) == 0 {
-		return
+		return fmt.Errorf("invalid config")
 	}
 	cred, err := secrets.LoadRandomSecret(ctx, cfg.Secrets)
 	if err != nil {
-		return
+		return err
 	}
 	enc := base64.StdEncoding.EncodeToString([]byte(cred))
 	r.Header.Set(cfg.Header, cfg.Prefix+enc)
+	return nil
 }
 
 func init() { authplugins.RegisterOutgoing(&BasicAuthOut{}) }

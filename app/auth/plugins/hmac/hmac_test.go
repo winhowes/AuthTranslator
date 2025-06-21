@@ -24,7 +24,9 @@ func TestHMACOutgoingAddAuth(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	p.AddAuth(context.Background(), r, cfg)
+	if err := p.AddAuth(context.Background(), r, cfg); err != nil {
+		t.Fatal(err)
+	}
 	mac := hmac.New(sha256.New, []byte("key"))
 	mac.Write([]byte("hello"))
 	expected := hex.EncodeToString(mac.Sum(nil))
@@ -170,14 +172,18 @@ func TestHMACOutgoingEdgeCases(t *testing.T) {
 	p := HMACSignature{}
 	// invalid params type
 	r := &http.Request{Header: http.Header{}, Body: io.NopCloser(strings.NewReader("body"))}
-	p.AddAuth(context.Background(), r, struct{}{})
+	if err := p.AddAuth(context.Background(), r, struct{}{}); err == nil {
+		t.Fatal("expected error")
+	}
 	if h := r.Header.Get("X-Signature"); h != "" {
 		t.Fatalf("expected no header, got %s", h)
 	}
 
 	// missing secrets
 	r = &http.Request{Header: http.Header{}, Body: io.NopCloser(strings.NewReader("body"))}
-	p.AddAuth(context.Background(), r, &outParams{})
+	if err := p.AddAuth(context.Background(), r, &outParams{}); err == nil {
+		t.Fatal("expected error")
+	}
 	if h := r.Header.Get("X-Signature"); h != "" {
 		t.Fatalf("expected no header, got %s", h)
 	}
@@ -185,7 +191,9 @@ func TestHMACOutgoingEdgeCases(t *testing.T) {
 	// secret loading error
 	r = &http.Request{Header: http.Header{}, Body: io.NopCloser(strings.NewReader("body"))}
 	cfg := &outParams{Secrets: []string{"fail:oops"}}
-	p.AddAuth(context.Background(), r, cfg)
+	if err := p.AddAuth(context.Background(), r, cfg); err == nil {
+		t.Fatal("expected error")
+	}
 	if h := r.Header.Get("X-Signature"); h != "" {
 		t.Fatalf("expected no header, got %s", h)
 	}
@@ -193,7 +201,9 @@ func TestHMACOutgoingEdgeCases(t *testing.T) {
 	// body read error
 	r = &http.Request{Header: http.Header{}, Body: errReadCloser{}}
 	cfg = &outParams{Secrets: []string{"env:SECRET"}}
-	p.AddAuth(context.Background(), r, cfg)
+	if err := p.AddAuth(context.Background(), r, cfg); err == nil {
+		t.Fatal("expected error")
+	}
 	if h := r.Header.Get("X-Signature"); h != "" {
 		t.Fatalf("expected no header, got %s", h)
 	}
@@ -201,7 +211,9 @@ func TestHMACOutgoingEdgeCases(t *testing.T) {
 	// unsupported algo
 	r = &http.Request{Header: http.Header{}, Body: io.NopCloser(strings.NewReader("body"))}
 	cfg = &outParams{Secrets: []string{"env:SECRET"}, Algo: "bad"}
-	p.AddAuth(context.Background(), r, cfg)
+	if err := p.AddAuth(context.Background(), r, cfg); err == nil {
+		t.Fatal("expected error")
+	}
 	if h := r.Header.Get("X-Signature"); h != "" {
 		t.Fatalf("expected no header, got %s", h)
 	}
@@ -209,7 +221,9 @@ func TestHMACOutgoingEdgeCases(t *testing.T) {
 	// successful custom header/prefix
 	r = &http.Request{Header: http.Header{}, Body: io.NopCloser(strings.NewReader("body"))}
 	cfg = &outParams{Secrets: []string{"env:SECRET"}, Header: "Sig", Prefix: "pre:", Algo: "sha512"}
-	p.AddAuth(context.Background(), r, cfg)
+	if err := p.AddAuth(context.Background(), r, cfg); err != nil {
+		t.Fatal(err)
+	}
 	mac := hmac.New(sha512.New, []byte("key"))
 	mac.Write([]byte("body"))
 	expected := "pre:" + hex.EncodeToString(mac.Sum(nil))
