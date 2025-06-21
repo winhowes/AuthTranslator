@@ -10,8 +10,8 @@ import (
 
 func TestSlackCapabilities(t *testing.T) {
 	caps := integrationplugins.CapabilitiesFor("slack")
-	if len(caps) != 2 {
-		t.Fatalf("expected 2 capabilities, got %d", len(caps))
+	if len(caps) != 3 {
+		t.Fatalf("expected 3 capabilities, got %d", len(caps))
 	}
 
 	spec, ok := caps["post_public_as"]
@@ -69,6 +69,35 @@ func TestSlackCapabilities(t *testing.T) {
 
 	// missing fields should error
 	if _, err := spec2.Generate(map[string]interface{}{"username": "bot"}); err == nil {
+		t.Errorf("expected error for missing channels")
+	}
+
+	spec3, ok := caps["post_channels"]
+	if !ok {
+		t.Fatalf("post_channels not registered")
+	}
+	params = map[string]interface{}{
+		"channels": []interface{}{"c1"},
+	}
+	rules, err = spec3.Generate(params)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(rules) != 1 {
+		t.Fatalf("expected 1 rule, got %d", len(rules))
+	}
+	rule = rules[0]
+	rc, ok = rule.Methods["POST"]
+	if !ok {
+		t.Fatalf("missing POST method")
+	}
+	chVal, ok = rc.Body["channel"].([]interface{})
+	if !ok || !reflect.DeepEqual(chVal, []interface{}{"c1"}) {
+		t.Errorf("channels not propagated: %v", rc.Body["channel"])
+	}
+
+	// missing channels should error
+	if _, err := spec3.Generate(map[string]interface{}{}); err == nil {
 		t.Errorf("expected error for missing channels")
 	}
 }

@@ -25,6 +25,11 @@ func TestRegistryInitialization(t *testing.T) {
 	} else if !reflect.DeepEqual(spec.Params, []string{"username", "channels"}) {
 		t.Fatalf("unexpected post_channels_as params: %v", spec.Params)
 	}
+	if spec, ok := slack["post_channels"]; !ok {
+		t.Fatalf("post_channels capability missing")
+	} else if !reflect.DeepEqual(spec.Params, []string{"channels"}) {
+		t.Fatalf("unexpected post_channels params: %v", spec.Params)
+	}
 
 	github, ok := list["github"]
 	if !ok {
