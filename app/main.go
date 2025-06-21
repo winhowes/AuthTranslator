@@ -98,6 +98,10 @@ var enableMetrics = flag.Bool("enable-metrics", true, "expose /metrics endpoint"
 var enableHTTP3 = flag.Bool("enable-http3", false, "serve HTTP/3 in addition to HTTP/1 and HTTP/2")
 var logger = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 
+// httpClient is used for fetching remote configuration and allowlist files.
+// It has a 10 second timeout.
+var httpClient = &http.Client{Timeout: 10 * time.Second}
+
 // setAllowlist is used by reload to register caller allowlists. It is declared
 // as a variable so tests can override it.
 var setAllowlist = SetAllowlist
@@ -115,7 +119,11 @@ func isRemote(path string) bool {
 
 func openSource(path string) (io.ReadCloser, error) {
 	if isRemote(path) {
-		resp, err := http.Get(path)
+		req, err := http.NewRequestWithContext(context.Background(), "GET", path, nil)
+		if err != nil {
+			return nil, fmt.Errorf("fetch %s: %w", path, err)
+		}
+		resp, err := httpClient.Do(req)
 		if err != nil {
 			return nil, fmt.Errorf("fetch %s: %w", path, err)
 		}

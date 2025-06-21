@@ -13,7 +13,7 @@ This guide explains how AuthTranslator behaves at runtime and lists the service 
 
 ## Hot reload
 
-Send `SIGHUP` or run with `-watch` to reload the configuration and allowlist files without dropping connections. The watcher re-adds itself when files are replaced so edits trigger a reload automatically.
+Send `SIGHUP` or run with `-watch` to reload the configuration and allowlist files without dropping connections. The watcher re-adds itself when files are replaced so edits trigger a reload automatically. Remote configuration URLs are fetched with a 10&nbsp;second HTTP timeout.
 
 ---
 

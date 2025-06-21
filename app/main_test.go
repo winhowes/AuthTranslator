@@ -1073,7 +1073,7 @@ func TestMainMetricsDisabled(t *testing.T) {
 		t.Fatalf("start failed: %v", err)
 	}
 	time.Sleep(200 * time.Millisecond)
-	resp, err := http.Get("http://" + addr + "/_at_internal/metrics")
+	resp, err := httpClient.Get("http://" + addr + "/_at_internal/metrics")
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -1106,7 +1106,7 @@ func TestMainMetricsEnabled(t *testing.T) {
 		t.Fatalf("start failed: %v", err)
 	}
 	time.Sleep(200 * time.Millisecond)
-	resp, err := http.Get("http://" + addr + "/_at_internal/metrics")
+	resp, err := httpClient.Get("http://" + addr + "/_at_internal/metrics")
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -1172,7 +1172,7 @@ func TestMainWatchReload(t *testing.T) {
 	time.Sleep(200 * time.Millisecond)
 
 	getReload := func() string {
-		resp, err := http.Get("http://" + addr + "/_at_internal/healthz")
+		resp, err := httpClient.Get("http://" + addr + "/_at_internal/healthz")
 		if err != nil {
 			t.Fatalf("request failed: %v", err)
 		}
@@ -1305,7 +1305,7 @@ func TestMainHTTP3NoTLS(t *testing.T) {
 	time.Sleep(200 * time.Millisecond)
 
 	// HTTP/1 request should succeed
-	resp, err := http.Get("http://" + addr + "/_at_internal/healthz")
+	resp, err := httpClient.Get("http://" + addr + "/_at_internal/healthz")
 	if err != nil {
 		t.Fatalf("http1 request failed: %v", err)
 	}
