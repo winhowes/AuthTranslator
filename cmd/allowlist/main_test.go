@@ -158,6 +158,9 @@ func TestListCapsOutput(t *testing.T) {
 	if !strings.Contains(out, "post_channels_as (params: username,channels)") {
 		t.Fatalf("missing capability info: %s", out)
 	}
+	if !strings.Contains(out, "post_channels (params: channels)") {
+		t.Fatalf("missing capability info: %s", out)
+	}
 }
 
 func TestRemoveEntry(t *testing.T) {
