@@ -28,7 +28,11 @@ func TestSendgridCapabilities(t *testing.T) {
 		if !ok {
 			t.Fatalf("%s not registered", tt.name)
 		}
-		rules, err := spec.Generate(nil)
+		params := map[string]interface{}{}
+		if tt.name == "send_email" {
+			params = map[string]interface{}{"from": "me@example.com"}
+		}
+		rules, err := spec.Generate(params)
 		if err != nil {
 			t.Fatalf("generate failed: %v", err)
 		}
@@ -39,8 +43,41 @@ func TestSendgridCapabilities(t *testing.T) {
 		if r.Path != tt.path {
 			t.Errorf("%s path mismatch: %s", tt.name, r.Path)
 		}
-		if _, ok := r.Methods[tt.method]; !ok {
+		rc, ok := r.Methods[tt.method]
+		if !ok {
 			t.Errorf("%s missing method %s", tt.name, tt.method)
+			continue
 		}
+		if tt.name == "send_email" {
+			if rc.Body["from"] != "me@example.com" {
+				t.Errorf("from not propagated")
+			}
+			if rc.Body["reply_to"] != nil {
+				t.Errorf("reply_to default unexpected: %#v", rc.Body["reply_to"])
+			}
+		}
+	}
+
+	spec := caps["send_email"]
+	if _, err := spec.Generate(map[string]interface{}{}); err == nil {
+		t.Errorf("expected error for missing from")
+	}
+
+	rules, err := spec.Generate(map[string]interface{}{"from": "me@example.com", "replyTo": "r@example.com"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	rc := rules[0].Methods["POST"]
+	if rc.Body["reply_to"] != "r@example.com" {
+		t.Errorf("reply_to value not propagated")
+	}
+
+	rules, err = spec.Generate(map[string]interface{}{"from": "me@example.com", "replyTo": nil})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	rc = rules[0].Methods["POST"]
+	if rc.Body["reply_to"] != nil {
+		t.Errorf("reply_to nil not set")
 	}
 }

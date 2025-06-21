@@ -41,7 +41,7 @@ Run `go run ./cmd/allowlist list` to list capabilities from your build. For quic
 | pagerduty | trigger_incident | – |
 | pagerduty | resolve_incident | – |
 | sendgrid | manage_contacts | – |
-| sendgrid | send_email | – |
+| sendgrid | send_email | from, replyTo |
 | sendgrid | update_template | – |
 | servicenow | open_ticket | – |
 | servicenow | query_status | – |
@@ -60,4 +60,6 @@ Run `go run ./cmd/allowlist list` to list capabilities from your build. For quic
 | zendesk | open_ticket | – |
 | zendesk | query_status | – |
 | zendesk | update_ticket | – |
+
+For SendGrid `send_email`, if `replyTo` is omitted the reply address is empty. Provide `null` explicitly to leave the reply-to header unset.
 Capabilities not listed above may be added by custom plugins. Use the CLI to discover them in your build.
