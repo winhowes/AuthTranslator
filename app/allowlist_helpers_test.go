@@ -141,3 +141,19 @@ func TestValidateRequestReasonFailures(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateRequestUnsupportedContentType(t *testing.T) {
+	cons := RequestConstraint{Body: map[string]interface{}{"a": "b"}}
+	r := buildReq(http.MethodPost, "http://x", "text/plain", []byte("ignored"))
+	if !validateRequest(r, cons) {
+		t.Fatal("expected success for unsupported content type")
+	}
+	if ok, reason := validateRequestReason(r, cons); !ok || reason != "" {
+		t.Fatalf("expected empty reason on success, got %v %q", ok, reason)
+	}
+
+	r = buildReq(http.MethodPost, "http://x", "", []byte("ignored"))
+	if !validateRequest(r, cons) {
+		t.Fatal("expected success with no content type")
+	}
+}
