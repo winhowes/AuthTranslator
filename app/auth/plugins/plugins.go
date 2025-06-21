@@ -11,5 +11,6 @@ import (
 	_ "github.com/winhowes/AuthTranslator/app/auth/plugins/passthrough"
 	_ "github.com/winhowes/AuthTranslator/app/auth/plugins/slack_signature"
 	_ "github.com/winhowes/AuthTranslator/app/auth/plugins/token"
+	_ "github.com/winhowes/AuthTranslator/app/auth/plugins/twilio_signature"
 	_ "github.com/winhowes/AuthTranslator/app/auth/plugins/urlpath"
 )

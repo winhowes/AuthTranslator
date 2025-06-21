@@ -23,6 +23,7 @@ AuthTranslator’s behaviour is extended by **plugins** – small Go packages th
 | Inbound   | `jwt`              | Verifies JWTs with provided keys. |
 | Inbound   | `mtls`             | Requires a trusted client certificate. |
 | Inbound   | `slack_signature`  | Validates Slack request signatures. |
+| Inbound   | `twilio_signature`  | Validates Twilio webhook signatures. |
 | Inbound   | `token`            | Compares a shared token header. |
 | Inbound   | `url_path`         | Checks a token embedded in the request path. |
 | Inbound   | `passthrough`      | Accepts every request with no authentication. |
