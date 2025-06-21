@@ -48,7 +48,7 @@ Run `go run ./cmd/allowlist list` to list capabilities from your build. For quic
 | servicenow | update_ticket | – |
 | slack | post_channels_as | username, channels |
 | slack | post_channels | channels |
-| slack | post_public_as | username |
+| slack | post_as | username |
 | stripe | create_charge | – |
 | stripe | create_customer | – |
 | stripe | refund_charge | – |

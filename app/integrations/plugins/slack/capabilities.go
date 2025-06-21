@@ -7,7 +7,7 @@ import (
 )
 
 func init() {
-	integrationplugins.RegisterCapability("slack", "post_public_as", integrationplugins.CapabilitySpec{
+       integrationplugins.RegisterCapability("slack", "post_as", integrationplugins.CapabilitySpec{
 		Params: []string{"username"},
 		Generate: func(p map[string]interface{}) ([]integrationplugins.CallRule, error) {
 			user, _ := p["username"].(string)

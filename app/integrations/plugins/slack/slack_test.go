@@ -14,9 +14,9 @@ func TestSlackCapabilities(t *testing.T) {
 		t.Fatalf("expected 3 capabilities, got %d", len(caps))
 	}
 
-	spec, ok := caps["post_public_as"]
-	if !ok {
-		t.Fatalf("post_public_as not registered")
+       spec, ok := caps["post_as"]
+       if !ok {
+               t.Fatalf("post_as not registered")
 	}
 	rules, err := spec.Generate(map[string]interface{}{"username": "bot"})
 	if err != nil {

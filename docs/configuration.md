@@ -92,7 +92,7 @@ Two ways to authorise a caller:
     - id: demo-user
       # easiest: assign a capability
       capabilities:
-        - name: post_public_as
+        - name: post_as
 
     - id: service‑42
       # granular example

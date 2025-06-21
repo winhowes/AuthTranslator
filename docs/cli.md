@@ -5,7 +5,7 @@ AuthTranslator ships with two small helper binaries under **`cmd/`**:
 | Binary         | Purpose                                       | Typical usage                                     |
 | -------------- | --------------------------------------------- | ------------------------------------------------- |
 | `integrations` | Modify or inspect *config.yaml*. | `go run ./cmd/integrations slack -file config.yaml -token env:SLACK_TOKEN -signing-secret env:SLACK_SIGNING` |
-| `allowlist`    | Modify or inspect *allowlist.yaml*.           | `go run ./cmd/allowlist add -integration slack -caller bot -capability post_public_as` |
+| `allowlist`    | Modify or inspect *allowlist.yaml*.           | `go run ./cmd/allowlist add -integration slack -caller bot -capability post_as` |
 These helpers complement the [Configuration Reference](configuration.md) and [Allowlist Configuration](allowlist-config.md) docs.
 
 > **Heads‑up** Both helpers are thin wrappers around Go structs—check the `--help` output for the definitive flag list because the CLI evolves alongside the schema.
@@ -76,11 +76,11 @@ go run ./cmd/allowlist list
 
 # Grant a caller permission
 go run ./cmd/allowlist add -integration slack \
-  -caller bot-123 -capability post_public_as
+  -caller bot-123 -capability post_as
 
 # Revoke that permission
 go run ./cmd/allowlist remove -integration slack \
-  -caller bot-123 -capability post_public_as
+  -caller bot-123 -capability post_as
 ```
 
 #### Flags
