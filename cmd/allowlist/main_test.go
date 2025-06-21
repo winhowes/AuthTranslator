@@ -152,9 +152,9 @@ func TestListCapsOutput(t *testing.T) {
 	if !strings.Contains(out, "slack:") {
 		t.Fatalf("missing slack integration in output: %s", out)
 	}
-       if !strings.Contains(out, "post_as (params: username)") {
-               t.Fatalf("missing capability info: %s", out)
-       }
+	if !strings.Contains(out, "post_as (params: username)") {
+		t.Fatalf("missing capability info: %s", out)
+	}
 	if !strings.Contains(out, "post_channels_as (params: username,channels)") {
 		t.Fatalf("missing capability info: %s", out)
 	}
