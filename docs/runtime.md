@@ -19,7 +19,7 @@ Send `SIGHUP` or run with `-watch` to reload the configuration and allowlist fil
 
 ## Resource tuning
 
-* **Redis support** – specify `-redis-addr` to persist rate‑limit counters in Redis with optional TLS via `rediss://` and certificate verification using `-redis-ca`.
+* **Redis support** – specify `-redis-addr` to persist rate‑limit counters in Redis. Use `rediss://` for TLS and provide `-redis-ca` to verify the server certificate; without it TLS skips verification.
 * **Body size limit** – adjust buffered request bytes with `-max_body_size` (default 10 MB, `0` disables the limit).
 
 ---
@@ -39,7 +39,7 @@ AuthTranslator exposes several command‑line options:
 | `-x_at_int_host` | only respect `X-AT-Int` when this host is requested |
 | `-tls-cert` and `-tls-key` | TLS certificate and key to serve HTTPS |
 | `-redis-addr` | Redis address for rate limit counters. Accepts `host:port` or a `redis://`/`rediss://` URL with optional `user:pass@` credentials. |
-| `-redis-ca` | CA certificate for verifying Redis TLS |
+| `-redis-ca` | CA certificate for verifying Redis TLS; leave empty to skip verification |
 | `-redis-timeout` | timeout for dialing Redis (default `5s`) |
 | `-max_body_size` | maximum bytes buffered from request bodies; use `0` to disable |
 | `-secret-refresh` | refresh interval for cached secrets; `0` disables expiry |
