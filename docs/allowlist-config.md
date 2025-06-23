@@ -65,6 +65,8 @@ Each capability item contains a `name` and optional `params` map.
 > For a reference of built-in capabilities, see [capabilities.md](capabilities.md).
 > For guidelines on adding new ones, see [integration-plugins.md](integration-plugins.md).
 
+For convenience there is also a special capability `dangerously_allow_full_access` which grants unrestricted access to an integration. Use it sparingly.
+
 ### Granular Rule
 
 ```yaml

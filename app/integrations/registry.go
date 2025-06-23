@@ -1,5 +1,8 @@
 package integrationplugins
 
+const GlobalIntegration = "*"
+const DangerouslyAllowFullAccess = "dangerously_allow_full_access"
+
 // CapabilityConfig defines a named capability and optional parameters.
 type CapabilityConfig struct {
 	Name   string                 `json:"name"`
@@ -23,11 +26,16 @@ func RegisterCapability(integration, name string, spec CapabilitySpec) {
 
 func getCapability(integration, name string) (CapabilitySpec, bool) {
 	m, ok := capabilityRegistry[integration]
-	if !ok {
-		return CapabilitySpec{}, false
+	if ok {
+		if spec, ok := m[name]; ok {
+			return spec, true
+		}
 	}
-	spec, ok := m[name]
-	return spec, ok
+	if m, ok := capabilityRegistry[GlobalIntegration]; ok {
+		spec, ok := m[name]
+		return spec, ok
+	}
+	return CapabilitySpec{}, false
 }
 
 func CapabilitiesFor(integration string) map[string]CapabilitySpec {
