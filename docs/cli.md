@@ -54,7 +54,7 @@ go run ./cmd/integrations delete slack -file config.yaml
 
 | Flag       | Default                              | Meaning                    |
 | ---------- | ------------------------------------ | -------------------------- |
-| `--file`   | `config.yaml` | Path to the configuration file. |
+| `-file`   | `config.yaml` | Path to the configuration file. |
 
 ## 3  `allowlist` helper
 
@@ -87,11 +87,11 @@ go run ./cmd/allowlist remove -integration slack \
 
 | Flag            | Default          | Meaning                             |
 | --------------- | ---------------- | ----------------------------------- |
-| `--file`        | `allowlist.yaml` | Path to YAML file for `add`/`remove`. |
-| `--caller`      | –                | Caller ID for `add`/`remove`.       |
-| `--integration` | –                | Integration name for `add`/`remove`. |
-| `--capability`  | –                | Capability name for `add`/`remove`. |
-| `--params`      | ""               | Extra key=value pairs for `add` (optional). |
+| `-file`        | `allowlist.yaml` | Path to YAML file for `add`/`remove`. |
+| `-caller`      | –                | Caller ID for `add`/`remove`.       |
+| `-integration` | –                | Integration name for `add`/`remove`. |
+| `-capability`  | –                | Capability name for `add`/`remove`. |
+| `-params`      | ""               | Extra key=value pairs for `add` (optional). |
 
 ---
 
