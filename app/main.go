@@ -150,6 +150,9 @@ func loadConfig(filename string) (*Config, error) {
 
 	var config Config
 	if err := dec.Decode(&config); err != nil {
+		if errors.Is(err, io.EOF) {
+			return &Config{}, nil
+		}
 		return nil, err
 	}
 
