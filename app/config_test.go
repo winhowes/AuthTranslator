@@ -97,3 +97,20 @@ func TestLoadConfigURL(t *testing.T) {
 		t.Fatalf("unexpected config %+v", cfg)
 	}
 }
+
+func TestLoadConfigEmptyFile(t *testing.T) {
+	tmp, err := os.CreateTemp("", "emptycfg*.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tmp.Name())
+	tmp.Close()
+
+	cfg, err := loadConfig(tmp.Name())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(cfg.Integrations) != 0 {
+		t.Fatalf("expected zero integrations, got %d", len(cfg.Integrations))
+	}
+}
