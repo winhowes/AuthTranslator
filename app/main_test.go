@@ -289,6 +289,32 @@ func TestOpenSourceFileURL(t *testing.T) {
 	}
 }
 
+func TestOpenSourceLocalPath(t *testing.T) {
+	f, err := os.CreateTemp("", "src*.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	name := f.Name()
+	if _, err := f.WriteString("ok"); err != nil {
+		t.Fatal(err)
+	}
+	f.Close()
+	defer os.Remove(name)
+
+	rc, err := openSource(name)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	data, err := io.ReadAll(rc)
+	rc.Close()
+	if err != nil {
+		t.Fatalf("read error: %v", err)
+	}
+	if string(data) != "ok" {
+		t.Fatalf("unexpected body %q", data)
+	}
+}
+
 func TestIsRemoteWindowsPath(t *testing.T) {
 	if isRemote("C:\\path\\to\\file.yaml") {
 		t.Fatal("windows path detected as remote")
