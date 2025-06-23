@@ -5,6 +5,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha1"
 	"encoding/base64"
+	authplugins "github.com/winhowes/AuthTranslator/app/auth"
 	"io"
 	"net/http"
 	"net/url"
@@ -167,5 +168,51 @@ func TestTwilioSignatureMultipleSecrets(t *testing.T) {
 	}
 	if !p.Authenticate(context.Background(), r, cfg) {
 		t.Fatal("expected auth using second secret")
+	}
+}
+
+func TestTwilioSignatureParseParamsUnknownField(t *testing.T) {
+	p := TwilioSignatureAuth{}
+	if _, err := p.ParseParams(map[string]interface{}{"secrets": []string{"env:S"}, "extra": true}); err == nil {
+		t.Fatal("expected error for unknown field")
+	}
+}
+
+func TestTwilioSignatureAuthenticateBodyError(t *testing.T) {
+	form := url.Values{"B": []string{"c"}}
+	urlStr := "/bodyerr"
+	sig := sign(urlStr, form, "tok")
+	body := form.Encode()
+	r := &http.Request{Method: "POST", URL: &url.URL{Path: urlStr}, Header: http.Header{
+		"X-Twilio-Signature": []string{sig},
+		"Content-Type":       []string{"application/x-www-form-urlencoded"},
+	}, Body: io.NopCloser(strings.NewReader(body))}
+
+	old := authplugins.MaxBodySize
+	authplugins.MaxBodySize = 1
+	defer func() { authplugins.MaxBodySize = old }()
+
+	p := TwilioSignatureAuth{}
+	t.Setenv("T", "tok")
+	cfg, _ := p.ParseParams(map[string]interface{}{"secrets": []string{"env:T"}})
+	if p.Authenticate(context.Background(), r, cfg) {
+		t.Fatal("expected failure due to body error")
+	}
+}
+
+func TestTwilioSignatureSecretLoadError(t *testing.T) {
+	form := url.Values{"Q": []string{"v"}}
+	urlStr := "/loaderr"
+	sig := sign(urlStr, form, "tok")
+	body := form.Encode()
+	r := &http.Request{Method: "POST", URL: &url.URL{Path: urlStr}, Header: http.Header{
+		"X-Twilio-Signature": []string{sig},
+		"Content-Type":       []string{"application/x-www-form-urlencoded"},
+	}, Body: io.NopCloser(strings.NewReader(body))}
+
+	p := TwilioSignatureAuth{}
+	cfg, _ := p.ParseParams(map[string]interface{}{"secrets": []string{"env:MISSING"}})
+	if p.Authenticate(context.Background(), r, cfg) {
+		t.Fatal("expected auth failure when secret load fails")
 	}
 }

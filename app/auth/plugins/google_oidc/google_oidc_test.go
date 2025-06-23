@@ -216,6 +216,21 @@ func makeToken(aud, sub string, exp int64, key *rsa.PrivateKey, kid string) stri
 	return signingInput + "." + base64.RawURLEncoding.EncodeToString(sig)
 }
 
+func makeTokenOptionalExp(aud, sub string, exp *int64, key *rsa.PrivateKey, kid string) string {
+	headerBytes, _ := json.Marshal(map[string]string{"alg": "RS256", "kid": kid})
+	header := base64.RawURLEncoding.EncodeToString(headerBytes)
+	claims := map[string]interface{}{"aud": aud, "sub": sub}
+	if exp != nil {
+		claims["exp"] = *exp
+	}
+	payloadBytes, _ := json.Marshal(claims)
+	payload := base64.RawURLEncoding.EncodeToString(payloadBytes)
+	signingInput := header + "." + payload
+	h := sha256.Sum256([]byte(signingInput))
+	sig, _ := rsa.SignPKCS1v15(rand.Reader, key, crypto.SHA256, h[:])
+	return signingInput + "." + base64.RawURLEncoding.EncodeToString(sig)
+}
+
 func jwksForKey(pub *rsa.PublicKey, kid string) string {
 	n := base64.RawURLEncoding.EncodeToString(pub.N.Bytes())
 	eBytes := make([]byte, 0)
@@ -871,6 +886,18 @@ func TestGoogleOIDCAuthenticateExpired(t *testing.T) {
 	oldClient := HTTPClient
 	HTTPClient = ts.Client()
 	defer func() { HTTPClient = oldClient }()
+	keyCache.mu.Lock()
+	oldKeys := keyCache.keys
+	oldExp := keyCache.expiry
+	keyCache.keys = nil
+	keyCache.expiry = time.Time{}
+	keyCache.mu.Unlock()
+	defer func() {
+		keyCache.mu.Lock()
+		keyCache.keys = oldKeys
+		keyCache.expiry = oldExp
+		keyCache.mu.Unlock()
+	}()
 	tok := makeToken("aud", "u", time.Now().Add(-time.Hour).Unix(), key, kid)
 	r := &http.Request{Header: http.Header{"Authorization": []string{"Bearer " + tok}}}
 	g := GoogleOIDCAuth{}
@@ -978,5 +1005,41 @@ func TestGoogleOIDCAuthenticateParseFail(t *testing.T) {
 	r := &http.Request{Header: http.Header{"Authorization": []string{"Bearer bad"}}}
 	if g.Authenticate(context.Background(), r, cfg) {
 		t.Fatal("expected failure for bad token")
+	}
+}
+
+func TestGoogleOIDCAuthenticateNoExp(t *testing.T) {
+	key, _ := rsa.GenerateKey(rand.Reader, 1024)
+	kid := "noexp"
+	jwks := jwksForKey(&key.PublicKey, kid)
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { fmt.Fprint(w, jwks) }))
+	defer ts.Close()
+
+	oldURL := CertsURL
+	CertsURL = ts.URL
+	defer func() { CertsURL = oldURL }()
+	oldClient := HTTPClient
+	HTTPClient = ts.Client()
+	defer func() { HTTPClient = oldClient }()
+
+	keyCache.mu.Lock()
+	oldKeys := keyCache.keys
+	oldExp := keyCache.expiry
+	keyCache.keys = nil
+	keyCache.expiry = time.Time{}
+	keyCache.mu.Unlock()
+	defer func() {
+		keyCache.mu.Lock()
+		keyCache.keys = oldKeys
+		keyCache.expiry = oldExp
+		keyCache.mu.Unlock()
+	}()
+
+	tok := makeTokenOptionalExp("aud", "u", nil, key, kid)
+	r := &http.Request{Header: http.Header{"Authorization": []string{"Bearer " + tok}}}
+	g := GoogleOIDCAuth{}
+	cfg, _ := g.ParseParams(map[string]interface{}{"audience": "aud"})
+	if !g.Authenticate(context.Background(), r, cfg) {
+		t.Fatal("expected authentication without exp claim")
 	}
 }

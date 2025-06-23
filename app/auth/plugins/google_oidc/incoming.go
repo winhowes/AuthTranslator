@@ -232,10 +232,8 @@ func (g *GoogleOIDCAuth) Authenticate(ctx context.Context, r *http.Request, para
 	if aud, ok := claims["aud"]; !ok || !matchAudience(aud, cfg.Audience) {
 		return false
 	}
-	if exp, ok := claims["exp"].(float64); ok {
-		if int64(exp) < time.Now().Unix() {
-			return false
-		}
+	if exp, ok := claims["exp"].(float64); ok && int64(exp) < time.Now().Unix() {
+		return false
 	}
 	return true
 }
