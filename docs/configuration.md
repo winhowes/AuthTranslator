@@ -56,13 +56,13 @@ See [Secret Back-Ends](secret-backends.md) for all supported URI schemes.
 | `out_rate_limit` | int           | `0`          | Max outbound requests per caller within the window. |
 | `rate_limit_window` | duration    | `1m`         | Rolling window length for rate limiting. |
 | `rate_limit_strategy` | string    | `fixed_window` | Rate limit algorithm (`fixed_window`, `token_bucket`, or `leaky_bucket`). |
-| `idle_conn_timeout` | duration    | `0`          | How long idle connections stay pooled. |
-| `tls_handshake_timeout` | duration | `0`          | Maximum time to wait for TLS handshakes. |
+| `idle_conn_timeout` | duration    | `90s`        | How long idle connections stay pooled. |
+| `tls_handshake_timeout` | duration | `10s`        | Maximum time to wait for TLS handshakes. |
 | `response_header_timeout` | duration | `0`        | Time to wait for the first response header. |
 | `tls_insecure_skip_verify` | bool   | `false`     | Disable server certificate verification (dev only!). |
 | `disable_keep_alives` | bool       | `false`      | Disable HTTP keep‑alive connections. |
-| `max_idle_conns` | int            | `0`          | Total idle connections to keep open. |
-| `max_idle_conns_per_host` | int     | `0`          | Idle connection limit per upstream host. |
+| `max_idle_conns` | int            | `100`        | Total idle connections to keep open. |
+| `max_idle_conns_per_host` | int     | `2`          | Idle connection limit per upstream host. |
 
 #### `PluginSpec`
 
