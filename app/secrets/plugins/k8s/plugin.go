@@ -69,8 +69,8 @@ func (k8sPlugin) Load(ctx context.Context, id string) (string, error) {
 		client = &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{RootCAs: pool}}, Timeout: client.Timeout}
 	}
 
-	url := fmt.Sprintf("https://%s:%s/api/v1/namespaces/%s/secrets/%s", host, port, namespace, name)
-	req, err := newRequest(ctx, "GET", url, nil)
+	apiURL := fmt.Sprintf("https://%s:%s/api/v1/namespaces/%s/secrets/%s", host, port, namespace, name)
+	req, err := newRequest(ctx, "GET", apiURL, nil)
 	if err != nil {
 		return "", err
 	}
