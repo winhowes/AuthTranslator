@@ -93,3 +93,29 @@ func TestCapabilitiesHelpers(t *testing.T) {
 		t.Fatalf("AllCapabilities returned %#v", all)
 	}
 }
+
+func TestExpandCapabilitiesGlobal(t *testing.T) {
+	orig := capabilityRegistry
+	capabilityRegistry = map[string]map[string]CapabilitySpec{}
+	t.Cleanup(func() { capabilityRegistry = orig })
+
+	RegisterCapability(GlobalIntegration, DangerouslyAllowFullAccess, CapabilitySpec{
+		Generate: func(map[string]interface{}) ([]CallRule, error) {
+			rule := CallRule{Path: "/**", Methods: map[string]RequestConstraint{"GET": {}}}
+			return []CallRule{rule}, nil
+		},
+	})
+
+	callers := []CallerConfig{{ID: "c", Capabilities: []CapabilityConfig{{Name: DangerouslyAllowFullAccess}}}}
+	got := ExpandCapabilities("foo", callers)
+	if len(got) != 1 || len(got[0].Rules) != 1 {
+		t.Fatalf("unexpected expansion: %+v", got)
+	}
+	r := got[0].Rules[0]
+	if r.Path != "/**" {
+		t.Errorf("unexpected path %s", r.Path)
+	}
+	if _, ok := r.Methods["GET"]; !ok {
+		t.Errorf("expected GET method in rule")
+	}
+}

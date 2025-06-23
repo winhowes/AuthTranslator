@@ -6,6 +6,7 @@ Run `go run ./cmd/allowlist list` to list capabilities from your build. For quic
 
 | Integration | Capability | Parameters |
 |-------------|-----------|------------|
+| * | dangerously_allow_full_access | – |
 | asana | add_comment | – |
 | asana | create_task | – |
 | asana | update_status | – |
