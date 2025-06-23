@@ -6,13 +6,13 @@ Thank you for your interest in contributing! This project uses the standard Go t
 
 1. Run the precommit checks to format, vet and lint your code:
    ```bash
-make precommit
-```
-
-2. Run the tests:
+   make precommit
+   make tidy
+   ```
+2. Run the CI checks locally:
    ```bash
-make test
-```
+   make ci
+   ```
 
 3. Commit your changes and open a pull request on GitHub targeting the `main` branch.
 
