@@ -113,11 +113,13 @@ func usage() {
 }
 
 func isRemote(path string) bool {
-	u, err := url.Parse(path)
-	return err == nil && u.Scheme != "" && u.Scheme != "file"
+	return strings.Contains(path, "://")
 }
 
 func openSource(path string) (io.ReadCloser, error) {
+	if strings.HasPrefix(path, "file://") {
+		return os.Open(strings.TrimPrefix(path, "file://"))
+	}
 	if isRemote(path) {
 		req, err := http.NewRequestWithContext(context.Background(), "GET", path, nil)
 		if err != nil {
