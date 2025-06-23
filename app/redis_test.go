@@ -267,3 +267,45 @@ func TestRedisCmdStringReadError(t *testing.T) {
 		t.Fatal("expected read error")
 	}
 }
+
+func TestRedisCmdStringSimple(t *testing.T) {
+	srv, cli := net.Pipe()
+	defer srv.Close()
+	defer cli.Close()
+
+	go func() {
+		br := bufio.NewReader(srv)
+		br.ReadBytes('\n')
+		br.ReadBytes('\n')
+		srv.Write([]byte("+PONG\r\n"))
+	}()
+
+	val, err := redisCmdString(cli, "PING")
+	if err != nil {
+		t.Fatalf("redisCmdString error: %v", err)
+	}
+	if val != "PONG" {
+		t.Fatalf("expected PONG, got %q", val)
+	}
+}
+
+func TestRedisCmdStringInteger(t *testing.T) {
+	srv, cli := net.Pipe()
+	defer srv.Close()
+	defer cli.Close()
+
+	go func() {
+		br := bufio.NewReader(srv)
+		br.ReadBytes('\n')
+		br.ReadBytes('\n')
+		srv.Write([]byte(":5\r\n"))
+	}()
+
+	val, err := redisCmdString(cli, "INCR", "k")
+	if err != nil {
+		t.Fatalf("redisCmdString error: %v", err)
+	}
+	if val != "5" {
+		t.Fatalf("expected 5, got %q", val)
+	}
+}

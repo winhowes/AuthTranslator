@@ -171,6 +171,26 @@ func TestWatchFilesCreateAddError(t *testing.T) {
 	<-done
 }
 
+func TestWatchFilesCreateAddMissing(t *testing.T) {
+	mw := &mockWatcher{events: make(chan fsnotify.Event, 1), errors: make(chan error), addErr: os.ErrNotExist}
+	old := newWatcher
+	newWatcher = func() (fileWatcher, error) { return mw, nil }
+	defer func() { newWatcher = old }()
+
+	ch := make(chan struct{}, 1)
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { watchFiles(ctx, []string{"f"}, ch); close(done) }()
+	mw.events <- fsnotify.Event{Name: "f", Op: fsnotify.Create}
+	select {
+	case <-ch:
+	case <-time.After(time.Second):
+		t.Fatal("timeout waiting for create event")
+	}
+	cancel()
+	<-done
+}
+
 func TestWatchFilesNewWatcherError(t *testing.T) {
 	old := newWatcher
 	newWatcher = func() (fileWatcher, error) { return nil, fmt.Errorf("fail") }
