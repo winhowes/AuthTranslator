@@ -25,7 +25,7 @@ outgoing_auth:
 | `gcp`            | `gcp:projects/acme/locations/global/keyRings/auth/cryptoKeys/token:ciphertext` | Running on GKE / Cloud Run; decrypt via **Cloud KMS**. |
 | `aws`            | `aws:Ci0KU29tZUNpcGhlcnRleHQ=` | AES‑GCM encrypted values decrypted using `AWS_KMS_KEY`. |
 | `azure`          | `azure:https://kv-name.vault.azure.net/secrets/secret-name`         | AKS or VM SS with **Managed Identity**.                       |
-| `vault`          | `vault://kv/data/slack#token`                                       | Self‑hosted **HashiCorp Vault** cluster.                      |
+| `vault`          | `vault:secret/data/slack`                                       | Self‑hosted **HashiCorp Vault** cluster.                      |
 
 > **Not exhaustive** — you can add more with \~50 LoC (see below).
 
