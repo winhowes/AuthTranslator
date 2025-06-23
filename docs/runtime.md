@@ -76,6 +76,9 @@ Use the Makefile helpers before committing changes:
 ```bash
 make precommit
 make test
+make tidy
+make ci
 ```
 
 `make precommit` formats and vets the code and runs `golangci-lint` if installed.
+`make ci` runs the precommit checks, tidies modules and executes the tests with coverage.

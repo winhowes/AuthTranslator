@@ -1,4 +1,4 @@
-.PHONY: fmt vet lint test docker precommit
+.PHONY: fmt vet lint test tidy docker precommit ci
 
 GOFILES := $(shell find . -name '*.go' -not -path './.git/*')
 
@@ -18,7 +18,13 @@ lint:
 test:
 	go test ./...
 
+tidy:
+	go mod tidy
+
 docker:
 	docker build -t authtranslator .
 
 precommit: fmt vet lint
+
+ci: precommit tidy
+	go test -coverprofile=coverage.out ./...

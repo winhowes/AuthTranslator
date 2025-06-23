@@ -130,6 +130,8 @@ Official container images include a Docker HEALTHCHECK that polls the health end
 ```bash
 make precommit  # fmt + vet + lint
 make test       # run unit tests
+make tidy       # update go.mod/go.sum
+make ci         # run full checks + tests with coverage
 make docker     # build container
 ```
 
