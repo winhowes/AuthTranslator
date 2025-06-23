@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bufio"
+	"net"
 	"testing"
 	"time"
 )
@@ -295,4 +297,30 @@ func TestAllowUnknownStrategy(t *testing.T) {
 	if !rl.Allow(key) {
 		t.Fatal("second call should still be allowed for unknown strategy")
 	}
+}
+
+func TestRetryAfterRedisPath(t *testing.T) {
+	old := *redisAddr
+	*redisAddr = "dummy"
+	rl := NewRateLimiter(1, time.Second, "")
+	t.Cleanup(func() { *redisAddr = old; rl.Stop() })
+
+	srv, cli := net.Pipe()
+	rl.conns <- cli
+	done := make(chan struct{})
+	go func() {
+		defer func() { srv.Close(); close(done) }()
+		br := bufio.NewReader(srv)
+		if cmd, args := parseRedisCommand(t, br); cmd != "PTTL" || args[0] != "k" {
+			t.Errorf("unexpected command %s %v", cmd, args)
+			return
+		}
+		srv.Write([]byte(":1000\r\n"))
+	}()
+
+	d := rl.RetryAfter("k")
+	if d != time.Second {
+		t.Fatalf("expected 1s, got %v", d)
+	}
+	<-done
 }
