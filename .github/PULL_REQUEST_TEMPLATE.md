@@ -1,10 +1,10 @@
-### \ud83d\udccb Pull Request Template
+### 📋 Pull Request Template
 
 > Thanks for contributing! Please fill out this PR template so we can review it efficiently.
 
 ---
 
-### \ud83d\udee0\ufe0f What does this PR do?
+### 🛠️ What does this PR do?
 
 <!-- A short summary of what this PR changes, adds, or fixes. -->
 
@@ -12,7 +12,7 @@
 
 ---
 
-### \u2705 Checklist
+### ✅ Checklist
 
 * [ ] My code follows the project's coding style
 * [ ] I have added tests that prove my fix is effective / my feature works
@@ -21,13 +21,13 @@
 
 ---
 
-### \ud83d\udcf8 Screenshots / Demos (if applicable)
+### 📸 Screenshots / Demos (if applicable)
 
 <!-- Include screenshots or demo gifs/videos for UI/UX changes -->
 
 ---
 
-### \ud83d\udd0d Related Issue(s)
+### 🔍 Related Issue(s)
 
 <!-- Link any related issues (e.g., Fixes #123, Closes #456) -->
 
@@ -36,7 +36,7 @@
 
 ---
 
-### \ud83e\udd2e Testing Instructions
+### 🧪 Testing Instructions
 
 <!-- Step-by-step instructions on how to test this PR -->
 
@@ -46,12 +46,12 @@
 
 ---
 
-### \ud83d\udcac Additional Notes
+### 💬 Additional Notes
 
 <!-- Any extra context, caveats, or design decisions worth mentioning -->
 
 ---
 
-### \ud83d\ude4c Thanks again!
+### 🙌 Thanks again!
 
 ---
