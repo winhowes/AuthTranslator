@@ -184,3 +184,30 @@ func TestGCPTokenDecodeError(t *testing.T) {
 		t.Fatalf("expected no header")
 	}
 }
+
+func TestGCPTokenRequiredOptional(t *testing.T) {
+	p := GCPToken{}
+	if p.RequiredParams() != nil {
+		t.Fatalf("expected nil required params")
+	}
+	opts := p.OptionalParams()
+	if len(opts) != 2 || opts[0] != "header" || opts[1] != "prefix" {
+		t.Fatalf("unexpected optional params: %v", opts)
+	}
+}
+
+func TestGCPTokenParseParamsError(t *testing.T) {
+	p := GCPToken{}
+	if _, err := p.ParseParams(map[string]any{"unknown": true}); err == nil {
+		t.Fatal("expected parse error")
+	}
+}
+
+func TestFetchTokenRequestError(t *testing.T) {
+	oldHost := MetadataHost
+	MetadataHost = ":"
+	defer func() { MetadataHost = oldHost }()
+	if _, _, err := fetchToken(); err == nil {
+		t.Fatal("expected error from bad url")
+	}
+}
