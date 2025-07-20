@@ -191,3 +191,18 @@ func TestValidateAllowlistEntriesDoesNotModifyInput(t *testing.T) {
 		t.Fatalf("input modified: %#v", entries)
 	}
 }
+
+func TestValidateAllowlistEntriesGlobalCapability(t *testing.T) {
+	entries := []AllowlistEntry{{
+		Integration: "slack",
+		Callers: []CallerConfig{{
+			ID: "c",
+			Capabilities: []integrationplugins.CapabilityConfig{{
+				Name: integrationplugins.DangerouslyAllowFullAccess,
+			}},
+		}},
+	}}
+	if err := validateAllowlistEntries(entries); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}

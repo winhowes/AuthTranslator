@@ -83,7 +83,12 @@ func validateAllowlistEntry(name string, callers []CallerConfig) error {
 func validateCapability(integration string, cap integrationplugins.CapabilityConfig) error {
 	spec, ok := integrationplugins.CapabilitiesFor(integration)[cap.Name]
 	if !ok {
-		return fmt.Errorf("unknown capability %s", cap.Name)
+		// Check for globally registered capabilities such as
+		// DangerouslyAllowFullAccess.
+		spec, ok = integrationplugins.CapabilitiesFor(integrationplugins.GlobalIntegration)[cap.Name]
+		if !ok {
+			return fmt.Errorf("unknown capability %s", cap.Name)
+		}
 	}
 	for p := range cap.Params {
 		valid := false
