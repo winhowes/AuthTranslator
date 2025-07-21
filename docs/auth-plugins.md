@@ -36,6 +36,7 @@ AuthTranslator’s behaviour is extended by **plugins** – small Go packages th
 | Outbound  | `token`            | Adds a token header on outgoing requests. |
 | Outbound  | `passthrough`      | Does nothing; useful when upstream handles auth. |
 | Outbound  | `url_path`         | Appends a secret segment to the request path. |
+| Outbound  | `find_replace`     | Replaces occurrences of one secret value with another across the URL, headers and body. |
 ---
 
 ## Detailed examples
