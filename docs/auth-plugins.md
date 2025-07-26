@@ -68,6 +68,19 @@ outgoing_auth:
 
 Adds the configured token to the `X-Api-Key` header on each request.
 
+### Outbound `find_replace`
+
+```yaml
+outgoing_auth:
+  - type: find_replace
+    params:
+      find_secret: env:FIND
+      replace_secret: env:REPLACE
+```
+
+Replaces every occurrence of the secret referenced by `find_secret` with
+the value from `replace_secret` across the URL, headers and body.
+
 ---
 
 ## Writing your own plugin
