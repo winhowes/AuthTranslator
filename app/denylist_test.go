@@ -178,6 +178,30 @@ func TestMatchDenylistTrimsMethod(t *testing.T) {
 	}
 }
 
+func TestMatchDenylistIntegrationCaseInsensitive(t *testing.T) {
+	resetDenylists()
+
+	if err := SetDenylist("CaSe", []DenylistCaller{{
+		ID: "*",
+		Rules: []CallRule{{
+			Path: "/blocked",
+			Methods: map[string]RequestConstraint{
+				"GET": {Headers: map[string][]string{"X-Block": {"yes"}}},
+			},
+		}},
+	}}); err != nil {
+		t.Fatalf("failed to set denylist: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "http://case/blocked", nil)
+	req.Header.Set("X-Block", "yes")
+	integ := &Integration{Name: "CaSe"}
+	blocked, _ := matchDenylist(integ, "caller", req)
+	if !blocked {
+		t.Fatal("expected denylist to match regardless of integration name case")
+	}
+}
+
 func TestConstraintMatchesRequestJSON(t *testing.T) {
 	body := `{"foo":{"bar":"baz","extra":1},"tags":["a","b"]}`
 	req := httptest.NewRequest(http.MethodPost, "http://json/path", strings.NewReader(body))
