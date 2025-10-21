@@ -159,7 +159,7 @@ var integrations = struct {
 	m map[string]*Integration
 }{m: make(map[string]*Integration)}
 
-var nameRegexp = regexp.MustCompile(`^[a-zA-Z0-9-]+$`)
+var nameRegexp = regexp.MustCompile(`^[a-zA-Z0-9._-]+$`)
 
 // prepareIntegration validates the config and populates parsed fields
 // without storing it in the global map.

@@ -27,7 +27,7 @@ integrations:
     rate_limit_window: 1m
 ```
 
-The integration name (`slack` above) is referenced by the allowlist. Incoming plugins run in order until one succeeds, optionally producing the caller ID (depending on the auth plugins). Outgoing plugins modify each request before forwarding it to the `destination` URL.
+The integration name (`slack` above) is referenced by the allowlist. Incoming plugins run in order until one succeeds, optionally producing the caller ID (depending on the auth plugins). Outgoing plugins modify each request before forwarding it to the `destination` URL. Names are lowercased automatically and may include letters, numbers, dashes, underscores, and dots.
 
 ## Multiple secrets
 

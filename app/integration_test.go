@@ -93,12 +93,29 @@ func TestAddIntegrationInvalidDestination(t *testing.T) {
 
 func TestAddIntegrationInvalidName(t *testing.T) {
 	i := &Integration{
-		Name:        "bad_name",
+		Name:        "bad|name",
 		Destination: "http://example.com",
 	}
 	if err := AddIntegration(i); err == nil || !strings.Contains(err.Error(), "invalid integration name") {
 		t.Fatalf("expected invalid name error, got %v", err)
 	}
+}
+
+func TestAddIntegrationAllowsDotsAndUnderscores(t *testing.T) {
+	i := &Integration{
+		Name:         "with.dot_and-name",
+		Destination:  "http://example.com",
+		InRateLimit:  1,
+		OutRateLimit: 1,
+		IncomingAuth: []AuthPluginConfig{{Type: "token", Params: map[string]interface{}{"secrets": []string{"env:TOK"}, "header": "X-Auth"}}},
+	}
+	if err := AddIntegration(i); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	t.Cleanup(func() {
+		i.inLimiter.Stop()
+		i.outLimiter.Stop()
+	})
 }
 
 func TestAddIntegrationDuplicateName(t *testing.T) {

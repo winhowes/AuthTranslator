@@ -82,6 +82,37 @@ func TestMetricsHandlerOutput(t *testing.T) {
 	}
 }
 
+func TestMetricsHandlerOutputWithPunctuation(t *testing.T) {
+	Reset()
+
+	dotName := "with.dot"
+	underscoreName := "with_underscore"
+
+	IncRequest(dotName)
+	RecordDuration(dotName, 150*time.Millisecond)
+	RecordStatus(dotName, http.StatusAccepted)
+
+	RecordStatus(underscoreName, http.StatusBadGateway)
+
+	req := httptest.NewRequest(http.MethodGet, "/_at_internal/metrics", nil)
+	rr := httptest.NewRecorder()
+	Handler(rr, req, "", "")
+
+	body := rr.Body.String()
+	if !strings.Contains(body, fmt.Sprintf(`authtranslator_requests_total{integration=%q} 1`, dotName)) {
+		t.Fatalf("missing request counter for %s: %s", dotName, body)
+	}
+	if !strings.Contains(body, fmt.Sprintf(`authtranslator_request_duration_seconds_sum{integration=%q}`, dotName)) {
+		t.Fatalf("missing duration histogram for %s: %s", dotName, body)
+	}
+	if !strings.Contains(body, fmt.Sprintf(`authtranslator_upstream_responses_total{integration=%q,code=%q} 1`, dotName, "202")) {
+		t.Fatalf("missing status metric for %s: %s", dotName, body)
+	}
+	if !strings.Contains(body, fmt.Sprintf(`authtranslator_upstream_responses_total{integration=%q,code=%q} 1`, underscoreName, "502")) {
+		t.Fatalf("missing status metric for %s: %s", underscoreName, body)
+	}
+}
+
 func TestMetricsHandlerAuth(t *testing.T) {
 	Reset()
 	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
