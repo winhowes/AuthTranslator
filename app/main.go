@@ -483,6 +483,10 @@ func (rl *RateLimiter) Allow(key string) bool {
 
 	switch rl.strategy {
 	case "fixed_window":
+		if rl.window > 0 && time.Since(rl.resetTime) >= rl.window {
+			rl.requests = make(map[string]int)
+			rl.resetTime = time.Now()
+		}
 		if rl.requests[key] >= rl.limit {
 			return false
 		}
