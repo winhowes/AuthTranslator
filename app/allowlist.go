@@ -195,7 +195,7 @@ func validateRequestReason(r *http.Request, c RequestConstraint) (bool, string) 
 	if err != nil {
 		return false, "error reading body"
 	}
-	ct := r.Header.Get("Content-Type")
+	ct := strings.ToLower(r.Header.Get("Content-Type"))
 	if strings.Contains(ct, "application/json") {
 		var data map[string]interface{}
 		if err := json.Unmarshal(bodyBytes, &data); err != nil {

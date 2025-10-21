@@ -253,3 +253,21 @@ func TestFindConstraintCapability(t *testing.T) {
 		t.Fatal("expected capability constraint match")
 	}
 }
+
+func TestValidateRequestReasonJSONContentTypeCaseInsensitive(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "http://case/json", strings.NewReader(`{"foo":"bar"}`))
+	req.Header.Set("Content-Type", "Application/JSON; charset=utf-8")
+	cons := RequestConstraint{Body: map[string]interface{}{"foo": "bar"}}
+	if ok, reason := validateRequestReason(req, cons); !ok {
+		t.Fatalf("expected JSON constraint to pass regardless of content type case: %s", reason)
+	}
+}
+
+func TestValidateRequestReasonFormContentTypeCaseInsensitive(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "http://case/form", strings.NewReader("foo=bar"))
+	req.Header.Set("Content-Type", "Application/X-Www-Form-Urlencoded")
+	cons := RequestConstraint{Body: map[string]interface{}{"foo": "bar"}}
+	if ok, reason := validateRequestReason(req, cons); !ok {
+		t.Fatalf("expected form constraint to pass regardless of content type case: %s", reason)
+	}
+}

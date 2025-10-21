@@ -215,6 +215,18 @@ func TestConstraintMatchesRequestJSON(t *testing.T) {
 	}
 }
 
+func TestConstraintMatchesRequestJSONContentTypeCaseInsensitive(t *testing.T) {
+	body := `{"foo":"bar"}`
+	req := httptest.NewRequest(http.MethodPost, "http://json/path", strings.NewReader(body))
+	req.Header.Set("Content-Type", "Application/JSON; charset=utf-8")
+	cons := RequestConstraint{Body: map[string]interface{}{
+		"foo": "bar",
+	}}
+	if !constraintMatchesRequest(req, cons) {
+		t.Fatal("expected JSON body to match constraint regardless of content type case")
+	}
+}
+
 func TestConstraintMatchesRequestForm(t *testing.T) {
 	vals := url.Values{"a": {"1", "2"}, "b": {"x"}}
 	req := httptest.NewRequest(http.MethodPost, "http://form/path", strings.NewReader(vals.Encode()))
@@ -225,6 +237,18 @@ func TestConstraintMatchesRequestForm(t *testing.T) {
 	}}
 	if !constraintMatchesRequest(req, cons) {
 		t.Fatal("expected form body to match constraint")
+	}
+}
+
+func TestConstraintMatchesRequestFormContentTypeCaseInsensitive(t *testing.T) {
+	vals := url.Values{"foo": {"bar"}}
+	req := httptest.NewRequest(http.MethodPost, "http://form/path", strings.NewReader(vals.Encode()))
+	req.Header.Set("Content-Type", "Application/X-Www-Form-Urlencoded")
+	cons := RequestConstraint{Body: map[string]interface{}{
+		"foo": "bar",
+	}}
+	if !constraintMatchesRequest(req, cons) {
+		t.Fatal("expected form body to match constraint regardless of content type case")
 	}
 }
 
