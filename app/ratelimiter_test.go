@@ -43,6 +43,27 @@ func TestRateLimiterReset(t *testing.T) {
 	}
 }
 
+func TestRateLimiterFixedWindowRefreshesOnAllow(t *testing.T) {
+	rl := NewRateLimiter(1, time.Hour, "")
+	t.Cleanup(rl.Stop)
+	key := "caller"
+
+	if !rl.Allow(key) {
+		t.Fatal("initial call should be allowed")
+	}
+	if rl.Allow(key) {
+		t.Fatal("second call should be rejected before refresh")
+	}
+
+	rl.mu.Lock()
+	rl.resetTime = time.Now().Add(-2 * rl.window)
+	rl.mu.Unlock()
+
+	if !rl.Allow(key) {
+		t.Fatal("call should be allowed once window has elapsed")
+	}
+}
+
 func TestRateLimiterUnlimited(t *testing.T) {
 	rl := NewRateLimiter(0, time.Hour, "")
 	t.Cleanup(rl.Stop)
