@@ -149,6 +149,29 @@ func TestMatchDenylistWildcardCaller(t *testing.T) {
 	blocked, _ = matchDenylist(integ, "caller", reqNoQuery)
 	if blocked {
 		t.Fatal("expected denylist not to match without query parameter")
+  }
+}
+
+func TestMatchDenylistTrimsMethod(t *testing.T) {
+	resetDenylists()
+
+	if err := SetDenylist("deny", []DenylistCaller{{
+		ID: "caller",
+		Rules: []CallRule{{
+			Path: "/blocked",
+			Methods: map[string]RequestConstraint{
+				" get ": {},
+			},
+		}},
+	}}); err != nil {
+		t.Fatalf("failed to set denylist: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "http://deny/blocked", nil)
+	integ := &Integration{Name: "deny"}
+	blocked, _ := matchDenylist(integ, "caller", req)
+	if !blocked {
+		t.Fatal("expected denylist to match with trimmed method")
 	}
 }
 
