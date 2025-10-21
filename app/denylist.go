@@ -97,7 +97,7 @@ func SetDenylist(name string, callers []DenylistCaller) error {
 
 func GetDenylist(name string) []DenylistCaller {
 	denylists.RLock()
-	callers := denylists.m[name]
+	callers := denylists.m[strings.ToLower(name)]
 	res := make([]DenylistCaller, 0, len(callers))
 	for id, rules := range callers {
 		copyRules := make([]CallRule, len(rules))
@@ -112,7 +112,7 @@ func GetDenylist(name string) []DenylistCaller {
 
 func matchDenylist(i *Integration, callerID string, r *http.Request) (bool, string) {
 	denylists.RLock()
-	callers := denylists.m[i.Name]
+	callers := denylists.m[strings.ToLower(i.Name)]
 	denylists.RUnlock()
 	if len(callers) == 0 {
 		return false, ""
