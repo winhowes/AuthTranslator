@@ -9,3 +9,5 @@ data:
 {{ .Values.config | indent 4 }}
   allowlist.yaml: |-
 {{ .Values.allowlist | indent 4 }}
+  denylist.yaml: |-
+{{ .Values.denylist | indent 4 }}

@@ -19,7 +19,7 @@ helm upgrade --install authtranslator charts/authtranslator \
 This:
 
 * Creates a `Deployment` running **one replica** of AuthTranslator.
-* Mounts your `config.yaml` and `allowlist.yaml` via a `ConfigMap`.
+* Mounts your `config.yaml`, `allowlist.yaml`, and `denylist.yaml` via a `ConfigMap`.
 * Exposes port 8080 via a `ClusterIP` Service called `authtranslator`.
 
 ---
@@ -39,6 +39,7 @@ This:
 | `serviceAccountName` | `""`                            | Pod service account name. |
 | `config`           | *(string)*                        | Raw YAML for `config.yaml`.                                        |
 | `allowlist`        | *(string)*                        | Raw YAML for `allowlist.yaml`.                                     |
+| `denylist`         | *(string)*                        | Raw YAML for `denylist.yaml`.                                      |
 
 Full schema lives in [`charts/authtranslator/values.yaml`](../charts/authtranslator/values.yaml).
 
@@ -68,6 +69,17 @@ allowlist: |
         - id: demo
           capabilities:
             - name: post_as
+
+denylist: |
+  - integration: slack
+    callers:
+      - id: "*"
+        rules:
+          - path: /api/chat.postMessage
+            methods:
+              POST:
+                body:
+                  channel: forbidden-room
 
 ```
 

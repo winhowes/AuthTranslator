@@ -49,6 +49,9 @@ spec:
             - name: config
               mountPath: /conf/allowlist.yaml
               subPath: allowlist.yaml
+            - name: config
+              mountPath: /conf/denylist.yaml
+              subPath: denylist.yaml
           ports:
             - containerPort: 8080
               name: http

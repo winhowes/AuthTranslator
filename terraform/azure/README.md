@@ -18,6 +18,7 @@ Optional:
 - `redis_ca` – CA file for verifying Redis TLS
 - `config_path` – path to the configuration file inside the container
 - `allowlist_path` – path to the allowlist file inside the container
+- `denylist_path` – path to the denylist file inside the container
 
 ## Example
 

@@ -31,6 +31,31 @@ func TestLoadAllowlistsValid(t *testing.T) {
 	}
 }
 
+func TestLoadDenylistsValid(t *testing.T) {
+	tmp, err := os.CreateTemp("", "denylist*.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tmp.Name())
+
+	data := `[{"integration":"foo","callers":[{"id":"*","rules":[{"path":"/","methods":{"GET":{}}}]}]}]`
+	if _, err := tmp.Write([]byte(data)); err != nil {
+		t.Fatal(err)
+	}
+	tmp.Close()
+
+	dl, err := loadDenylists(tmp.Name())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(dl) != 1 || dl[0].Integration != "foo" {
+		t.Fatalf("unexpected denylist %+v", dl)
+	}
+	if len(dl[0].Callers) != 1 || len(dl[0].Callers[0].Rules) != 1 {
+		t.Fatalf("unexpected caller rules %+v", dl[0].Callers)
+	}
+}
+
 func TestParseLevel(t *testing.T) {
 	cases := map[string]slog.Level{
 		"debug": slog.LevelDebug,
@@ -89,6 +114,12 @@ func TestLoadAllowlistsMissingFile(t *testing.T) {
 	}
 }
 
+func TestLoadDenylistsMissingFile(t *testing.T) {
+	if _, err := loadDenylists("/no/such/file"); err == nil {
+		t.Fatal("expected error for missing file")
+	}
+}
+
 func TestLoadAllowlistsInvalidYAMLHandlers(t *testing.T) {
 	tmp, err := os.CreateTemp("", "al*.yaml")
 	if err != nil {
@@ -104,6 +135,21 @@ func TestLoadAllowlistsInvalidYAMLHandlers(t *testing.T) {
 	}
 }
 
+func TestLoadDenylistsInvalidYAMLHandlers(t *testing.T) {
+	tmp, err := os.CreateTemp("", "dl*.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	name := tmp.Name()
+	tmp.WriteString(":")
+	tmp.Close()
+	defer os.Remove(name)
+
+	if _, err := loadDenylists(name); err == nil {
+		t.Fatal("expected YAML parse error")
+	}
+}
+
 func TestLoadAllowlistsUnknownFieldHandlers(t *testing.T) {
 	tmp, err := os.CreateTemp("", "al*.yaml")
 	if err != nil {
@@ -115,6 +161,21 @@ func TestLoadAllowlistsUnknownFieldHandlers(t *testing.T) {
 	defer os.Remove(name)
 
 	if _, err := loadAllowlists(name); err == nil {
+		t.Fatal("expected unknown field error")
+	}
+}
+
+func TestLoadDenylistsUnknownFieldHandlers(t *testing.T) {
+	tmp, err := os.CreateTemp("", "dl*.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	name := tmp.Name()
+	tmp.WriteString(`[{"bogus":1}]`)
+	tmp.Close()
+	defer os.Remove(name)
+
+	if _, err := loadDenylists(name); err == nil {
 		t.Fatal("expected unknown field error")
 	}
 }

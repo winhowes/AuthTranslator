@@ -24,11 +24,12 @@ docker run --rm -p 8080:8080 \
   -v $(pwd)/examples:/conf \
   ghcr.io/winhowes/authtranslator:latest \
     -config /conf/config.yaml \
-    -allowlist /conf/allowlist.yaml
+    -allowlist /conf/allowlist.yaml \
+    -denylist /conf/denylist.yaml
 ```
 
-`config.yaml` defines which integrations are available, while
-`allowlist.yaml` controls which callers may use them.
+`config.yaml` defines which integrations are available, `allowlist.yaml` controls which callers may use them, and
+`denylist.yaml` lists requests that should always be rejected.
 
 When the service starts it prints its version and log level to standard output.
 
@@ -56,7 +57,8 @@ If you can’t modify the `Host` header, set an `X-AT-Int` header with the integ
 ```bash
 go run ./app \
   -config examples/config.yaml \
-  -allowlist examples/allowlist.yaml
+  -allowlist examples/allowlist.yaml \
+  -denylist examples/denylist.yaml
 ```
 
 Make sure `$SLACK_TOKEN` is still in your environment.
@@ -67,6 +69,7 @@ Make sure `$SLACK_TOKEN` is still in your environment.
 
 * **Integrations** live in `config.yaml`. Change the `destination` URL or swap the `outgoing_auth` plug‑in.
 * **Caller permissions** live in `allowlist.yaml`. Grant a different caller ID by editing or duplicating the YAML block.
+* **Request blocks** live in `denylist.yaml`. Add patterns that should return `403` before hitting the upstream.
 * The proxy hot‑reloads on **SIGHUP** or when started with `-watch`.
 
 Full schema details: [Configuration](configuration.md).

@@ -6,6 +6,7 @@ AuthTranslator loads up to **two** YAML (or pure‑JSON) documents at runtime:
 | ---------------- | --------- | ----------- | ---------------------------------------------------------------------------------- |
 | `config.yaml`    | ✅         | ✅           | Declares *integrations* – where to proxy traffic and how to authenticate outwards. |
 | `allowlist.yaml` | –          | ✅           | Grants each *caller ID* a set of capabilities **or** low‑level request filters.    |
+| `denylist.yaml`  | –          | ✅           | Blocks requests whose headers/query/body match predefined subsets for a path/method. |
 
 If no allowlist is provided, every request is permitted once inbound authentication succeeds.
 Running without an allowlist effectively gives all authenticated callers unrestricted access, so supplying `allowlist.yaml` is **strongly recommended** even if it just contains a single wildcard entry to start.
@@ -141,11 +142,49 @@ Regular expressions are not supported.
 | `methods.<name>.headers` | map[string][]string | Header names and required values. Empty list checks only presence. |
 | `methods.<name>.body` | map[string]interface{} | Recursive subset of the request body (JSON or form). Arrays matched unordered. The proxy inspects `Content-Type`; unknown types skip body checks. |
 
+---
+
+## 3  `denylist.yaml` – request blockers
+
+Denylists complement allowlists by describing requests that must never be forwarded. Each entry targets an integration and groups `CallRule` objects (the same schema as allowlist rules) per caller ID—just like the allowlist. Provide specific IDs for callers you want to block or use `"*"`/omit the field for a wildcard block. If **any** rule matches a request for that caller, the proxy immediately returns **403 Forbidden**.
+
+```yaml
+- integration: example
+  callers:
+    - id: employee-app
+      rules:
+        - path: /search
+          methods:
+            GET:
+              query:
+                q: ["blocked term"]
+    - id: "*"
+      rules:
+        - path: /api/chat.postMessage
+          methods:
+            POST:
+              headers:
+                X-Feature-Flag: [disabled]
+              body:
+                channel: forbidden-room
+```
+
+* Only the provided fields must match; extra headers/query/body keys are ignored.
+* JSON/form bodies are parsed using `Content-Type`. Unknown types cause the rule to be skipped (no deny).
+* Duplicate path/method combinations fail validation during reload, mirroring the allowlist behaviour.
+
+### Top‑level keys
+
+| Field         | Type               | Notes                                                                       |
+| ------------- | ------------------ | ---------------------------------------------------------------------------- |
+| `integration` | string             | Integration name (case-insensitive).                                        |
+| `callers`     | array of callers   | Per-caller deny rules. Omit `id` or set to `"*"` for a wildcard entry.      |
+
 > **Performance note** Low‑level matching adds negligible latency (<50 µs at 10 rules). Tune rule ordering so the most frequent match comes first.
 
 ---
 
-## 3  Validating configs in CI
+## 4  Validating configs in CI
 
 ### With JSON‑Schema
 
@@ -160,13 +199,14 @@ A sample `Makefile` target:
 validate:
         @yq eval -o=json config.yaml | jsonschema -i - schemas/config.schema.json
         @yq eval -o=json allowlist.yaml | jsonschema -i - schemas/allowlist.schema.json
+        @yq eval -o=json denylist.yaml | jsonschema -i - schemas/denylist.schema.json
 ```
 
 CI fails fast on typos so you never ship an invalid proxy.
 
 ---
 
-## 4  Further reading
+## 5  Further reading
 
 * [Auth Plugins](auth-plugins.md)
 * [Secret Back-Ends](secret-backends.md)

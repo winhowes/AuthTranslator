@@ -16,9 +16,9 @@ No. Incoming plugins validate or inspect the token, derive a **caller ID**, the
 
 ---
 
-### 3 What’s the difference between `config.yaml` and `allowlist.yaml`?
+### 3 What’s the difference between `config.yaml`, `allowlist.yaml`, and `denylist.yaml`?
 
-`config.yaml` defines **integrations** (destination URL, outgoing auth plug‑in, rate‑limit window). `allowlist.yaml` maps **caller IDs** to the specific paths/methods—or higher‑level *capabilities*—they may access.
+`config.yaml` defines **integrations** (destination URL, outgoing auth plug‑in, rate‑limit window). `allowlist.yaml` maps **caller IDs** to the specific paths/methods—or higher‑level *capabilities*—they may access. `denylist.yaml` specifies request patterns that should always be rejected (even if the allowlist would otherwise permit them).
 
 ---
 
@@ -30,7 +30,7 @@ Either:
 kill -s SIGHUP <pid>
 ```
 
-—or—start the proxy with `-watch` so it automatically reloads when the config or allowlist files change.
+—or—start the proxy with `-watch` so it automatically reloads when the config, allowlist, or denylist files change.
 
 ---
 

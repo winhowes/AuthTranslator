@@ -27,6 +27,7 @@ services:
     command: |
       -config /conf/config.yaml \
       -allowlist /conf/allowlist.yaml \
+      -denylist /conf/denylist.yaml \
       -redis-addr redis://redis:6379/0 \
       -watch                       # reload on file change
     depends_on:
@@ -50,7 +51,8 @@ volumes:
 ```
 conf/
   ├── config.yaml      # integrations
-  └── allowlist.yaml   # caller permissions
+  ├── allowlist.yaml   # caller permissions
+  └── denylist.yaml    # hard blocks
 docker-compose.yml
 ```
 
