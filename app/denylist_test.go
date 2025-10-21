@@ -7,6 +7,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	authplugins "github.com/winhowes/AuthTranslator/app/auth"
 )
 
 func resetDenylists() {
@@ -52,6 +54,69 @@ func TestSetDenylistDuplicateCaller(t *testing.T) {
 
 	if err := SetDenylist("dup", callers); err == nil {
 		t.Fatal("expected duplicate caller error")
+	}
+}
+
+func TestSetDenylistRejectsInvalidRules(t *testing.T) {
+	tests := []struct {
+		name    string
+		callers []DenylistCaller
+		wantErr string
+	}{
+		{
+			name: "MissingPath",
+			callers: []DenylistCaller{{
+				ID: "", // normalized to *
+				Rules: []CallRule{{
+					Path:    "",
+					Methods: map[string]RequestConstraint{"GET": {}},
+				}},
+			}},
+			wantErr: "missing path",
+		},
+		{
+			name: "MissingMethods",
+			callers: []DenylistCaller{{
+				ID: "caller",
+				Rules: []CallRule{{
+					Path:    "/no-methods",
+					Methods: nil,
+				}},
+			}},
+			wantErr: "has no methods",
+		},
+		{
+			name: "BlankMethod",
+			callers: []DenylistCaller{{
+				ID: "caller",
+				Rules: []CallRule{{
+					Path:    "/blank",
+					Methods: map[string]RequestConstraint{"   ": {}},
+				}},
+			}},
+			wantErr: "invalid method",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resetDenylists()
+
+			err := SetDenylist("invalid", tt.callers)
+			if err == nil {
+				t.Fatalf("expected error for %s", tt.name)
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("expected error to contain %q, got %v", tt.wantErr, err)
+			}
+
+			denylists.RLock()
+			_, ok := denylists.m["invalid"]
+			denylists.RUnlock()
+			if ok {
+				t.Fatal("denylist should not be stored on validation error")
+			}
+		})
 	}
 }
 
@@ -155,6 +220,79 @@ func TestMatchDenylistWildcardCaller(t *testing.T) {
 	}
 }
 
+func TestMatchDenylistCallerPrecedence(t *testing.T) {
+	resetDenylists()
+
+	if err := SetDenylist("deny", []DenylistCaller{
+		{
+			ID: "caller",
+			Rules: []CallRule{{
+				Path: "/only",
+				Methods: map[string]RequestConstraint{
+					"GET": {Headers: map[string][]string{"X-Mode": {"strict"}}},
+				},
+			}},
+		},
+		{
+			ID: "*",
+			Rules: []CallRule{{
+				Path: "/fallback",
+				Methods: map[string]RequestConstraint{
+					"POST": {},
+				},
+			}},
+		},
+	}); err != nil {
+		t.Fatalf("failed to set denylist: %v", err)
+	}
+
+	integ := &Integration{Name: "deny"}
+
+	req := httptest.NewRequest(http.MethodGet, "http://deny/only", nil)
+	req.Header.Set("X-Mode", "strict")
+	blocked, reason := matchDenylist(integ, "caller", req)
+	if !blocked {
+		t.Fatal("expected denylist to match specific caller rule")
+	}
+	if strings.Contains(reason, "caller *") {
+		t.Fatalf("expected specific caller reason, got %q", reason)
+	}
+
+	req2 := httptest.NewRequest(http.MethodPost, "http://deny/fallback", nil)
+	blocked, reason = matchDenylist(integ, "caller", req2)
+	if !blocked {
+		t.Fatal("expected denylist to fall back to wildcard caller")
+	}
+	if !strings.Contains(reason, "caller * POST /fallback") {
+		t.Fatalf("unexpected reason for wildcard match: %q", reason)
+	}
+}
+
+func TestMatchDenylistEmptyCallerUsesWildcard(t *testing.T) {
+	resetDenylists()
+
+	if err := SetDenylist("deny", []DenylistCaller{{
+		ID: "",
+		Rules: []CallRule{{
+			Path: "/path",
+			Methods: map[string]RequestConstraint{
+				"GET": {},
+			},
+		}},
+	}}); err != nil {
+		t.Fatalf("failed to set denylist: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "http://deny/path", nil)
+	blocked, reason := matchDenylist(&Integration{Name: "deny"}, "", req)
+	if !blocked {
+		t.Fatal("expected denylist to match empty caller using wildcard")
+	}
+	if !strings.Contains(reason, "caller * GET /path") {
+		t.Fatalf("unexpected reason: %q", reason)
+	}
+}
+
 func TestMatchDenylistTrimsMethod(t *testing.T) {
 	resetDenylists()
 
@@ -234,6 +372,20 @@ func TestConstraintMatchesRequestUnsupportedBody(t *testing.T) {
 	cons := RequestConstraint{Body: map[string]interface{}{"plain": "text"}}
 	if constraintMatchesRequest(req, cons) {
 		t.Fatal("expected unsupported content type not to match")
+	}
+}
+
+func TestConstraintMatchesRequestBodyReadError(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "http://limit/path", strings.NewReader("{\"foo\":\"bar\"}"))
+	req.Header.Set("Content-Type", "application/json")
+	cons := RequestConstraint{Body: map[string]interface{}{"foo": "bar"}}
+
+	oldMax := authplugins.MaxBodySize
+	authplugins.MaxBodySize = 1
+	defer func() { authplugins.MaxBodySize = oldMax }()
+
+	if constraintMatchesRequest(req, cons) {
+		t.Fatal("expected body read error to prevent match")
 	}
 }
 
