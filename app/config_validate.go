@@ -3,12 +3,9 @@ package main
 import (
 	"fmt"
 	"net/url"
-	"regexp"
 	"strings"
 	"time"
 )
-
-var configNameRegexp = regexp.MustCompile(`^[a-zA-Z0-9-]+$`)
 
 // validateConfig ensures the Config contains sane values before use.
 func validateConfig(c *Config) error {
@@ -19,7 +16,7 @@ func validateConfig(c *Config) error {
 			return fmt.Errorf("integration at index %d missing name", idx)
 		}
 		lower := strings.ToLower(i.Name)
-		if !configNameRegexp.MatchString(lower) {
+		if !nameRegexp.MatchString(lower) {
 			return fmt.Errorf("integration %s has invalid name", i.Name)
 		}
 		if _, dup := names[lower]; dup {

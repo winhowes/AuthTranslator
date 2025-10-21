@@ -119,3 +119,10 @@ func TestValidateConfigGoodRateLimitStrategy(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateConfigAllowsDotsAndUnderscores(t *testing.T) {
+	c := Config{Integrations: []Integration{{Name: "with.dot_and-name", Destination: "http://ex"}}}
+	if err := validateConfig(&c); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
