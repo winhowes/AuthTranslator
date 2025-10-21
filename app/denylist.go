@@ -207,7 +207,7 @@ func constraintMatchesRequest(r *http.Request, c RequestConstraint) bool {
 	if err != nil {
 		return false
 	}
-	ct := r.Header.Get("Content-Type")
+	ct := strings.ToLower(r.Header.Get("Content-Type"))
 	switch {
 	case strings.Contains(ct, "application/json"):
 		var data map[string]interface{}
