@@ -13,6 +13,10 @@ import (
 	"time"
 )
 
+// statusKeySeparator joins the integration name and HTTP status code when
+// storing upstream counters in expvar. We intentionally pick a character that
+// integrations cannot contain so parsing during Prometheus export stays
+// unambiguous even after allowing dots and underscores in names.
 const statusKeySeparator = "|"
 
 var (
