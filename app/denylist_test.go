@@ -62,6 +62,29 @@ func TestMatchDenylist(t *testing.T) {
 	}
 }
 
+func TestMatchDenylistTrimsMethod(t *testing.T) {
+	resetDenylists()
+
+	if err := SetDenylist("deny", []DenylistCaller{{
+		ID: "caller",
+		Rules: []CallRule{{
+			Path: "/blocked",
+			Methods: map[string]RequestConstraint{
+				" get ": {},
+			},
+		}},
+	}}); err != nil {
+		t.Fatalf("failed to set denylist: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "http://deny/blocked", nil)
+	integ := &Integration{Name: "deny"}
+	blocked, _ := matchDenylist(integ, "caller", req)
+	if !blocked {
+		t.Fatal("expected denylist to match with trimmed method")
+	}
+}
+
 func TestConstraintMatchesRequestJSON(t *testing.T) {
 	body := `{"foo":{"bar":"baz","extra":1},"tags":["a","b"]}`
 	req := httptest.NewRequest(http.MethodPost, "http://json/path", strings.NewReader(body))

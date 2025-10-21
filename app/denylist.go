@@ -80,7 +80,8 @@ func SetDenylist(name string, callers []DenylistCaller) error {
 			r.Segments = splitPath(r.Path)
 			methods := make(map[string]RequestConstraint, len(r.Methods))
 			for method, cons := range r.Methods {
-				methods[strings.ToUpper(method)] = cons
+				cleaned := strings.ToUpper(strings.TrimSpace(method))
+				methods[cleaned] = cons
 			}
 			r.Methods = methods
 			rules[i] = r
