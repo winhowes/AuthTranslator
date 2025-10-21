@@ -37,3 +37,9 @@ variable "allowlist_path" {
   default     = "allowlist.yaml"
 }
 
+variable "denylist_path" {
+  description = "Path to the denylist file inside the container"
+  type        = string
+  default     = "denylist.yaml"
+}
+

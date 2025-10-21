@@ -13,7 +13,7 @@ This guide explains how AuthTranslator behaves at runtime and lists the service 
 
 ## Hot reload
 
-Send `SIGHUP` or run with `-watch` to reload the configuration and allowlist files without dropping connections. The watcher re-adds itself when files are replaced so edits trigger a reload automatically. Remote configuration URLs are fetched with a 10&nbsp;second HTTP timeout.
+Send `SIGHUP` or run with `-watch` to reload the configuration, allowlist, and denylist files without dropping connections. The watcher re-adds itself when files are replaced so edits trigger a reload automatically. Remote configuration URLs are fetched with a 10&nbsp;second HTTP timeout.
 
 ---
 
@@ -35,6 +35,8 @@ AuthTranslator exposes several command‑line options:
 | `-config-url` | URL for a remote configuration file |
 | `-allowlist` | path to the allowlist file (`allowlist.yaml` by default) |
 | `-allowlist-url` | URL for a remote allowlist file |
+| `-denylist` | path to the denylist file (`denylist.yaml` by default) |
+| `-denylist-url` | URL for a remote denylist file |
 | `-disable_x_at_int` | ignore the `X-AT-Int` header |
 | `-x_at_int_host` | only respect `X-AT-Int` when this host is requested |
 | `-tls-cert` and `-tls-key` | TLS certificate and key to serve HTTPS |
@@ -48,7 +50,7 @@ AuthTranslator exposes several command‑line options:
 | `-log-level` | log verbosity (`DEBUG`, `INFO`, `WARN`, `ERROR`) |
 | `-log-format` | log output format (`text` or `json`) |
 | `-version` | print the build version and exit |
-| `-watch` | automatically reload when config or allowlist files change |
+| `-watch` | automatically reload when config, allowlist, or denylist files change |
 | `-enable-metrics` | expose the `/_at_internal/metrics` endpoint (default `true`) |
 | `-enable-http3` | serve HTTP/3 in addition to HTTP/1 and HTTP/2 (requires `-tls-cert` and `-tls-key`) |
 | `-metrics-user` | username required to access `/_at_internal/metrics` (must be used with `-metrics-pass`) |

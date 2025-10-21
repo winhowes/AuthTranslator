@@ -1,0 +1,9 @@
+- integration: slack
+  callers:
+    - id: "*"
+      rules:
+        - path: /api/chat.postMessage
+          methods:
+            POST:
+              body:
+                channel: bad-channel

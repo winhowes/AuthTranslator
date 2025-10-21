@@ -50,3 +50,13 @@ allowlist: |
               GET:
                 query:
                   q: ["example"]
+denylist: |
+  - integration: example
+    callers:
+      - id: "*"
+        rules:
+          - path: /search
+            methods:
+              GET:
+                query:
+                  q: ["blocked"]

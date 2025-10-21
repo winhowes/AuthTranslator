@@ -14,6 +14,7 @@ services:
     command: |
       -config /conf/config.yaml \
       -allowlist /conf/allowlist.yaml \
+      -denylist /conf/denylist.yaml \
       -redis-addr redis://redis:6379/0 \
       -watch                       # reload on file change
     depends_on:

@@ -17,8 +17,9 @@ This chart deploys [AuthTranslator](https://github.com/winhowes/AuthTranslator) 
 | `serviceAccountName` | Pod service account | `""` |
 | `config` | Contents of `config.yaml` stored in a ConfigMap | sample configuration |
 | `allowlist` | Contents of `allowlist.yaml` stored in a ConfigMap | sample allowlist |
+| `denylist` | Contents of `denylist.yaml` stored in a ConfigMap | sample denylist |
 
-The configuration and allowlist values are written to a ConfigMap that is mounted into the container at `/conf/config.yaml` and `/conf/allowlist.yaml`.
+The configuration, allowlist, and denylist values are written to a ConfigMap that is mounted into the container at `/conf/config.yaml`, `/conf/allowlist.yaml`, and `/conf/denylist.yaml`.
 
 ## Installing
 

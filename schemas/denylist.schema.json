@@ -1,0 +1,63 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "array",
+  "items": { "$ref": "#/definitions/entry" },
+  "definitions": {
+    "entry": {
+      "type": "object",
+      "required": ["integration", "callers"],
+      "properties": {
+        "integration": { "type": "string" },
+        "callers": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/caller" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "caller": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "rules": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/rule" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "rule": {
+      "type": "object",
+      "required": ["path", "methods"],
+      "properties": {
+        "path": { "type": "string" },
+        "methods": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/definitions/requestConstraint" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "requestConstraint": {
+      "type": "object",
+      "properties": {
+        "headers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "query": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "body": { "type": "object" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -29,11 +29,11 @@ docker run --rm -p 8080:8080 \
   -e SLACK_TOKEN=demo-token \
   -v $(pwd)/examples:/conf \
   ghcr.io/winhowes/authtranslator:latest \
-    -config /conf/config.yaml -allowlist /conf/allowlist.yaml
+    -config /conf/config.yaml -allowlist /conf/allowlist.yaml -denylist /conf/denylist.yaml
 ```
 Or run from source:
 ```bash
-go run ./app -config examples/config.yaml -allowlist examples/allowlist.yaml
+go run ./app -config examples/config.yaml -allowlist examples/allowlist.yaml -denylist examples/denylist.yaml
 ```
 2. Curl through the proxy
 ```bash
@@ -72,6 +72,7 @@ AuthTranslator eats **YAML** (or pure JSON) for two files:
 | ---------------- | ----------------------------------------------------------------------------------------------------- |
 | `config.yaml`    | Declares **integrations** – upstream URL, outgoing auth plug‑in, transport tweaks, rate‑limit window. |
 | `allowlist.yaml` | Grants each **caller ID** specific HTTP paths/methods **or** named **capabilities**.                  |
+| `denylist.yaml`  | Blocks requests per caller when **any** deny rule’s constraint subset matches a path/method.          |
 
 Example snippets live under [`examples/`](examples/) and a full JSON‑Schema is in [`schemas/`](schemas/) – CI fails if you drift.
 

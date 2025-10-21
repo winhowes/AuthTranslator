@@ -33,7 +33,8 @@ resource "azurerm_container_group" "this" {
     command = concat([
       "./authtranslator",
       "-config", var.config_path,
-      "-allowlist", var.allowlist_path
+      "-allowlist", var.allowlist_path,
+      "-denylist", var.denylist_path
       ],
       var.redis_address != "" ? ["-redis-addr", var.redis_address] : [],
       var.redis_ca != "" ? ["-redis-ca", var.redis_ca] : [])

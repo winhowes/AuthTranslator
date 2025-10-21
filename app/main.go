@@ -47,6 +47,16 @@ type AllowlistEntry struct {
 	Callers     []CallerConfig `json:"callers" yaml:"callers"`
 }
 
+type DenylistEntry struct {
+	Integration string           `json:"integration" yaml:"integration"`
+	Callers     []DenylistCaller `json:"callers" yaml:"callers"`
+}
+
+type DenylistCaller struct {
+	ID    string     `json:"id" yaml:"id"`
+	Rules []CallRule `json:"rules" yaml:"rules,omitempty"`
+}
+
 type Config struct {
 	Integrations []Integration `json:"integrations" yaml:"integrations"`
 }
@@ -72,12 +82,35 @@ func loadAllowlists(filename string) ([]AllowlistEntry, error) {
 	return entries, nil
 }
 
+func loadDenylists(filename string) ([]DenylistEntry, error) {
+	f, err := openSource(filename)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	dec := yaml.NewDecoder(f)
+	dec.KnownFields(true)
+
+	var entries []DenylistEntry
+	if err := dec.Decode(&entries); err != nil {
+		if errors.Is(err, io.EOF) {
+			return entries, nil
+		}
+		return nil, err
+	}
+
+	return entries, nil
+}
+
 var disableXATInt = flag.Bool("disable_x_at_int", false, "ignore X-AT-Int header for routing")
 var xAtIntHost = flag.String("x_at_int_host", "", "only respect X-AT-Int header when request Host matches this value")
 var addr = flag.String("addr", ":8080", "listen address")
 var allowlistFile = flag.String("allowlist", "allowlist.yaml", "path to allowlist configuration")
 var configFile = flag.String("config", "config.yaml", "path to configuration file")
 var allowlistURL = flag.String("allowlist-url", "", "URL to remote allowlist file")
+var denylistFile = flag.String("denylist", "denylist.yaml", "path to denylist configuration")
+var denylistURL = flag.String("denylist-url", "", "URL to remote denylist file")
 var configURL = flag.String("config-url", "", "URL to remote configuration file")
 var tlsCert = flag.String("tls-cert", "", "path to TLS certificate")
 var tlsKey = flag.String("tls-key", "", "path to TLS key")
@@ -91,7 +124,7 @@ var secretRefresh = flag.Duration("secret-refresh", 0, "refresh interval for cac
 var readTimeout = flag.Duration("read-timeout", 0, "HTTP server read timeout")
 var writeTimeout = flag.Duration("write-timeout", 0, "HTTP server write timeout")
 var showVersion = flag.Bool("version", false, "print version and exit")
-var watch = flag.Bool("watch", false, "watch config and allowlist files for changes")
+var watch = flag.Bool("watch", false, "watch config, allowlist, and denylist files for changes")
 var metricsUser = flag.String("metrics-user", "", "username for metrics endpoint")
 var metricsPass = flag.String("metrics-pass", "", "password for metrics endpoint")
 var enableMetrics = flag.Bool("enable-metrics", true, "expose /metrics endpoint")
@@ -105,6 +138,10 @@ var httpClient = &http.Client{Timeout: 10 * time.Second}
 // setAllowlist is used by reload to register caller allowlists. It is declared
 // as a variable so tests can override it.
 var setAllowlist = SetAllowlist
+
+// setDenylist is used by reload to register integration denylists. It is declared
+// as a variable so tests can override it.
+var setDenylist = SetDenylist
 
 func usage() {
 	fmt.Fprintf(flag.CommandLine.Output(), "Usage: authtranslator [options]\n\n")
@@ -271,6 +308,42 @@ func reload() error {
 				allowlists.m = old
 				allowlists.Unlock()
 				return fmt.Errorf("failed to load allowlist for %s: %w", al.Integration, err)
+			}
+		}
+	}
+
+	dlSrc := *denylistFile
+	if *denylistURL != "" {
+		dlSrc = *denylistURL
+	}
+	drules, err := loadDenylists(dlSrc)
+	denylists.RLock()
+	oldDeny := denylists.m
+	denylists.RUnlock()
+	if err != nil {
+		if os.IsNotExist(err) {
+			logger.Warn("denylist file missing; keeping existing entries", "file", dlSrc)
+		} else {
+			logger.Error("failed to load denylist; keeping existing entries", "error", err)
+		}
+	} else {
+		if err := validateDenylistEntries(drules); err != nil {
+			denylists.Lock()
+			denylists.m = oldDeny
+			denylists.Unlock()
+			return fmt.Errorf("invalid denylist: %w", err)
+		}
+
+		denylists.Lock()
+		denylists.m = make(map[string]map[string][]CallRule)
+		denylists.Unlock()
+
+		for _, dl := range drules {
+			if err := setDenylist(dl.Integration, dl.Callers); err != nil {
+				denylists.Lock()
+				denylists.m = oldDeny
+				denylists.Unlock()
+				return fmt.Errorf("failed to load denylist for %s: %w", dl.Integration, err)
 			}
 		}
 	}
@@ -1097,6 +1170,15 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if blocked, reason := matchDenylist(integ, callerID, r); blocked {
+		logger.Warn("request denied by denylist", "integration", integ.Name, "caller_id", callerID, "reason", reason)
+		w.Header().Set("X-AT-Error-Reason", reason)
+		w.Header().Set("X-AT-Upstream-Error", "false")
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		http.Error(w, fmt.Sprintf("Forbidden: %s", reason), http.StatusForbidden)
+		return
+	}
+
 	callers := GetAllowlist(integ.Name)
 	if len(callers) > 0 {
 		cons, ok := findConstraint(integ, callerID, r.URL.Path, r.Method)
@@ -1235,12 +1317,15 @@ func main() {
 
 	var cancelWatch context.CancelFunc
 	if *watch {
-		files := make([]string, 0, 2)
+		files := make([]string, 0, 3)
 		if *configURL == "" && !isRemote(*configFile) {
 			files = append(files, *configFile)
 		}
 		if *allowlistURL == "" && !isRemote(*allowlistFile) {
 			files = append(files, *allowlistFile)
+		}
+		if *denylistURL == "" && !isRemote(*denylistFile) {
+			files = append(files, *denylistFile)
 		}
 		if len(files) > 0 {
 			var watchCtx context.Context

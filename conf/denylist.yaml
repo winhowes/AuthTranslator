@@ -1,0 +1,9 @@
+- integration: example
+  callers:
+    - id: "*"
+      rules:
+        - path: /search
+          methods:
+            GET:
+              query:
+                q: ["blocked"]

@@ -11,6 +11,10 @@ import (
 )
 
 func TestProxyHandlerPrefersHeader(t *testing.T) {
+	denylists.Lock()
+	denylists.m = make(map[string]map[string][]CallRule)
+	denylists.Unlock()
+
 	srvHeaderHit := false
 	srvHeader := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		srvHeaderHit = true
@@ -62,6 +66,10 @@ func TestProxyHandlerPrefersHeader(t *testing.T) {
 }
 
 func TestProxyHandlerUsesHost(t *testing.T) {
+	denylists.Lock()
+	denylists.m = make(map[string]map[string][]CallRule)
+	denylists.Unlock()
+
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusAccepted)
 	}))
@@ -88,6 +96,10 @@ func TestProxyHandlerUsesHost(t *testing.T) {
 }
 
 func TestProxyHandlerHostCaseInsensitive(t *testing.T) {
+	denylists.Lock()
+	denylists.m = make(map[string]map[string][]CallRule)
+	denylists.Unlock()
+
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusAccepted)
 	}))
@@ -114,6 +126,10 @@ func TestProxyHandlerHostCaseInsensitive(t *testing.T) {
 }
 
 func TestProxyHandlerDisableXAtInt(t *testing.T) {
+	denylists.Lock()
+	denylists.m = make(map[string]map[string][]CallRule)
+	denylists.Unlock()
+
 	*disableXATInt = true
 	defer func() { *disableXATInt = false }()
 
@@ -161,6 +177,55 @@ func TestProxyHandlerDisableXAtInt(t *testing.T) {
 	}
 	if rr.Code != http.StatusAccepted {
 		t.Fatalf("expected status from host integration, got %d", rr.Code)
+	}
+}
+
+func TestProxyHandlerDenylistBlocks(t *testing.T) {
+	denylists.Lock()
+	denylists.m = make(map[string]map[string][]CallRule)
+	denylists.Unlock()
+
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusCreated)
+	}))
+	defer backend.Close()
+
+	integ := Integration{Name: "deny", Destination: backend.URL, InRateLimit: 0, OutRateLimit: 0}
+	if err := AddIntegration(&integ); err != nil {
+		t.Fatalf("failed to add integration: %v", err)
+	}
+	t.Cleanup(func() {
+		integ.inLimiter.Stop()
+		integ.outLimiter.Stop()
+	})
+
+	if err := SetDenylist("deny", []DenylistCaller{{
+		ID: "*",
+		Rules: []CallRule{{
+			Path: "/blocked",
+			Methods: map[string]RequestConstraint{
+				"GET": {Headers: map[string][]string{"X-Block": {"yes"}}},
+			},
+		}},
+	}}); err != nil {
+		t.Fatalf("failed to set denylist: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "http://deny/blocked", nil)
+	req.Host = "deny"
+	req.Header.Set("X-Block", "yes")
+	rr := httptest.NewRecorder()
+	proxyHandler(rr, req)
+	if rr.Code != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d", rr.Code)
+	}
+
+	req2 := httptest.NewRequest(http.MethodGet, "http://deny/other", nil)
+	req2.Host = "deny"
+	rr2 := httptest.NewRecorder()
+	proxyHandler(rr2, req2)
+	if rr2.Code != http.StatusCreated {
+		t.Fatalf("expected upstream status, got %d", rr2.Code)
 	}
 }
 

@@ -6,6 +6,7 @@ This folder holds **runnable snippets** you can copy‑paste while reading the d
 | ---------------- | -------------------------------------------------------------------------------- |
 | `config.yaml`    | Defines one Slack integration (destination, outgoing auth, 1‑minute rate‑limit). |
 | `allowlist.yaml` | Grants caller `demo-user` the `post_as` capability.              |
+| `denylist.yaml`  | Blocks Slack posts to the sample `bad-channel`.                  |
 
 ## Quick try‑out
 
@@ -14,7 +15,8 @@ This folder holds **runnable snippets** you can copy‑paste while reading the d
 
 go run ./app \
   -config    examples/config.yaml \
-  -allowlist examples/allowlist.yaml
+  -allowlist examples/allowlist.yaml \
+  -denylist  examples/denylist.yaml
 
 # Smoke‑test it’s alive
 curl http://localhost:8080/_at_internal/healthz
