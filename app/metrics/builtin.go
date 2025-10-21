@@ -13,6 +13,8 @@ import (
 	"time"
 )
 
+const statusKeySeparator = "|"
+
 var (
 	requestCounts        = expvar.NewMap("authtranslator_requests_total")
 	rateLimitCounts      = expvar.NewMap("authtranslator_rate_limit_events_total")
@@ -107,7 +109,7 @@ func IncAuthFailure(integration string) { authFailureCounts.Add(integration, 1) 
 
 // RecordStatus records the upstream status code for the integration.
 func RecordStatus(integration string, status int) {
-	key := fmt.Sprintf("%s_%d", integration, status)
+	key := fmt.Sprintf("%s%s%d", integration, statusKeySeparator, status)
 	upstreamStatusCounts.Add(key, 1)
 }
 
@@ -142,7 +144,7 @@ func WriteProm(w http.ResponseWriter) {
 		fmt.Fprintf(w, "authtranslator_auth_failures_total{integration=%q} %s\n", kv.Key, kv.Value.String())
 	})
 	upstreamStatusCounts.Do(func(kv expvar.KeyValue) {
-		parts := strings.SplitN(kv.Key, "_", 2)
+		parts := strings.SplitN(kv.Key, statusKeySeparator, 2)
 		if len(parts) != 2 {
 			return
 		}
