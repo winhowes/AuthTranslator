@@ -6,7 +6,7 @@ The **denylist** answers another narrow question:
 
 It lives beside `config.yaml` and `allowlist.yaml`, is hot‑reloaded, and is entirely optional. In day‑to‑day operation you should
 prefer shaping access through the [allowlist](allowlist-config.md); the denylist is best reserved for defensive blocks (for
-example, temporarily disabling tool calls in the OpenAI Responses API or stopping a newly discovered attack vector). Both files can be used in tandem: a
+example, temporarily disabling tool calls in the OpenAI Responses API). Both files can be used in tandem: a
 request must first be permitted by the allowlist and then **avoid matching** any deny rules.
 
 ---
@@ -56,7 +56,7 @@ strict:
 
 * **Path and method must match first.** Paths are anchored and support `*` (single segment) and `**` (remainder) wildcards.
 * **Every listed constraint must be present.** Headers, query parameters, and body fragments are all ANDed together. If a rule
-  references both a query parameter and a header, **both must be present with one of the listed values** for the rule to fire.
+  references both a query parameter and a header, for example, **both must be present with one of the listed values** for the rule to fire.
 * **Value comparisons are exact string matches.** There is no regex or partial matching.
 * **Bodies require a supported content type.** JSON and form bodies are parsed; other types skip matching and the rule will not
   apply.
