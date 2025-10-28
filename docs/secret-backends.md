@@ -20,7 +20,7 @@ outgoing_auth:
 | Scheme           | Example URI                                                         | When to use it                                                |
 | ---------------- | ------------------------------------------------------------------- | ------------------------------------------------------------- |
 | `env`            | `env:SLACK_TOKEN`                                                   | Local dev & CI – the token sits in an env var.                |
-| `file`           | `file:///etc/secrets/slack_token`                                   | Kubernetes **secret volume** or Docker bind‑mount.            |
+| `file`           | `file:///etc/secrets/slack_token`                                   | Kubernetes **secret volume** or Docker bind‑mount. Append `:KEY` to read key/value files; omit it to load the entire file. |
 | `k8s`            | `k8s:default/mysecret#token`         | In‑cluster secret via the Kubernetes API.                     |
 | `gcp`            | `gcp:projects/acme/locations/global/keyRings/auth/cryptoKeys/token:ciphertext` | Running on GKE / Cloud Run; decrypt via **Cloud KMS**. |
 | `aws`            | `aws:Ci0KU29tZUNpcGhlcnRleHQ=` | AES‑GCM encrypted values decrypted using `AWS_KMS_KEY`. |
@@ -36,12 +36,20 @@ Some schemes rely on environment variables for authentication or decryption:
 | Prefix | Environment Variables | Description | Example |
 | ------ | -------------------- | ----------- | ------- |
 | `env`  | Names referenced in the configuration (e.g. `env:IN_TOKEN`) | Secrets are read directly from those variables. | `env:IN_TOKEN` resolves to `$IN_TOKEN` |
-| `file` | _none_ | Reads file contents from disk for `file:` secrets. | `file:/etc/token` reads `/etc/token` |
+| `file` | _none_ | Reads file contents from disk for `file:` secrets. Append `:KEY` to select entries from `KEY=value` files; omit it to load the whole file. | `file:/etc/secrets.env:SLACK_SECRET` |
 | `k8s` | `KUBERNETES_SERVICE_HOST`, `KUBERNETES_SERVICE_PORT` | Provided by Kubernetes; used with the in-cluster service account. | `k8s:default/mysecret#token` |
 | `aws` | `AWS_KMS_KEY` | Base64 encoded 32 byte key for decrypting `aws:` secrets. | `aws:Ci0KU29tZUNpcGhlcnRleHQ=` |
 | `azure` | `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET` | Credentials for fetching `azure:` secrets from Key Vault. | `azure:https://kv-name.vault.azure.net/secrets/token` |
 | `gcp` | _none_ | Uses the GCP metadata service when resolving `gcp:` secrets. | `gcp:projects/p/locations/l/keyRings/r/cryptoKeys/k:cipher` |
 | `vault` | `VAULT_ADDR`, `VAULT_TOKEN` | Fetches secrets from HashiCorp Vault via its HTTP API. | `vault:secret/data/api` reads from Vault |
+
+For `file:` URIs that use the `:KEY` suffix, AuthTranslator treats the file as a simple `KEY=value` list:
+
+* Only the first `=` acts as the delimiter for each entry.
+* Blank lines and lines starting with `#` are ignored, so you can document the file.
+* Leading/trailing whitespace around the key or value is trimmed.
+
+If you omit `:KEY`, the entire file contents are loaded (with surrounding whitespace trimmed). This mode is ideal for multi-line material such as PEM certificates.
 
 ```bash
 export IN_TOKEN=secret-in            # env:IN_TOKEN

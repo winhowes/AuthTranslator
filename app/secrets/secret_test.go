@@ -134,6 +134,22 @@ func TestLoadSecretFile(t *testing.T) {
 	}
 }
 
+func TestLoadSecretFileKey(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "secret.env")
+	contents := "A=foo\nB = bar\n"
+	if err := os.WriteFile(path, []byte(contents), 0600); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	val, err := secrets.LoadSecret(context.Background(), "file:"+path+":B")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val != "bar" {
+		t.Fatalf("expected 'bar', got %s", val)
+	}
+}
+
 func TestLoadSecretFileTrailingNewline(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "secret.txt")
