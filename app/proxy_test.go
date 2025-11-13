@@ -1,14 +1,20 @@
 package main
 
 import (
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 
 	_ "github.com/winhowes/AuthTranslator/app/auth/plugins/token"
 	_ "github.com/winhowes/AuthTranslator/app/secrets/plugins"
 )
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
 
 func TestProxyHandlerPrefersHeader(t *testing.T) {
 	denylists.Lock()
@@ -557,5 +563,121 @@ func TestProxyHandlerRewritesHost(t *testing.T) {
 	u, _ := url.Parse(srv.URL)
 	if upstreamHost != u.Host {
 		t.Fatalf("expected host %s, got %s", u.Host, upstreamHost)
+	}
+}
+
+func TestProxyHandlerWildcardMissingDestination(t *testing.T) {
+	denylists.Lock()
+	denylists.m = make(map[string]map[string][]CallRule)
+	denylists.Unlock()
+
+	integ := Integration{Name: "wild-missing", Destination: "http://*.example.com", InRateLimit: 1, OutRateLimit: 1}
+	if err := AddIntegration(&integ); err != nil {
+		t.Fatalf("failed to add integration: %v", err)
+	}
+	t.Cleanup(func() {
+		integ.inLimiter.Stop()
+		integ.outLimiter.Stop()
+		DeleteIntegration("wild-missing")
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "http://wild-missing/path", nil)
+	req.Host = "wild-missing"
+	rr := httptest.NewRecorder()
+
+	proxyHandler(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", rr.Code)
+	}
+	if rr.Header().Get("X-AT-Error-Reason") != "invalid destination" {
+		t.Fatalf("unexpected error reason: %s", rr.Header().Get("X-AT-Error-Reason"))
+	}
+}
+
+func TestProxyHandlerWildcardHostMismatch(t *testing.T) {
+	denylists.Lock()
+	denylists.m = make(map[string]map[string][]CallRule)
+	denylists.Unlock()
+
+	integ := Integration{Name: "wild-mismatch", Destination: "http://*.example.com", InRateLimit: 1, OutRateLimit: 1}
+	if err := AddIntegration(&integ); err != nil {
+		t.Fatalf("failed to add integration: %v", err)
+	}
+	t.Cleanup(func() {
+		integ.inLimiter.Stop()
+		integ.outLimiter.Stop()
+		DeleteIntegration("wild-mismatch")
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "http://wild-mismatch/path", nil)
+	req.Host = "wild-mismatch"
+	req.Header.Set("X-AT-Destination", "http://example.com")
+	rr := httptest.NewRecorder()
+
+	proxyHandler(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", rr.Code)
+	}
+	if rr.Header().Get("X-AT-Error-Reason") != "invalid destination" {
+		t.Fatalf("unexpected error reason: %s", rr.Header().Get("X-AT-Error-Reason"))
+	}
+}
+
+func TestProxyHandlerWildcardSuccess(t *testing.T) {
+	denylists.Lock()
+	denylists.m = make(map[string]map[string][]CallRule)
+	denylists.Unlock()
+
+	integ := Integration{Name: "wild-success", Destination: "http://*.example.com/base?static=1", InRateLimit: 1, OutRateLimit: 1}
+	if err := AddIntegration(&integ); err != nil {
+		t.Fatalf("failed to add integration: %v", err)
+	}
+	t.Cleanup(func() {
+		integ.inLimiter.Stop()
+		integ.outLimiter.Stop()
+		DeleteIntegration("wild-success")
+	})
+
+	called := false
+	integ.proxy.Transport = roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		called = true
+		if req.URL.Host != "foo.example.com" {
+			t.Fatalf("unexpected upstream host: %s", req.URL.Host)
+		}
+		if req.Host != "foo.example.com" {
+			t.Fatalf("unexpected request host: %s", req.Host)
+		}
+		if req.URL.Path != "/base/test" {
+			t.Fatalf("unexpected upstream path: %s", req.URL.Path)
+		}
+		if req.URL.RawQuery != "static=1&foo=bar" {
+			t.Fatalf("unexpected query: %s", req.URL.RawQuery)
+		}
+		if req.Header.Get("X-AT-Destination") != "" {
+			t.Fatal("X-AT-Destination header should be stripped before proxying")
+		}
+		resp := &http.Response{
+			StatusCode: http.StatusNoContent,
+			Header:     make(http.Header),
+			Body:       io.NopCloser(strings.NewReader("")),
+			Request:    req,
+		}
+		return resp, nil
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "http://wild-success/test?foo=bar", nil)
+	req.Host = "wild-success"
+	req.Header.Set("X-AT-Destination", "http://foo.example.com")
+	rr := httptest.NewRecorder()
+
+	proxyHandler(rr, req)
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d", rr.Code)
+	}
+	if !called {
+		t.Fatal("expected transport to be invoked")
 	}
 }

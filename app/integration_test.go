@@ -7,6 +7,7 @@ import (
 	"encoding/pem"
 	"math/big"
 	"net/http"
+	"net/http/httptest"
 	"reflect"
 	"strings"
 	"testing"
@@ -187,6 +188,104 @@ func TestUpdateIntegration(t *testing.T) {
 		got.inLimiter.Stop()
 		got.outLimiter.Stop()
 	})
+}
+
+func TestResolveRequestDestinationWildcard(t *testing.T) {
+	integ := &Integration{Name: "wild", Destination: "https://*.example.com/base"}
+	if err := prepareIntegration(integ); err != nil {
+		t.Fatalf("prepareIntegration: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "http://wild.local/request", nil)
+	req.Header.Set("X-AT-Destination", "https://foo.example.com")
+
+	dest, err := integ.resolveRequestDestination(req)
+	if err != nil {
+		t.Fatalf("resolveRequestDestination: %v", err)
+	}
+	if dest.Host != "foo.example.com" {
+		t.Fatalf("unexpected host: %s", dest.Host)
+	}
+	if dest.Path != "/base" {
+		t.Fatalf("unexpected path: %s", dest.Path)
+	}
+	if dest.Scheme != "https" {
+		t.Fatalf("unexpected scheme: %s", dest.Scheme)
+	}
+}
+
+func TestResolveRequestDestinationWildcardErrors(t *testing.T) {
+	integ := &Integration{Name: "wild-err", Destination: "https://*.example.com"}
+	if err := prepareIntegration(integ); err != nil {
+		t.Fatalf("prepareIntegration: %v", err)
+	}
+
+	tests := []struct {
+		name   string
+		header string
+	}{
+		{name: "missing", header: ""},
+		{name: "no_subdomain", header: "https://example.com"},
+		{name: "wrong_domain", header: "https://foo.notexample.com"},
+		{name: "bad_scheme", header: "http://foo.example.com"},
+		{name: "unexpected_port", header: "https://foo.example.com:8080"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "http://wild-err", nil)
+			if tc.header != "" {
+				req.Header.Set("X-AT-Destination", tc.header)
+			}
+			if _, err := integ.resolveRequestDestination(req); err == nil {
+				t.Fatalf("expected error for %s", tc.name)
+			}
+		})
+	}
+}
+
+func TestResolveRequestDestinationWildcardPort(t *testing.T) {
+	integ := &Integration{Name: "wild-port", Destination: "https://*.example.com:8443"}
+	if err := prepareIntegration(integ); err != nil {
+		t.Fatalf("prepareIntegration: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "http://wild-port", nil)
+	req.Header.Set("X-AT-Destination", "https://foo.example.com")
+	dest, err := integ.resolveRequestDestination(req)
+	if err != nil {
+		t.Fatalf("resolveRequestDestination: %v", err)
+	}
+	if dest.Host != "foo.example.com:8443" {
+		t.Fatalf("unexpected host: %s", dest.Host)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "http://wild-port", nil)
+	req.Header.Set("X-AT-Destination", "https://foo.example.com:9443")
+	if _, err := integ.resolveRequestDestination(req); err == nil {
+		t.Fatal("expected error for mismatched port")
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "http://wild-port", nil)
+	req.Header.Set("X-AT-Destination", "https://foo.example.com:8443")
+	if _, err := integ.resolveRequestDestination(req); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestResolveRequestDestinationStatic(t *testing.T) {
+	integ := &Integration{Name: "static", Destination: "https://api.example.com"}
+	if err := prepareIntegration(integ); err != nil {
+		t.Fatalf("prepareIntegration: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "http://static", nil)
+	dest, err := integ.resolveRequestDestination(req)
+	if err != nil {
+		t.Fatalf("resolveRequestDestination: %v", err)
+	}
+	if dest.String() != "https://api.example.com" {
+		t.Fatalf("unexpected destination: %s", dest)
+	}
 }
 
 func TestDeleteIntegration(t *testing.T) {

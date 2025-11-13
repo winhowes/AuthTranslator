@@ -29,6 +29,8 @@ integrations:
 
 The integration name (`slack` above) is referenced by the allowlist. Incoming plugins run in order until one succeeds, optionally producing the caller ID (depending on the auth plugins). Outgoing plugins modify each request before forwarding it to the `destination` URL. Names are lowercased automatically and may include letters, numbers, dashes, underscores, and dots.
 
+Need to fan out to many subdomains? Use a `destination` with a wildcard host such as `https://*.example.com`. Every request must supply an `X-AT-Destination` header that resolves the wildcard (for example `https://foo.example.com`); the proxy validates the header, strips it, and then forwards the request using the configured base path.
+
 ## Multiple secrets
 
 Both incoming and outgoing plugin configs accept a list of `secrets:`. Incoming plugins try each secret until one matches, ignoring errors so callers aren’t blocked by a bad entry. Outgoing plugins pick one secret at random for every request, spreading traffic evenly across all configured secrets.

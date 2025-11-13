@@ -50,7 +50,7 @@ See [Secret Back-Ends](secret-backends.md) for all supported URI schemes.
 
 | Field           | Type           | Default      | Description                                                                  |
 | --------------- | -------------- | ------------ | ---------------------------------------------------------------------------- |
-| `destination`   | URL            | **required** | Base URL; path from client is appended as‑is.                                |
+| `destination`   | URL            | **required** | Base URL; path from client is appended as‑is. Supports `*` wildcards in the host (e.g. `https://*.example.com`) when paired with an `X-AT-Destination` header containing the concrete upstream URL. |
 | `outgoing_auth` | `[]PluginSpec` | `[]`         | Injects credential **before** forwarding.                         |
 | `incoming_auth` | `[]PluginSpec` | `[]`         | Zero or more validators that run **in order**; the first that succeeds wins. |
 | `in_rate_limit` | int            | `0`          | Max inbound requests per caller within the window. |
@@ -64,6 +64,8 @@ See [Secret Back-Ends](secret-backends.md) for all supported URI schemes.
 | `disable_keep_alives` | bool       | `false`      | Disable HTTP keep‑alive connections. |
 | `max_idle_conns` | int            | `100`        | Total idle connections to keep open. |
 | `max_idle_conns_per_host` | int     | `2`          | Idle connection limit per upstream host. |
+
+When the configured destination host contains a `*`, each request **must** include an `X-AT-Destination` header whose scheme and host match the configured pattern. The proxy validates the header, strips it before forwarding, and uses the configured base path/query when building the upstream URL. Missing or invalid headers trigger a `400 Bad Request` response with `X-AT-Error-Reason: invalid destination`.
 
 #### `PluginSpec`
 

@@ -15,7 +15,13 @@
       "required": ["name", "destination"],
       "properties": {
         "name": { "type": "string", "pattern": "^[a-zA-Z0-9-]+$" },
-        "destination": { "type": "string", "format": "uri" },
+        "destination": {
+          "type": "string",
+          "anyOf": [
+            { "format": "uri" },
+            { "pattern": "^[a-zA-Z][a-zA-Z0-9+.-]*://[^/]*\\*[^/]*(/.*)?$" }
+          ]
+        },
         "in_rate_limit": { "type": "integer" },
         "out_rate_limit": { "type": "integer" },
         "rate_limit_window": { "type": "string" },

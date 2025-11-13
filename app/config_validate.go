@@ -31,6 +31,16 @@ func validateConfig(c *Config) error {
 		if err != nil || u.Scheme == "" || u.Host == "" {
 			return fmt.Errorf("integration %s has invalid destination", i.Name)
 		}
+		if strings.Contains(i.Destination, "*") {
+			hostPattern := u.Hostname()
+			if !strings.Contains(hostPattern, "*") || strings.Contains(u.Scheme, "*") || strings.Contains(u.Path, "*") || strings.Contains(u.RawQuery, "*") || strings.Contains(u.Fragment, "*") || strings.Contains(u.Port(), "*") {
+				return fmt.Errorf("integration %s has invalid destination wildcard", i.Name)
+			}
+			trimmed := strings.ReplaceAll(hostPattern, "*", "")
+			if strings.Trim(trimmed, ".") == "" {
+				return fmt.Errorf("integration %s has invalid destination wildcard", i.Name)
+			}
+		}
 		if i.RateLimitWindow != "" {
 			d, err := time.ParseDuration(i.RateLimitWindow)
 			if err != nil || d <= 0 {

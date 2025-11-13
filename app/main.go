@@ -1205,6 +1205,20 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	resolvedDest, err := integ.resolveRequestDestination(r)
+	if err != nil {
+		logger.Warn("invalid destination header", "integration", integ.Name, "error", err)
+		w.Header().Set("X-AT-Upstream-Error", "false")
+		w.Header().Set("X-AT-Error-Reason", "invalid destination")
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		http.Error(w, fmt.Sprintf("Bad Request: %s", err.Error()), http.StatusBadRequest)
+		return
+	}
+	r = r.WithContext(contextWithResolvedDestination(r.Context(), resolvedDest))
+	if integ.requiresDestinationHeader {
+		r.Header.Del("X-AT-Destination")
+	}
+
 	for _, cfg := range integ.OutgoingAuth {
 		p := authplugins.GetOutgoing(cfg.Type)
 		if p != nil {
