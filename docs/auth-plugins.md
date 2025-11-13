@@ -10,6 +10,8 @@ AuthTranslator’s behaviour is extended by **plugins** – small Go packages th
 
 > **Tip** Any plugin can be swapped at runtime – just edit `config.yaml` and send `SIGHUP` (or run with `-watch`).
 
+> Need help sourcing credentials for a plugin? See the [Secret Back‑Ends](secret-backends.md) reference.
+
 ---
 
 ## Built‑in plugins
@@ -80,18 +82,6 @@ outgoing_auth:
 
 Replaces every occurrence of the secret referenced by `find_secret` with
 the value from `replace_secret` across the URL, headers and body.
-
-To match a literal placeholder instead of loading a secret, use the
-`dangerousLiteral` source (the value is stored directly in config, so avoid real
-secrets):
-
-```yaml
-outgoing_auth:
-  - type: find_replace
-    params:
-      find_secret: dangerousLiteral:__SECRET__
-      replace_secret: file:secrets.env:GITHUB_TOKEN
-```
 
 ---
 
