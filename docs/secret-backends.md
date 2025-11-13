@@ -3,6 +3,7 @@
 AuthTranslator never expects you to paste raw API keys into a YAML file. Instead, any plugin parameter that contains a credential can use a **secret URI**. At runtime the proxy resolves that URI via a pluggable back‑end and injects the value.
 
 For full config examples, see the [Configuration Reference](configuration.md).
+For plugin-specific usage, refer to the [Auth Plugins](auth-plugins.md) guide.
 ```yaml
 outgoing_auth:
   - type: token
@@ -26,6 +27,26 @@ outgoing_auth:
 | `aws`            | `aws:Ci0KU29tZUNpcGhlcnRleHQ=` | AES‑GCM encrypted values decrypted using `AWS_KMS_KEY`. |
 | `azure`          | `azure:https://kv-name.vault.azure.net/secrets/secret-name`         | AKS or VM SS with **Managed Identity**.                       |
 | `vault`          | `vault:secret/data/slack`                                       | Self‑hosted **HashiCorp Vault** cluster.                      |
+| `dangerousLiteral` | `dangerousLiteral:__PLACEHOLDER__`                              | Rare cases where you need a literal sentinel string. |
+
+### Literal placeholders (`dangerousLiteral:`)
+
+The `dangerousLiteral:` prefix stores a value *directly in the configuration file* instead of fetching it from an external back-end.
+
+> ⚠️ **Warning**
+>
+> * Avoid using `dangerousLiteral:` for real secrets – the value is written in plain text and easily leaks if the config is checked into source control or shared.
+> * Prefer one of the managed back-ends above whenever possible.
+
+```yaml
+outgoing_auth:
+  - type: find_replace
+    params:
+      find_secret: dangerousLiteral:__PLACEHOLDER__
+      replace_secret: file:secrets.env:GITHUB_TOKEN
+```
+
+The `dangerousLiteral:` option can be useful when you need to match or replace sentinel strings during testing, or when migrating legacy configurations.
 
 > **Not exhaustive** — you can add more with \~50 LoC (see below).
 
@@ -42,6 +63,7 @@ Some schemes rely on environment variables for authentication or decryption:
 | `azure` | `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET` | Credentials for fetching `azure:` secrets from Key Vault. | `azure:https://kv-name.vault.azure.net/secrets/token` |
 | `gcp` | _none_ | Uses the GCP metadata service when resolving `gcp:` secrets. | `gcp:projects/p/locations/l/keyRings/r/cryptoKeys/k:cipher` |
 | `vault` | `VAULT_ADDR`, `VAULT_TOKEN` | Fetches secrets from HashiCorp Vault via its HTTP API. | `vault:secret/data/api` reads from Vault |
+| `dangerousLiteral` | _none_ | Value is stored directly in config; no external dependencies. | `dangerousLiteral:__PLACEHOLDER__` |
 
 For `file:` URIs that use the `:KEY` suffix, AuthTranslator treats the file as a simple `KEY=value` list:
 
@@ -132,7 +154,6 @@ A working GCP implementation is in [`app/secrets/plugins/gcp`](../app/secrets/pl
 
 ## Best practices
 
-* **Least privilege** Grant the proxy only *read* access to each secret.
 * **Rotate centrally** Because credentials load at start, rotation is instantaneous after a hot reload and zero code changes.
 * **Avoid multi‑line PEMs in env** Use `file:` or a cloud vault instead; most shells mangle newlines.
-* **Redaction** Structured logs never emit secret bytes, but disable debug logging in prod just in case.
+* **Handle literals carefully** If you rely on `dangerousLiteral:` placeholders, never commit real credentials and treat them as temporary scaffolding.
