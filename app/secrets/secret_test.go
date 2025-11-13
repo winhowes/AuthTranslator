@@ -34,11 +34,11 @@ func TestLoadSecretEnvMissing(t *testing.T) {
 }
 
 func TestLoadSecretDangerousLiteral(t *testing.T) {
-	val, err := secrets.LoadSecret(context.Background(), "dangerousLiteral:__SECRET[api.github.com]__")
+	val, err := secrets.LoadSecret(context.Background(), "dangerousLiteral:__SECRET__")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if val != "__SECRET[api.github.com]__" {
+	if val != "__SECRET__" {
 		t.Fatalf("expected placeholder to be returned, got %q", val)
 	}
 }

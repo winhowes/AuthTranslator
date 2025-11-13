@@ -89,8 +89,8 @@ secrets):
 outgoing_auth:
   - type: find_replace
     params:
-      find_secret: dangerousLiteral:__SECRET[api.github.com]__
-      replace_secret: file:/run/authtranslator/secrets.env:GITHUB_TOKEN
+      find_secret: dangerousLiteral:__SECRET__
+      replace_secret: file:secrets.env:GITHUB_TOKEN
 ```
 
 ---
