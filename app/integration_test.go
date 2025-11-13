@@ -229,6 +229,9 @@ func TestResolveRequestDestinationWildcardErrors(t *testing.T) {
 		{name: "wrong_domain", header: "https://foo.notexample.com"},
 		{name: "bad_scheme", header: "http://foo.example.com"},
 		{name: "unexpected_port", header: "https://foo.example.com:8080"},
+		{name: "user_info", header: "https://user:pass@foo.example.com"},
+		{name: "missing_host", header: "https:///path"},
+		{name: "wildcard_header", header: "https://*.example.com"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -285,6 +288,68 @@ func TestResolveRequestDestinationStatic(t *testing.T) {
 	}
 	if dest.String() != "https://api.example.com" {
 		t.Fatalf("unexpected destination: %s", dest)
+	}
+}
+
+func TestPrepareIntegrationWildcardValidation(t *testing.T) {
+	cases := []struct {
+		name        string
+		destination string
+	}{
+		{name: "user_info", destination: "https://user@*.example.com"},
+		{name: "scheme_star", destination: "h*tp://*.example.com"},
+		{name: "path_star", destination: "https://*.example.com/foo*"},
+		{name: "port_star", destination: "https://*.example.com:*"},
+		{name: "no_base", destination: "https://*/"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			integ := &Integration{Name: tc.name, Destination: tc.destination}
+			if err := prepareIntegration(integ); err == nil {
+				t.Fatalf("expected error for destination %q", tc.destination)
+			}
+		})
+	}
+}
+
+func TestPrepareIntegrationWildcardFlags(t *testing.T) {
+	integ := &Integration{Name: "flags", Destination: "https://*.Example.COM"}
+	if err := prepareIntegration(integ); err != nil {
+		t.Fatalf("prepareIntegration: %v", err)
+	}
+	if !integ.requiresDestinationHeader {
+		t.Fatal("expected wildcard integration to require destination header")
+	}
+	if integ.wildcardHostPattern != "*.example.com" {
+		t.Fatalf("unexpected wildcard host pattern: %q", integ.wildcardHostPattern)
+	}
+}
+
+func TestMatchWildcardHost(t *testing.T) {
+	tests := []struct {
+		name     string
+		pattern  string
+		host     string
+		expected bool
+	}{
+		{name: "exact", pattern: "api.example.com", host: "api.example.com", expected: true},
+		{name: "exact_case", pattern: "API.EXAMPLE.COM", host: "api.example.com", expected: true},
+		{name: "wildcard_prefix", pattern: "*.example.com", host: "foo.example.com", expected: true},
+		{name: "wildcard_multi", pattern: "*.example.com", host: "foo.bar.example.com", expected: true},
+		{name: "wildcard_requires_subdomain", pattern: "*.example.com", host: "example.com", expected: false},
+		{name: "wildcard_suffix", pattern: "api.*.example.com", host: "api.foo.example.com", expected: true},
+		{name: "wildcard_suffix_miss", pattern: "api.*.example.com", host: "api.example.com", expected: false},
+		{name: "no_pattern", pattern: "", host: "", expected: true},
+		{name: "no_pattern_host", pattern: "", host: "example.com", expected: false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := matchWildcardHost(tc.pattern, tc.host); got != tc.expected {
+				t.Fatalf("matchWildcardHost(%q, %q) = %v, want %v", tc.pattern, tc.host, got, tc.expected)
+			}
+		})
 	}
 }
 
