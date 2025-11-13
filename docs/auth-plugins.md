@@ -81,6 +81,18 @@ outgoing_auth:
 Replaces every occurrence of the secret referenced by `find_secret` with
 the value from `replace_secret` across the URL, headers and body.
 
+To match a literal placeholder instead of loading a secret, use the
+`dangerousLiteral` source (the value is stored directly in config, so avoid real
+secrets):
+
+```yaml
+outgoing_auth:
+  - type: find_replace
+    params:
+      find_secret: dangerousLiteral:__SECRET[api.github.com]__
+      replace_secret: file:/run/authtranslator/secrets.env:GITHUB_TOKEN
+```
+
 ---
 
 ## Writing your own plugin
