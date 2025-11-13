@@ -213,19 +213,10 @@ func prepareIntegration(i *Integration) error {
 				req.Host = u.Host
 				return
 			}
-			req.URL.Scheme = dest.Scheme
-			req.URL.Host = dest.Host
-			req.Host = dest.Host
-			req.URL.Path, req.URL.RawPath = joinProxyPath(dest, req)
-			targetQuery := dest.RawQuery
-			if targetQuery == "" || req.URL.RawQuery == "" {
-				req.URL.RawQuery = targetQuery + req.URL.RawQuery
-			} else {
-				req.URL.RawQuery = targetQuery + "&" + req.URL.RawQuery
+			if resolvedDestinationApplied(req.Context()) {
+				return
 			}
-			if _, ok := req.Header["User-Agent"]; !ok {
-				req.Header.Set("User-Agent", "")
-			}
+			applyResolvedDestination(req, dest)
 		}
 	} else {
 		i.proxy.Director = func(req *http.Request) {
@@ -415,16 +406,58 @@ func (i *Integration) resolveRequestDestination(r *http.Request) (*url.URL, erro
 
 type resolvedDestinationKey struct{}
 
+type resolvedDestinationState struct {
+	dest    *url.URL
+	applied bool
+}
+
 func contextWithResolvedDestination(ctx context.Context, dest *url.URL) context.Context {
-	return context.WithValue(ctx, resolvedDestinationKey{}, dest)
+	return context.WithValue(ctx, resolvedDestinationKey{}, &resolvedDestinationState{dest: dest})
 }
 
 func resolvedDestinationFromContext(ctx context.Context) (*url.URL, bool) {
-	dest, _ := ctx.Value(resolvedDestinationKey{}).(*url.URL)
-	if dest == nil {
+	state, _ := ctx.Value(resolvedDestinationKey{}).(*resolvedDestinationState)
+	if state == nil || state.dest == nil {
 		return nil, false
 	}
-	return dest, true
+	return state.dest, true
+}
+
+func resolvedDestinationApplied(ctx context.Context) bool {
+	state, _ := ctx.Value(resolvedDestinationKey{}).(*resolvedDestinationState)
+	if state == nil {
+		return false
+	}
+	return state.applied
+}
+
+func markResolvedDestinationApplied(ctx context.Context) {
+	state, _ := ctx.Value(resolvedDestinationKey{}).(*resolvedDestinationState)
+	if state != nil {
+		state.applied = true
+	}
+}
+
+func applyResolvedDestination(req *http.Request, dest *url.URL) {
+	path, rawPath := joinProxyPath(dest, req)
+	targetQuery := dest.RawQuery
+
+	req.URL.Scheme = dest.Scheme
+	req.URL.Host = dest.Host
+	req.Host = dest.Host
+	req.URL.Path = path
+	req.URL.RawPath = rawPath
+
+	if targetQuery == "" || req.URL.RawQuery == "" {
+		req.URL.RawQuery = targetQuery + req.URL.RawQuery
+	} else {
+		req.URL.RawQuery = targetQuery + "&" + req.URL.RawQuery
+	}
+	if _, ok := req.Header["User-Agent"]; !ok {
+		req.Header.Set("User-Agent", "")
+	}
+
+	markResolvedDestinationApplied(req.Context())
 }
 
 func matchWildcardHost(pattern, host string) bool {

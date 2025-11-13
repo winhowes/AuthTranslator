@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -8,9 +10,58 @@ import (
 	"strings"
 	"testing"
 
+	authplugins "github.com/winhowes/AuthTranslator/app/auth"
 	_ "github.com/winhowes/AuthTranslator/app/auth/plugins/token"
 	_ "github.com/winhowes/AuthTranslator/app/secrets/plugins"
 )
+
+type captureParams struct {
+	ExpectHost string `json:"expect_host"`
+}
+
+type capturePlugin struct{}
+
+func (capturePlugin) Name() string { return "test_capture" }
+
+func (capturePlugin) ParseParams(params map[string]interface{}) (interface{}, error) {
+	raw, ok := params["expect_host"].(string)
+	if !ok || raw == "" {
+		return nil, fmt.Errorf("expect_host must be provided")
+	}
+	return &captureParams{ExpectHost: raw}, nil
+}
+
+func (capturePlugin) AddAuth(_ context.Context, r *http.Request, params interface{}) error {
+	cfg, ok := params.(*captureParams)
+	if !ok {
+		return fmt.Errorf("unexpected params type %T", params)
+	}
+	if r.URL.Host != cfg.ExpectHost {
+		return fmt.Errorf("unexpected URL host %s", r.URL.Host)
+	}
+	if r.Host != cfg.ExpectHost {
+		return fmt.Errorf("unexpected request host %s", r.Host)
+	}
+	if got := r.Header.Get("X-AT-Destination"); got != "" {
+		return fmt.Errorf("X-AT-Destination should be stripped before AddAuth, got %q", got)
+	}
+	captureLastURL = r.URL.String()
+	captureAddAuthCount++
+	return nil
+}
+
+func (capturePlugin) RequiredParams() []string { return []string{"expect_host"} }
+
+func (capturePlugin) OptionalParams() []string { return nil }
+
+var (
+	captureAddAuthCount int
+	captureLastURL      string
+)
+
+func init() {
+	authplugins.RegisterOutgoing(capturePlugin{})
+}
 
 type roundTripFunc func(*http.Request) (*http.Response, error)
 
@@ -679,5 +730,60 @@ func TestProxyHandlerWildcardSuccess(t *testing.T) {
 	}
 	if !called {
 		t.Fatal("expected transport to be invoked")
+	}
+}
+
+func TestProxyHandlerWildcardAddAuthSeesResolvedDestination(t *testing.T) {
+	denylists.Lock()
+	denylists.m = make(map[string]map[string][]CallRule)
+	denylists.Unlock()
+
+	captureAddAuthCount = 0
+	captureLastURL = ""
+
+	integ := Integration{
+		Name:         "wild-auth",
+		Destination:  "http://*.example.com/base?static=1",
+		InRateLimit:  1,
+		OutRateLimit: 1,
+		OutgoingAuth: []AuthPluginConfig{{
+			Type:   "test_capture",
+			Params: map[string]interface{}{"expect_host": "foo.example.com"},
+		}},
+	}
+	if err := AddIntegration(&integ); err != nil {
+		t.Fatalf("failed to add integration: %v", err)
+	}
+	t.Cleanup(func() {
+		integ.inLimiter.Stop()
+		integ.outLimiter.Stop()
+		DeleteIntegration("wild-auth")
+	})
+
+	integ.proxy.Transport = roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		resp := &http.Response{
+			StatusCode: http.StatusNoContent,
+			Header:     make(http.Header),
+			Body:       io.NopCloser(strings.NewReader("")),
+			Request:    req,
+		}
+		return resp, nil
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "http://wild-auth/test?foo=bar", nil)
+	req.Host = "wild-auth"
+	req.Header.Set("X-AT-Destination", "http://foo.example.com")
+	rr := httptest.NewRecorder()
+
+	proxyHandler(rr, req)
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d", rr.Code)
+	}
+	if captureAddAuthCount != 1 {
+		t.Fatalf("expected AddAuth to be called once, got %d", captureAddAuthCount)
+	}
+	if captureLastURL != "http://foo.example.com/base/test?static=1&foo=bar" {
+		t.Fatalf("unexpected URL seen by AddAuth: %s", captureLastURL)
 	}
 }

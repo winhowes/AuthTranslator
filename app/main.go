@@ -1216,6 +1216,7 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	r = r.WithContext(contextWithResolvedDestination(r.Context(), resolvedDest))
 	if integ.requiresDestinationHeader {
+		applyResolvedDestination(r, resolvedDest)
 		r.Header.Del("X-AT-Destination")
 	}
 
