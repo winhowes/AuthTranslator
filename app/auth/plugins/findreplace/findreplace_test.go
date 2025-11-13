@@ -44,6 +44,38 @@ func TestFindReplaceAddAuth(t *testing.T) {
 	}
 }
 
+func TestFindReplaceAddAuthLiteralFind(t *testing.T) {
+	r := &http.Request{
+		URL:    &url.URL{Scheme: "http", Host: "host", Path: "/__PLACE__", RawQuery: "q=__PLACE__"},
+		Header: http.Header{"__PLACE__-Header": []string{"body __PLACE__"}},
+		Body:   io.NopCloser(strings.NewReader("__PLACE__ payload")),
+		Host:   "host",
+	}
+	p := FindReplace{}
+	t.Setenv("REP", "SECRET")
+	cfg, err := p.ParseParams(map[string]interface{}{"find_secret": "dangerousLiteral:__PLACE__", "replace_secret": "env:REP"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := p.AddAuth(context.Background(), r, cfg); err != nil {
+		t.Fatal(err)
+	}
+
+	if r.URL.Path != "/SECRET" || r.URL.RawQuery != "q=SECRET" {
+		t.Fatalf("unexpected url %s?%s", r.URL.Path, r.URL.RawQuery)
+	}
+	if v := r.Header.Get("SECRET-Header"); v != "body SECRET" {
+		t.Fatalf("unexpected header value %s", v)
+	}
+	if _, ok := r.Header["__PLACE__-Header"]; ok {
+		t.Fatal("old header still present")
+	}
+	body, _ := io.ReadAll(r.Body)
+	if string(body) != "SECRET payload" {
+		t.Fatalf("unexpected body %q", string(body))
+	}
+}
+
 func TestFindReplaceAddAuthNoMatch(t *testing.T) {
 	r := &http.Request{URL: &url.URL{Path: "/foo"}, Header: http.Header{}, Body: io.NopCloser(strings.NewReader("bar"))}
 	p := FindReplace{}

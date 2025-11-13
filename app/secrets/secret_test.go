@@ -33,6 +33,16 @@ func TestLoadSecretEnvMissing(t *testing.T) {
 	}
 }
 
+func TestLoadSecretDangerousLiteral(t *testing.T) {
+	val, err := secrets.LoadSecret(context.Background(), "dangerousLiteral:__SECRET__")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val != "__SECRET__" {
+		t.Fatalf("expected placeholder to be returned, got %q", val)
+	}
+}
+
 func TestLoadSecretUnknown(t *testing.T) {
 	if _, err := secrets.LoadSecret(context.Background(), "unknown:id"); err == nil {
 		t.Fatal("expected error for unknown secret source")
