@@ -57,7 +57,27 @@ When running multiple replicas behind a Service or Load Balancer, prefer the **P
 
 ---
 
-## 4  Structured logs
+## 4  Grafana jump-start
+
+Use these sample PromQL queries to bootstrap your dashboard panels. They
+assume you scrape the metrics under the default job label
+`authtranslator`.
+
+| Panel idea                 | PromQL                                                                                     | Why it helps |
+| -------------------------- | ------------------------------------------------------------------------------------------ | ------------ |
+| Request rate per upstream  | `sum(rate(authtranslator_requests_total{job="authtranslator"}[5m])) by (integration)`     | Highlights traffic leaders and sudden drops. |
+| Error ratio                | `sum(rate(authtranslator_upstream_responses_total{job="authtranslator",code=~"5.."}[5m]))`<br>`/`<br>`sum(rate(authtranslator_upstream_responses_total{job="authtranslator"}[5m]))` | Surfaces spikes in upstream failures. |
+| 95th percentile latency    | `histogram_quantile(0.95, sum(rate(authtranslator_request_duration_seconds_bucket{job="authtranslator"}[5m])) by (le, integration))` | Watches for slowdowns before they hit the SLA. |
+| Rate-limit rejections      | `sum(rate(authtranslator_rate_limit_events_total{job="authtranslator"}[5m])) by (integration)` | Shows when callers are constrained and need more quota. |
+
+You can convert the table above into Grafana time-series panels by pasting the
+queries into new panels and turning on **Legend → `{{integration}}`**. For a
+snapshot of current conditions, duplicate the panels and switch the visualization
+type to **Stat**.
+
+---
+
+## 5  Structured logs
 
 The proxy logs in structured **text** by default. Pass
 `-log-format json` to emit **JSON** using Go’s `slog`. Fields:
@@ -86,7 +106,7 @@ Sample line (wrapped for readability):
 
 ---
 
-## 5  Alerting pointers
+## 6  Alerting pointers
 
 | Alert                     | Expression                                                        | Rationale                        |
 | ------------------------- | ----------------------------------------------------------------- | -------------------------------- |
