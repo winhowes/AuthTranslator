@@ -14,7 +14,7 @@
       "type": "object",
       "required": ["name", "destination"],
       "properties": {
-        "name": { "type": "string", "pattern": "^[a-zA-Z0-9-]+$" },
+        "name": { "type": "string", "pattern": "^[a-zA-Z0-9._-]+$" },
         "destination": {
           "type": "string",
           "anyOf": [
@@ -42,8 +42,8 @@
         "response_header_timeout": { "type": "string" },
         "tls_insecure_skip_verify": { "type": "boolean" },
         "disable_keep_alives": { "type": "boolean" },
-        "max_idle_conns": { "type": "integer" },
-        "max_idle_conns_per_host": { "type": "integer" }
+        "max_idle_conns": { "type": "integer", "minimum": 0 },
+        "max_idle_conns_per_host": { "type": "integer", "minimum": 0 }
       },
       "additionalProperties": false
     },
