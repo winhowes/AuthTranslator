@@ -787,3 +787,56 @@ func TestProxyHandlerWildcardAddAuthSeesResolvedDestination(t *testing.T) {
 		t.Fatalf("unexpected URL seen by AddAuth: %s", captureLastURL)
 	}
 }
+
+func TestProxyHandlerWildcardPreservesEncodedPath(t *testing.T) {
+	denylists.Lock()
+	denylists.m = make(map[string]map[string][]CallRule)
+	denylists.Unlock()
+
+	integ := Integration{
+		Name:         "wild-encoded",
+		Destination:  "http://*.example.com/base",
+		InRateLimit:  1,
+		OutRateLimit: 1,
+	}
+	if err := AddIntegration(&integ); err != nil {
+		t.Fatalf("failed to add integration: %v", err)
+	}
+	t.Cleanup(func() {
+		integ.inLimiter.Stop()
+		integ.outLimiter.Stop()
+		DeleteIntegration("wild-encoded")
+	})
+
+	called := false
+	integ.proxy.Transport = roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		called = true
+		if req.URL.Path != "/base/foo/bar" {
+			t.Fatalf("unexpected path: %s", req.URL.Path)
+		}
+		if req.URL.RawPath != "/base/foo%2Fbar" {
+			t.Fatalf("unexpected raw path: %s", req.URL.RawPath)
+		}
+		resp := &http.Response{
+			StatusCode: http.StatusNoContent,
+			Header:     make(http.Header),
+			Body:       io.NopCloser(strings.NewReader("")),
+			Request:    req,
+		}
+		return resp, nil
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "http://wild-encoded/foo%2Fbar?foo=bar", nil)
+	req.Host = "wild-encoded"
+	req.Header.Set("X-AT-Destination", "http://foo.example.com")
+	rr := httptest.NewRecorder()
+
+	proxyHandler(rr, req)
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d", rr.Code)
+	}
+	if !called {
+		t.Fatal("expected transport to be invoked")
+	}
+}

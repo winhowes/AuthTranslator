@@ -500,20 +500,24 @@ func matchWildcardHost(pattern, host string) bool {
 }
 
 func joinProxyPath(target *url.URL, req *http.Request) (string, string) {
-	tgtPath := target.EscapedPath()
-	if tgtPath == "" {
-		tgtPath = target.Path
+	if target.RawPath == "" && req.URL.RawPath == "" {
+		return singleJoiningSlash(target.Path, req.URL.Path), ""
 	}
-	reqPath := req.URL.EscapedPath()
-	if reqPath == "" {
-		reqPath = req.URL.Path
+
+	tgtEscaped := target.EscapedPath()
+	reqEscaped := req.URL.EscapedPath()
+
+	tgtHasSlash := strings.HasSuffix(tgtEscaped, "/")
+	reqHasSlash := strings.HasPrefix(reqEscaped, "/")
+
+	switch {
+	case tgtHasSlash && reqHasSlash:
+		return target.Path + req.URL.Path[1:], tgtEscaped + reqEscaped[1:]
+	case !tgtHasSlash && !reqHasSlash:
+		return target.Path + "/" + req.URL.Path, tgtEscaped + "/" + reqEscaped
+	default:
+		return target.Path + req.URL.Path, tgtEscaped + reqEscaped
 	}
-	path := singleJoiningSlash(tgtPath, reqPath)
-	rawPath := path
-	if req.URL.RawPath != "" || target.RawPath != "" {
-		rawPath = singleJoiningSlash(target.RawPath, req.URL.RawPath)
-	}
-	return path, rawPath
 }
 
 func singleJoiningSlash(a, b string) string {
