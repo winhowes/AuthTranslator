@@ -131,6 +131,22 @@ func TestValidateAllowlistEntriesDuplicateRule(t *testing.T) {
 	}
 }
 
+func TestValidateAllowlistEntriesDuplicateNormalizedPath(t *testing.T) {
+	entries := []AllowlistEntry{{
+		Integration: "test",
+		Callers: []CallerConfig{{
+			ID: "c",
+			Rules: []CallRule{
+				{Path: "/x", Methods: map[string]RequestConstraint{"GET": {}}},
+				{Path: "x/", Methods: map[string]RequestConstraint{"GET": {}}},
+			},
+		}},
+	}}
+	if err := validateAllowlistEntries(entries); err == nil {
+		t.Fatal("expected error for duplicate rule with equivalent paths")
+	}
+}
+
 func TestValidateAllowlistEntriesDuplicateWildcardCaller(t *testing.T) {
 	entries := []AllowlistEntry{{
 		Integration: "test",
