@@ -115,6 +115,41 @@ func TestWriteTimeoutFlagSet(t *testing.T) {
 	}
 }
 
+func TestRemoteFetchTimeoutFlagDefault(t *testing.T) {
+	if *remoteFetchTimeout != 10*time.Second {
+		t.Fatalf("expected default 10s, got %v", *remoteFetchTimeout)
+	}
+	if httpClient.Timeout != 10*time.Second {
+		t.Fatalf("expected default client timeout 10s, got %v", httpClient.Timeout)
+	}
+}
+
+func TestRemoteFetchTimeoutFlagSet(t *testing.T) {
+	oldFlag := *remoteFetchTimeout
+	oldTimeout := httpClient.Timeout
+	t.Cleanup(func() {
+		*remoteFetchTimeout = oldFlag
+		httpClient.Timeout = oldTimeout
+		if err := flag.Set("remote-fetch-timeout", oldFlag.String()); err != nil {
+			t.Errorf("cleanup: %v", err)
+		}
+	})
+
+	if err := flag.Set("remote-fetch-timeout", "42s"); err != nil {
+		t.Fatal(err)
+	}
+
+	applyRemoteFetchTimeout()
+
+	if *remoteFetchTimeout != 42*time.Second {
+		t.Fatalf("expected 42s flag value, got %v", *remoteFetchTimeout)
+	}
+
+	if httpClient.Timeout != 42*time.Second {
+		t.Fatalf("expected client timeout 42s, got %v", httpClient.Timeout)
+	}
+}
+
 type stubServer struct{ tls bool }
 
 func (s *stubServer) ListenAndServe() error                    { return nil }
