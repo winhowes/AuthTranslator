@@ -72,7 +72,7 @@ Make sure `$SLACK_TOKEN` is still in your environment.
 * **Request blocks** live in `denylist.yaml`. Add patterns that should return `403` before hitting the upstream.
 * The proxy hot‑reloads on **SIGHUP** or when started with `-watch`.
 
-Full schema details: [Configuration](configuration.md).
+Full schema details: [Configuration](configuration-overview.md).
 For a deeper dive into permissions, see the [Allowlist Configuration](allowlist-yaml.md) guide.
 
 AuthTranslator is extensible via three types of plugins:

@@ -2,7 +2,7 @@
 
 AuthTranslator never expects you to paste raw API keys into a YAML file. Instead, any plugin parameter that contains a credential can use a **secret URI**. At runtime the proxy resolves that URI via a pluggable back‑end and injects the value.
 
-For full config examples, see the [Configuration Reference](configuration.md).
+For full config examples, see the [Configuration Reference](configuration-overview.md).
 For plugin-specific usage, refer to the [Auth Plugins](auth-plugins.md) guide.
 ```yaml
 outgoing_auth:
