@@ -5,7 +5,7 @@ The **denylist** answers another narrow question:
 > *Given this caller ID and integration, must the request be rejected—even if the allowlist would pass it?*
 
 It lives beside `config.yaml` and `allowlist.yaml`, is hot‑reloaded, and is entirely optional. In day‑to‑day operation you should
-prefer shaping access through the [allowlist](allowlist-config.md); the denylist is best reserved for defensive blocks (for
+prefer shaping access through the [allowlist](allowlist-yaml.md); the denylist is best reserved for defensive blocks (for
 example, temporarily disabling tool calls in the OpenAI Responses API or blocking a channel in Slack that should never be posted to). Both files can be used in tandem: a
 request must first be permitted by the allowlist and then **avoid matching** any deny rules.
 

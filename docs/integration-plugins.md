@@ -1,7 +1,7 @@
 # Integration Plugins
 
 While **auth plugins** focus on translating credentials, an **integration plugin** bundles everything required to speak to a specific upstream service—URL, auth hints, default rate‑limits, and convenience CLI helpers.
-Think of it as a *cookie‑cutter* that stamps out a ready‑to‑run block in your `config.yaml` so teams don’t reinvent the wheel for common SaaS APIs.
+Think of it as a *cookie‑cutter* that stamps out a ready‑to‑run block in your `config.yaml` so teams don’t reinvent the wheel for common SaaS APIs. If you want to fully customize the resulting YAML, hop over to the [config walkthrough](config-yaml.md) for a field-by-field tour.
 
 > **Why separate the concerns?**
 > *Auth plugin* → **how** to sign a request (Bearer, Basic, etc.).
@@ -99,7 +99,7 @@ integrations:
     << generated block >>
 ```
 
-From here you can tweak fields—e.g. turn on `tls_insecure_skip_verify` for a dev sandbox.
+From here you can tweak fields—e.g. turn on `tls_insecure_skip_verify` for a dev sandbox. For deeper customization guidance, review the [config walkthrough](config-yaml.md).
 
 ---
 
