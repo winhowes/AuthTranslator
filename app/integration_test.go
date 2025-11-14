@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -8,6 +9,7 @@ import (
 	"math/big"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"reflect"
 	"strings"
 	"testing"
@@ -288,6 +290,72 @@ func TestResolveRequestDestinationStatic(t *testing.T) {
 	}
 	if dest.String() != "https://api.example.com" {
 		t.Fatalf("unexpected destination: %s", dest)
+	}
+}
+
+func TestContextWithResolvedDestination(t *testing.T) {
+	dest, err := url.Parse("https://foo.example.com/base")
+	if err != nil {
+		t.Fatalf("failed to parse destination: %v", err)
+	}
+
+	ctx := contextWithResolvedDestination(context.Background(), dest)
+
+	got, ok := resolvedDestinationFromContext(ctx)
+	if !ok {
+		t.Fatal("expected destination in context")
+	}
+	if got != dest {
+		t.Fatalf("unexpected destination pointer: %p != %p", got, dest)
+	}
+	if resolvedDestinationApplied(ctx) {
+		t.Fatal("destination should not be marked applied by default")
+	}
+
+	markResolvedDestinationApplied(ctx)
+	if !resolvedDestinationApplied(ctx) {
+		t.Fatal("expected destination to be marked applied")
+	}
+
+	got2, ok := resolvedDestinationFromContext(ctx)
+	if !ok || got2 != dest {
+		t.Fatal("resolved destination should remain available after marking applied")
+	}
+}
+
+func TestApplyResolvedDestination(t *testing.T) {
+	dest, err := url.Parse("https://backend.example.com:8443/base?token=1")
+	if err != nil {
+		t.Fatalf("failed to parse destination: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "http://incoming/request?user=alice", nil)
+	req = req.WithContext(contextWithResolvedDestination(req.Context(), dest))
+
+	applyResolvedDestination(req, dest)
+
+	if got := req.URL.Scheme; got != "https" {
+		t.Fatalf("unexpected scheme %q", got)
+	}
+	if got := req.URL.Host; got != "backend.example.com:8443" {
+		t.Fatalf("unexpected url host %q", got)
+	}
+	if got := req.Host; got != "backend.example.com:8443" {
+		t.Fatalf("unexpected request host %q", got)
+	}
+	if got := req.URL.Path; got != "/base/request" {
+		t.Fatalf("unexpected path %q", got)
+	}
+	if got := req.URL.RawQuery; got != "token=1&user=alice" {
+		t.Fatalf("unexpected query %q", got)
+	}
+	if !resolvedDestinationApplied(req.Context()) {
+		t.Fatal("expected destination to be marked applied")
+	}
+
+	got, ok := resolvedDestinationFromContext(req.Context())
+	if !ok || got != dest {
+		t.Fatal("expected destination to remain in context after application")
 	}
 }
 
