@@ -27,7 +27,7 @@ integrations:
     rate_limit_window: 1m
 ```
 
-The integration name (`slack` above) is referenced by the allowlist. Incoming plugins run in order until one succeeds, optionally producing the caller ID (depending on the auth plugins). Outgoing plugins modify each request before forwarding it to the `destination` URL. Names are lowercased automatically and may include letters, numbers, dashes, underscores, and dots.
+The integration name (`slack` above) is referenced by the allowlist. Incoming plugins run sequentially and **each** must authorise the request; plugins that implement the identifier interface can set the caller ID and those that implement the stripper interface remove the original credential before proxying. Outgoing plugins modify each request before forwarding it to the `destination` URL. Names are lowercased automatically and may include letters, numbers, dashes, underscores, and dots.
 
 Need to fan out to many subdomains? Use a `destination` with a wildcard host such as `https://*.example.com`. Every request must supply an `X-AT-Destination` header that resolves the wildcard (for example `https://foo.example.com`); the proxy validates the header, strips it, and then forwards the request using the configured base path.
 
