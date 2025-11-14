@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
@@ -207,7 +209,44 @@ func TestFetchTokenRequestError(t *testing.T) {
 	oldHost := MetadataHost
 	MetadataHost = ":"
 	defer func() { MetadataHost = oldHost }()
-	if _, _, err := fetchToken(); err == nil {
+	if _, _, err := fetchToken(context.Background()); err == nil {
 		t.Fatal("expected error from bad url")
+	}
+}
+
+func TestGCPTokenAddAuthPassesContext(t *testing.T) {
+	type ctxKey string
+	key := ctxKey("k")
+
+	oldClient := HTTPClient
+	defer func() { HTTPClient = oldClient }()
+	var seen any
+	HTTPClient = &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		resp := &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(strings.NewReader("{\"access_token\":\"tok\",\"expires_in\":10}")),
+		}
+		seen = r.Context().Value(key)
+		return resp, nil
+	})}
+
+	setCachedToken("", time.Time{})
+	defer setCachedToken("", time.Time{})
+
+	ctx := context.WithValue(context.Background(), key, "v")
+	p := GCPToken{}
+	cfg, err := p.ParseParams(map[string]any{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := &http.Request{Header: http.Header{}}
+	if err := p.AddAuth(ctx, r, cfg); err != nil {
+		t.Fatalf("AddAuth error: %v", err)
+	}
+	if seen != "v" {
+		t.Fatalf("expected context value to propagate, got %v", seen)
+	}
+	if got := r.Header.Get("Authorization"); got != "Bearer tok" {
+		t.Fatalf("expected header to be set, got %s", got)
 	}
 }
