@@ -119,15 +119,17 @@ Two ways to authorise a caller:
 Values for `query`, `headers`, and `body` are compared using **exact string equality**.
 Regular expressions are not supported.
 
-### Top‑level keys
+### Entry fields
 
-| Field        | Type               | Notes                                          |   |
-| ------------ | ------------------ | ---------------------------------------------- | - |
-| `callers`    | map\[string]Caller | Caller ID comes from the incoming‑auth plugin. |   |
+Each document entry targets a single integration and lists the callers that are
+authorised to use it.
+
+| Field         | Type       | Notes                                                   |
+| ------------- | ---------- | ------------------------------------------------------- |
+| `integration` | string     | Integration name (case-insensitive). Matches `config.yaml`.
+| `callers`     | `[]Caller` | Caller definitions. Caller IDs come from inbound auth plug-ins. |
 
 ### `Caller` object
-
-`<integration‑name>` sub‑keys match those in `config.yaml`.
 
 | Field          | Type       | Notes                                                   |
 | -------------- | ---------- | ------------------------------------------------------- |
