@@ -126,3 +126,29 @@ func TestValidateConfigAllowsDotsAndUnderscores(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
+
+func TestValidateConfigAllowsWildcardDestinations(t *testing.T) {
+	good := Config{Integrations: []Integration{{Name: "wild", Destination: "https://*.example.com"}}}
+	if err := validateConfig(&good); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	goodPort := Config{Integrations: []Integration{{Name: "wildport", Destination: "https://*.example.com:8443"}}}
+	if err := validateConfig(&goodPort); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestValidateConfigRejectsInvalidWildcardDestinations(t *testing.T) {
+	tests := []string{
+		"https://example.com/*",
+		"https://example.com/path*",
+		"https://*",
+	}
+	for _, dest := range tests {
+		c := Config{Integrations: []Integration{{Name: "badwild", Destination: dest}}}
+		if err := validateConfig(&c); err == nil {
+			t.Fatalf("expected error for destination %s", dest)
+		}
+	}
+}

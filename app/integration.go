@@ -1,9 +1,11 @@
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -152,6 +154,9 @@ type Integration struct {
 
 	destinationURL *url.URL               `json:"-" yaml:"-"`
 	proxy          *httputil.ReverseProxy `json:"-" yaml:"-"`
+
+	requiresDestinationHeader bool
+	wildcardHostPattern       string
 }
 
 var integrations = struct {
@@ -174,14 +179,52 @@ func prepareIntegration(i *Integration) error {
 		return fmt.Errorf("invalid destination URL: %w", err)
 	}
 	i.destinationURL = u
-	i.proxy = httputil.NewSingleHostReverseProxy(u)
-	// Ensure the upstream sees the correct Host header.
-	oldDirector := i.proxy.Director
-	i.proxy.Director = func(req *http.Request) {
-		oldDirector(req)
-		req.Host = u.Host
+
+	hostPattern := u.Hostname()
+	hasWildcard := strings.Contains(hostPattern, "*")
+	if hasWildcard {
+		if u.User != nil {
+			return fmt.Errorf("invalid destination URL: wildcard destinations cannot include user info")
+		}
+		if strings.Contains(u.Scheme, "*") || strings.Contains(u.Path, "*") || strings.Contains(u.RawQuery, "*") || strings.Contains(u.Fragment, "*") {
+			return fmt.Errorf("invalid destination URL: wildcard destinations must not include * outside the host")
+		}
+		if strings.Contains(u.Port(), "*") {
+			return fmt.Errorf("invalid destination URL: wildcard destinations must not include * in the port")
+		}
+		trimmed := strings.ReplaceAll(hostPattern, "*", "")
+		if strings.Trim(trimmed, ".") == "" {
+			return fmt.Errorf("invalid destination URL: wildcard host must include a base domain")
+		}
+		i.requiresDestinationHeader = true
+		i.wildcardHostPattern = strings.ToLower(hostPattern)
+	} else {
+		i.requiresDestinationHeader = false
+		i.wildcardHostPattern = ""
 	}
-	// Fire metrics hooks after the upstream responds.
+
+	i.proxy = httputil.NewSingleHostReverseProxy(u)
+	oldDirector := i.proxy.Director
+	if hasWildcard {
+		i.proxy.Director = func(req *http.Request) {
+			dest, ok := resolvedDestinationFromContext(req.Context())
+			if !ok {
+				oldDirector(req)
+				req.Host = u.Host
+				return
+			}
+			if resolvedDestinationApplied(req.Context()) {
+				return
+			}
+			applyResolvedDestination(req, dest)
+		}
+	} else {
+		i.proxy.Director = func(req *http.Request) {
+			oldDirector(req)
+			req.Host = u.Host
+		}
+	}
+
 	i.proxy.ModifyResponse = func(resp *http.Response) error {
 		caller := metrics.Caller(resp.Request.Context())
 		metrics.OnResponse(i.Name, caller, resp.Request, resp)
@@ -213,7 +256,6 @@ func prepareIntegration(i *Integration) error {
 		return fmt.Errorf("invalid rate_limit_strategy %s", i.RateLimitStrategy)
 	}
 
-	// ─── Validate incoming-auth configs ───────────────────────────────────────
 	for idx, a := range i.IncomingAuth {
 		p := authplugins.GetIncoming(a.Type)
 		if p == nil {
@@ -307,6 +349,190 @@ func prepareIntegration(i *Integration) error {
 	i.proxy.Transport = tr
 
 	return nil
+}
+func (i *Integration) resolveRequestDestination(r *http.Request) (*url.URL, error) {
+	if !i.requiresDestinationHeader {
+		return i.destinationURL, nil
+	}
+
+	header := r.Header.Get("X-AT-Destination")
+	if header == "" {
+		return nil, errors.New("missing X-AT-Destination header")
+	}
+
+	dest, err := url.Parse(header)
+	if err != nil {
+		return nil, fmt.Errorf("invalid X-AT-Destination header: %w", err)
+	}
+	if dest.User != nil {
+		return nil, errors.New("invalid X-AT-Destination header: user info not allowed")
+	}
+	if dest.Host == "" {
+		return nil, errors.New("invalid X-AT-Destination header: missing host")
+	}
+	if strings.Contains(dest.Hostname(), "*") {
+		return nil, errors.New("invalid X-AT-Destination header: wildcard not allowed")
+	}
+
+	scheme := dest.Scheme
+	if scheme == "" {
+		scheme = i.destinationURL.Scheme
+	}
+	if !strings.EqualFold(scheme, i.destinationURL.Scheme) {
+		return nil, errors.New("invalid X-AT-Destination header: unexpected scheme")
+	}
+
+	if !matchWildcardHost(i.wildcardHostPattern, dest.Hostname()) {
+		return nil, errors.New("invalid X-AT-Destination header: host not permitted")
+	}
+
+	port := dest.Port()
+	cfgPort := i.destinationURL.Port()
+	switch {
+	case cfgPort != "" && port == "":
+		dest.Host = net.JoinHostPort(dest.Hostname(), cfgPort)
+	case cfgPort != "" && port != cfgPort:
+		return nil, errors.New("invalid X-AT-Destination header: unexpected port")
+	case cfgPort == "" && port != "":
+		return nil, errors.New("invalid X-AT-Destination header: unexpected port")
+	}
+
+	resolved := *i.destinationURL
+	resolved.Scheme = scheme
+	resolved.Host = dest.Host
+	resolved.User = nil
+	return &resolved, nil
+}
+
+type resolvedDestinationKey struct{}
+
+type resolvedDestinationState struct {
+	dest    *url.URL
+	applied bool
+}
+
+func contextWithResolvedDestination(ctx context.Context, dest *url.URL) context.Context {
+	return context.WithValue(ctx, resolvedDestinationKey{}, &resolvedDestinationState{dest: dest})
+}
+
+func resolvedDestinationFromContext(ctx context.Context) (*url.URL, bool) {
+	state, _ := ctx.Value(resolvedDestinationKey{}).(*resolvedDestinationState)
+	if state == nil || state.dest == nil {
+		return nil, false
+	}
+	return state.dest, true
+}
+
+func resolvedDestinationApplied(ctx context.Context) bool {
+	state, _ := ctx.Value(resolvedDestinationKey{}).(*resolvedDestinationState)
+	if state == nil {
+		return false
+	}
+	return state.applied
+}
+
+func markResolvedDestinationApplied(ctx context.Context) {
+	state, _ := ctx.Value(resolvedDestinationKey{}).(*resolvedDestinationState)
+	if state != nil {
+		state.applied = true
+	}
+}
+
+func applyResolvedDestination(req *http.Request, dest *url.URL) {
+	path, rawPath := joinProxyPath(dest, req)
+	targetQuery := dest.RawQuery
+
+	req.URL.Scheme = dest.Scheme
+	req.URL.Host = dest.Host
+	req.Host = dest.Host
+	req.URL.Path = path
+	req.URL.RawPath = rawPath
+
+	if targetQuery == "" || req.URL.RawQuery == "" {
+		req.URL.RawQuery = targetQuery + req.URL.RawQuery
+	} else {
+		req.URL.RawQuery = targetQuery + "&" + req.URL.RawQuery
+	}
+	if _, ok := req.Header["User-Agent"]; !ok {
+		req.Header.Set("User-Agent", "")
+	}
+
+	markResolvedDestinationApplied(req.Context())
+}
+
+func matchWildcardHost(pattern, host string) bool {
+	if pattern == "" {
+		return strings.EqualFold(pattern, host)
+	}
+	pattern = strings.ToLower(pattern)
+	host = strings.ToLower(host)
+	if !strings.Contains(pattern, "*") {
+		return host == pattern
+	}
+
+	segments := strings.Split(pattern, "*")
+	if !strings.HasPrefix(host, segments[0]) {
+		return false
+	}
+	host = host[len(segments[0]):]
+	for i := 1; i < len(segments); i++ {
+		segment := segments[i]
+		last := i == len(segments)-1
+		if last {
+			if segment == "" {
+				return true
+			}
+			if !strings.HasSuffix(host, segment) {
+				return false
+			}
+			if strings.HasPrefix(pattern, "*") && len(host) == len(segment) {
+				return false
+			}
+			return true
+		}
+		pos := strings.Index(host, segment)
+		if pos < 0 {
+			return false
+		}
+		host = host[pos+len(segment):]
+	}
+	return true
+}
+
+func joinProxyPath(target *url.URL, req *http.Request) (string, string) {
+	if target.RawPath == "" && req.URL.RawPath == "" {
+		return singleJoiningSlash(target.Path, req.URL.Path), ""
+	}
+
+	tgtEscaped := target.EscapedPath()
+	reqEscaped := req.URL.EscapedPath()
+
+	tgtHasSlash := strings.HasSuffix(tgtEscaped, "/")
+	reqHasSlash := strings.HasPrefix(reqEscaped, "/")
+
+	switch {
+	case tgtHasSlash && reqHasSlash:
+		return target.Path + req.URL.Path[1:], tgtEscaped + reqEscaped[1:]
+	case !tgtHasSlash && !reqHasSlash:
+		return target.Path + "/" + req.URL.Path, tgtEscaped + "/" + reqEscaped
+	default:
+		return target.Path + req.URL.Path, tgtEscaped + reqEscaped
+	}
+}
+
+func singleJoiningSlash(a, b string) string {
+	aslash := strings.HasSuffix(a, "/")
+	bslash := strings.HasPrefix(b, "/")
+	switch {
+	case aslash && bslash:
+		return a + b[1:]
+	case !aslash && !bslash:
+		if a == "" || b == "" {
+			return a + b
+		}
+		return a + "/" + b
+	}
+	return a + b
 }
 
 // AddIntegration validates and stores a new integration.
