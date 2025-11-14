@@ -192,8 +192,8 @@ func prepareIntegration(i *Integration) error {
 		if strings.Contains(u.Port(), "*") {
 			return fmt.Errorf("invalid destination URL: wildcard destinations must not include * in the port")
 		}
-		trimmed := strings.ReplaceAll(hostPattern, "*", "")
-		if strings.Trim(trimmed, ".") == "" {
+		trimmed := strings.Trim(strings.ReplaceAll(hostPattern, "*", ""), ".")
+		if trimmed == "" && hostPattern != "*" {
 			return fmt.Errorf("invalid destination URL: wildcard host must include a base domain")
 		}
 		i.requiresDestinationHeader = true

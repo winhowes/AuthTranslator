@@ -85,6 +85,33 @@ func TestValidateAllowlistEntriesMethodCaseIgnored(t *testing.T) {
 	}
 }
 
+func TestValidateAllowlistEntriesMethodWhitespaceTrimmed(t *testing.T) {
+	entries := []AllowlistEntry{{
+		Integration: "test",
+		Callers:     []CallerConfig{{ID: "c", Rules: []CallRule{{Path: "/x", Methods: map[string]RequestConstraint{" get ": {}}}}}},
+	}}
+	if err := validateAllowlistEntries(entries); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestValidateAllowlistEntriesMethodWhitespaceDuplicate(t *testing.T) {
+	entries := []AllowlistEntry{{
+		Integration: "test",
+		Callers: []CallerConfig{{
+			ID: "c",
+			Rules: []CallRule{{
+				Path:    "/x",
+				Methods: map[string]RequestConstraint{"GET": {}, " get ": {}},
+			}},
+		}},
+	}}
+	err := validateAllowlistEntries(entries)
+	if err == nil || !strings.Contains(err.Error(), "duplicate rule") {
+		t.Fatalf("expected duplicate rule error, got %v", err)
+	}
+}
+
 func TestValidateAllowlistEntriesCapabilityParamErrors(t *testing.T) {
 	entries := []AllowlistEntry{{
 		Integration: "slack",
