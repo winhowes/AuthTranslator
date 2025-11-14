@@ -88,12 +88,25 @@ func verifyRS256(parts []string, pemData []byte) bool {
 	if block == nil {
 		return false
 	}
-	pub, err := x509.ParsePKIXPublicKey(block.Bytes)
-	if err != nil {
-		return false
-	}
-	rsaPub, ok := pub.(*rsa.PublicKey)
-	if !ok {
+	var rsaPub *rsa.PublicKey
+	switch block.Type {
+	case "PUBLIC KEY":
+		pub, err := x509.ParsePKIXPublicKey(block.Bytes)
+		if err != nil {
+			return false
+		}
+		var ok bool
+		rsaPub, ok = pub.(*rsa.PublicKey)
+		if !ok {
+			return false
+		}
+	case "RSA PUBLIC KEY":
+		key, err := x509.ParsePKCS1PublicKey(block.Bytes)
+		if err != nil {
+			return false
+		}
+		rsaPub = key
+	default:
 		return false
 	}
 	sig, err := base64.RawURLEncoding.DecodeString(parts[2])

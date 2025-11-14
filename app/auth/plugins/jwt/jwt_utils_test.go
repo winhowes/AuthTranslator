@@ -65,6 +65,11 @@ func TestVerifyRS256(t *testing.T) {
 	if !verifyRS256(parts, pemBytes) {
 		t.Fatal("expected verifyRS256 success")
 	}
+	// ensure PKCS#1 encoded keys are also accepted
+	pkcs1 := pem.EncodeToMemory(&pem.Block{Type: "RSA PUBLIC KEY", Bytes: x509.MarshalPKCS1PublicKey(&key.PublicKey)})
+	if !verifyRS256(parts, pkcs1) {
+		t.Fatal("expected verifyRS256 success for RSA PUBLIC KEY")
+	}
 	// modify signature to fail
 	bad := []string{parts[0], parts[1], parts[2] + "bad"}
 	if verifyRS256(bad, pemBytes) {
