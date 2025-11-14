@@ -390,7 +390,6 @@ func TestPrepareIntegrationWildcardValidation(t *testing.T) {
 		{name: "scheme_star", destination: "h*tp://*.example.com"},
 		{name: "path_star", destination: "https://*.example.com/foo*"},
 		{name: "port_star", destination: "https://*.example.com:*"},
-		{name: "no_base", destination: "https://*/"},
 	}
 
 	for _, tc := range cases {
@@ -412,6 +411,19 @@ func TestPrepareIntegrationWildcardFlags(t *testing.T) {
 		t.Fatal("expected wildcard integration to require destination header")
 	}
 	if integ.wildcardHostPattern != "*.example.com" {
+		t.Fatalf("unexpected wildcard host pattern: %q", integ.wildcardHostPattern)
+	}
+}
+
+func TestPrepareIntegrationWildcardCatchAll(t *testing.T) {
+	integ := &Integration{Name: "catchall", Destination: "https://*/"}
+	if err := prepareIntegration(integ); err != nil {
+		t.Fatalf("prepareIntegration: %v", err)
+	}
+	if !integ.requiresDestinationHeader {
+		t.Fatal("expected wildcard integration to require destination header")
+	}
+	if integ.wildcardHostPattern != "*" {
 		t.Fatalf("unexpected wildcard host pattern: %q", integ.wildcardHostPattern)
 	}
 }
