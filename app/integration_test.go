@@ -216,6 +216,27 @@ func TestResolveRequestDestinationWildcard(t *testing.T) {
 	}
 }
 
+func TestResolveRequestDestinationWildcardNoScheme(t *testing.T) {
+	integ := &Integration{Name: "wild-noscheme", Destination: "https://*.example.com"}
+	if err := prepareIntegration(integ); err != nil {
+		t.Fatalf("prepareIntegration: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "http://wild-noscheme", nil)
+	req.Header.Set("X-AT-Destination", "//foo.example.com")
+
+	dest, err := integ.resolveRequestDestination(req)
+	if err != nil {
+		t.Fatalf("resolveRequestDestination: %v", err)
+	}
+	if dest.Scheme != "https" {
+		t.Fatalf("expected scheme fallback to https, got %s", dest.Scheme)
+	}
+	if dest.Host != "foo.example.com" {
+		t.Fatalf("unexpected host: %s", dest.Host)
+	}
+}
+
 func TestResolveRequestDestinationWildcardErrors(t *testing.T) {
 	integ := &Integration{Name: "wild-err", Destination: "https://*.example.com"}
 	if err := prepareIntegration(integ); err != nil {
@@ -234,6 +255,7 @@ func TestResolveRequestDestinationWildcardErrors(t *testing.T) {
 		{name: "user_info", header: "https://user:pass@foo.example.com"},
 		{name: "missing_host", header: "https:///path"},
 		{name: "wildcard_header", header: "https://*.example.com"},
+		{name: "invalid_url", header: "%"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

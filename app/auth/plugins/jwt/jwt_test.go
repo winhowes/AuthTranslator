@@ -188,6 +188,26 @@ func TestJWTAuthRS256(t *testing.T) {
 	}
 }
 
+func TestJWTAuthRS256PKCS1PublicKey(t *testing.T) {
+	secrets.ClearCache()
+	key, err := rsa.GenerateKey(rand.Reader, 1024)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tok := makeRS256TokenClaims(t, key, "aud", "iss", "user", time.Now().Add(time.Hour).Unix())
+	pemBytes := pem.EncodeToMemory(&pem.Block{Type: "RSA PUBLIC KEY", Bytes: x509.MarshalPKCS1PublicKey(&key.PublicKey)})
+	t.Setenv("PKCS1", string(pemBytes))
+	p := JWTAuth{}
+	cfg, err := p.ParseParams(map[string]interface{}{"secrets": []string{"env:PKCS1"}, "audience": "aud", "issuer": "iss"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := &http.Request{Header: http.Header{"Authorization": []string{"Bearer " + tok}}}
+	if !p.Authenticate(context.Background(), r, cfg) {
+		t.Fatal("expected authentication to succeed with RSA PUBLIC KEY")
+	}
+}
+
 func TestJWTAuthUnsupportedAlgo(t *testing.T) {
 	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"none"}`))
 	payload := base64.RawURLEncoding.EncodeToString([]byte(`{}`))
