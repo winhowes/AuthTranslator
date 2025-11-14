@@ -41,6 +41,7 @@ func validateAllowlistEntry(name string, callers []CallerConfig) error {
 		if len(c.Rules) == 0 && len(c.Capabilities) == 0 {
 			return fmt.Errorf("caller %q has no rules or capabilities", id)
 		}
+		ruleSeen := make(map[string]map[string]struct{})
 		for _, cap := range c.Capabilities {
 			if err := validateCapability(name, cap); err != nil {
 				return err
@@ -53,10 +54,18 @@ func validateAllowlistEntry(name string, callers []CallerConfig) error {
 			if len(r.Methods) == 0 {
 				return fmt.Errorf("caller %q rule %d has no methods", id, ri)
 			}
+			normPath := strings.Join(splitPath(r.Path), "/")
+			if ruleSeen[normPath] == nil {
+				ruleSeen[normPath] = make(map[string]struct{})
+			}
 			for m := range r.Methods {
 				if strings.TrimSpace(m) == "" {
 					return fmt.Errorf("caller %q rule %d invalid method %q", id, ri, m)
 				}
+				if _, dup := ruleSeen[normPath][strings.ToUpper(m)]; dup {
+					return fmt.Errorf("duplicate rule for caller %q path %q method %s", id, r.Path, m)
+				}
+				ruleSeen[normPath][strings.ToUpper(m)] = struct{}{}
 			}
 		}
 	}
