@@ -59,13 +59,15 @@ func validateAllowlistEntry(name string, callers []CallerConfig) error {
 				ruleSeen[normPath] = make(map[string]struct{})
 			}
 			for m := range r.Methods {
-				if strings.TrimSpace(m) == "" {
+				trimmed := strings.TrimSpace(m)
+				if trimmed == "" {
 					return fmt.Errorf("caller %q rule %d invalid method %q", id, ri, m)
 				}
-				if _, dup := ruleSeen[normPath][strings.ToUpper(m)]; dup {
-					return fmt.Errorf("duplicate rule for caller %q path %q method %s", id, r.Path, m)
+				upper := strings.ToUpper(trimmed)
+				if _, dup := ruleSeen[normPath][upper]; dup {
+					return fmt.Errorf("duplicate rule for caller %q path %q method %s", id, r.Path, upper)
 				}
-				ruleSeen[normPath][strings.ToUpper(m)] = struct{}{}
+				ruleSeen[normPath][upper] = struct{}{}
 			}
 		}
 	}
@@ -75,7 +77,11 @@ func validateAllowlistEntry(name string, callers []CallerConfig) error {
 		for ri := range rules {
 			methods := make(map[string]RequestConstraint, len(rules[ri].Methods))
 			for m, cons := range rules[ri].Methods {
-				methods[strings.ToUpper(m)] = cons
+				trimmed := strings.TrimSpace(m)
+				if trimmed == "" {
+					continue
+				}
+				methods[strings.ToUpper(trimmed)] = cons
 			}
 			rules[ri].Methods = methods
 		}

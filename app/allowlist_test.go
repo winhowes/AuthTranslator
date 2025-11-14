@@ -144,12 +144,12 @@ func TestSetAllowlistDuplicateRule(t *testing.T) {
 	}
 }
 
-func TestSetAllowlistLowercaseMethod(t *testing.T) {
+func TestSetAllowlistMethodNormalization(t *testing.T) {
 	allowlists.Lock()
 	allowlists.m = make(map[string]map[string]CallerConfig)
 	allowlists.Unlock()
 
-	if err := SetAllowlist("case", []CallerConfig{{ID: "*", Rules: []CallRule{{Path: "/ok", Methods: map[string]RequestConstraint{"get": {}}}}}}); err != nil {
+	if err := SetAllowlist("case", []CallerConfig{{ID: "*", Rules: []CallRule{{Path: "/ok", Methods: map[string]RequestConstraint{" get ": {}}}}}}); err != nil {
 		t.Fatalf("failed to set allowlist: %v", err)
 	}
 
