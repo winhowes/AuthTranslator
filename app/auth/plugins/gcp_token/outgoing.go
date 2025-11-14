@@ -66,7 +66,7 @@ func (g *GCPToken) AddAuth(ctx context.Context, r *http.Request, params interfac
 	tok, exp := getCachedToken()
 	if tok == "" || time.Now().After(exp.Add(-1*time.Minute)) {
 		var err error
-		tok, exp, err = fetchToken()
+		tok, exp, err = fetchToken(ctx)
 		if err != nil {
 			return err
 		}
@@ -76,8 +76,8 @@ func (g *GCPToken) AddAuth(ctx context.Context, r *http.Request, params interfac
 	return nil
 }
 
-func fetchToken() (string, time.Time, error) {
-	req, err := http.NewRequest("GET", MetadataHost+"/computeMetadata/v1/instance/service-accounts/default/token", nil)
+func fetchToken(ctx context.Context) (string, time.Time, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", MetadataHost+"/computeMetadata/v1/instance/service-accounts/default/token", nil)
 	if err != nil {
 		return "", time.Time{}, err
 	}
