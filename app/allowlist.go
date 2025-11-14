@@ -77,7 +77,11 @@ func SetAllowlist(name string, callers []CallerConfig) error {
 			r.Segments = splitPath(r.Path)
 			methods := make(map[string]RequestConstraint, len(r.Methods))
 			for mth, cons := range r.Methods {
-				methods[strings.ToUpper(mth)] = cons
+				method := strings.TrimSpace(mth)
+				if method == "" {
+					continue
+				}
+				methods[strings.ToUpper(method)] = cons
 			}
 			r.Methods = methods
 		}
