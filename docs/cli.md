@@ -91,7 +91,18 @@ go run ./cmd/allowlist remove -integration slack \
 | `-caller`      | –                | Caller ID for `add`/`remove`.       |
 | `-integration` | –                | Integration name for `add`/`remove`. |
 | `-capability`  | –                | Capability name for `add`/`remove`. |
-| `-params`      | ""               | Extra key=value pairs for `add` (optional). |
+| `-params`      | ""               | Extra `key=value` pairs for `add` (optional). |
+
+`allowlist list` prints the capability names registered by each integration plug-in
+and the parameter keys they expect. It does **not** read `allowlist.yaml`; the
+command is purely a discovery tool to help you decide which capability name and
+parameter keys to pass to `add`.
+
+The `-params` flag accepts a comma-separated list such as
+`username=bot-123,channel=C123`. Each value is stored as a string in the YAML.
+When a capability requires structured data (for example, the Slack plug-in's
+`channels` parameter expects a list), run `add` with the closest shape you can and
+then touch up the generated YAML manually to insert arrays or nested objects.
 
 ---
 
