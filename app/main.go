@@ -132,7 +132,9 @@ var enableHTTP3 = flag.Bool("enable-http3", false, "serve HTTP/3 in addition to 
 var logger = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 
 // httpClient is used for fetching remote configuration and allowlist files.
-// It has a 10 second timeout.
+// It defaults to a 10 second timeout that can be overridden with -remote-fetch-timeout.
+var remoteFetchTimeout = flag.Duration("remote-fetch-timeout", 10*time.Second, "timeout for fetching remote configuration, allowlist, and denylist files")
+
 var httpClient = &http.Client{Timeout: 10 * time.Second}
 
 // setAllowlist is used by reload to register caller allowlists. It is declared
@@ -173,6 +175,10 @@ func openSource(path string) (io.ReadCloser, error) {
 		return resp.Body, nil
 	}
 	return os.Open(path)
+}
+
+func applyRemoteFetchTimeout() {
+	httpClient.Timeout = *remoteFetchTimeout
 }
 
 func loadConfig(filename string) (*Config, error) {
@@ -1278,6 +1284,8 @@ func newHTTPServer(addr string) *http.Server {
 func main() {
 	flag.Usage = usage
 	flag.Parse()
+
+	applyRemoteFetchTimeout()
 
 	if (*metricsUser != "" && *metricsPass == "") || (*metricsUser == "" && *metricsPass != "") {
 		log.Fatal("both -metrics-user and -metrics-pass must be provided")

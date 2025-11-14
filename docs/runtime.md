@@ -13,7 +13,7 @@ This guide explains how AuthTranslator behaves at runtime and lists the service 
 
 ## Hot reload
 
-Send `SIGHUP` or run with `-watch` to reload the configuration, allowlist, and denylist files without dropping connections. The watcher re-adds itself when files are replaced so edits trigger a reload automatically. Remote configuration URLs are fetched with a 10&nbsp;second HTTP timeout.
+Send `SIGHUP` or run with `-watch` to reload the configuration, allowlist, and denylist files without dropping connections. The watcher re-adds itself when files are replaced so edits trigger a reload automatically. Remote configuration URLs honour the `-remote-fetch-timeout` flag (default 10&nbsp;seconds) when fetching over HTTP.
 
 ---
 
@@ -37,6 +37,7 @@ AuthTranslator exposes several command‑line options:
 | `-allowlist-url` | URL for a remote allowlist file |
 | `-denylist` | path to the denylist file (`denylist.yaml` by default) |
 | `-denylist-url` | URL for a remote denylist file |
+| `-remote-fetch-timeout` | HTTP timeout when fetching remote configuration, allowlist, or denylist files (default `10s`) |
 | `-disable_x_at_int` | ignore the `X-AT-Int` header |
 | `-x_at_int_host` | only respect `X-AT-Int` when this host is requested |
 | `-tls-cert` and `-tls-key` | TLS certificate and key to serve HTTPS |
