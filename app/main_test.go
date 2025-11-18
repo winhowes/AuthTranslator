@@ -1360,7 +1360,7 @@ func TestMainHTTP3Enabled(t *testing.T) {
 
 	time.Sleep(200 * time.Millisecond)
 
-	rt := &http3.RoundTripper{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
+	rt := &http3.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
 	defer rt.Close()
 	client := &http.Client{Transport: rt}
 	resp, err := client.Get("https://" + addr + "/_at_internal/healthz")
@@ -1407,7 +1407,7 @@ func TestMainHTTP3NoTLS(t *testing.T) {
 	}
 
 	// HTTP/3 request should fail since TLS is not enabled
-	rt := &http3.RoundTripper{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
+	rt := &http3.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
 	defer rt.Close()
 	client := &http.Client{Transport: rt}
 	if _, err := client.Get("https://" + addr + "/_at_internal/healthz"); err == nil {
