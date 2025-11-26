@@ -213,6 +213,9 @@ func TestCanonicalURIPreservesTrailingAndRepeatedSlashes(t *testing.T) {
 		{name: "root", path: "/", want: "/"},
 		{name: "trailing slash", path: "/foo/bar/", want: "/foo/bar/"},
 		{name: "repeated slashes", path: "/foo//bar//baz", want: "/foo//bar//baz"},
+		{name: "dot segment", path: "/foo/./bar", want: "/foo/bar"},
+		{name: "parent segment", path: "/foo/../bar", want: "/bar"},
+		{name: "parent with trailing", path: "/foo/bar/../", want: "/foo/"},
 		{name: "no leading slash", path: "foo/bar", want: "/foo/bar"},
 	}
 

@@ -388,7 +388,64 @@ func canonicalURI(u *url.URL) string {
 	if !strings.HasPrefix(uri, "/") {
 		uri = "/" + uri
 	}
-	return uri
+	return removeDotSegments(uri)
+}
+
+func removeDotSegments(path string) string {
+	if path == "" {
+		return ""
+	}
+	input := path
+	output := ""
+	for len(input) > 0 {
+		switch {
+		case strings.HasPrefix(input, "../"):
+			input = input[3:]
+		case strings.HasPrefix(input, "./"):
+			input = input[2:]
+		case strings.HasPrefix(input, "/./"):
+			input = "/" + input[3:]
+		case input == "/.":
+			input = "/"
+		case strings.HasPrefix(input, "/../"):
+			input = "/" + input[4:]
+			output = removeLastSegment(output)
+		case input == "/..":
+			input = "/"
+			output = removeLastSegment(output)
+		case input == "." || input == "..":
+			input = ""
+		default:
+			var segment string
+			if strings.HasPrefix(input, "/") {
+				if idx := strings.Index(input[1:], "/"); idx != -1 {
+					segment = input[:idx+1]
+					input = input[idx+1:]
+				} else {
+					segment = input
+					input = ""
+				}
+			} else {
+				if idx := strings.IndexByte(input, '/'); idx != -1 {
+					segment = input[:idx]
+					input = input[idx:]
+				} else {
+					segment = input
+					input = ""
+				}
+			}
+			output += segment
+		}
+	}
+	return output
+}
+
+func removeLastSegment(path string) string {
+	idx := strings.LastIndex(path, "/")
+	if idx == -1 {
+		return ""
+	}
+	return path[:idx]
 }
 
 func hashSHA256Hex(b []byte) string {
