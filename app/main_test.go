@@ -298,6 +298,16 @@ func TestOpenSourceHTTPDialError(t *testing.T) {
 	}
 }
 
+func TestOpenSourceHTTPRequestError(t *testing.T) {
+	_, err := openSource("http://[::1")
+	if err == nil {
+		t.Fatal("expected error for invalid URL")
+	}
+	if !strings.Contains(err.Error(), "fetch http://[::1") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestOpenSourceFileURL(t *testing.T) {
 	f, err := os.CreateTemp("", "src*.txt")
 	if err != nil {
