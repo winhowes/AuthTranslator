@@ -11,7 +11,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"path"
 	"sort"
 	"strings"
 	"sync"
@@ -382,7 +381,10 @@ func canonicalURI(u *url.URL) string {
 	if uri == "" {
 		uri = "/"
 	}
-	return path.Clean(uri)
+	if !strings.HasPrefix(uri, "/") {
+		uri = "/" + uri
+	}
+	return uri
 }
 
 func hashSHA256Hex(b []byte) string {

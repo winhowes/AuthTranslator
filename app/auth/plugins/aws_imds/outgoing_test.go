@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -188,5 +189,28 @@ func TestErrorResponses(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodGet, "http://example.com", nil)
 	if err := plugin.AddAuth(context.Background(), req, paramsRaw); err == nil {
 		t.Fatalf("expected error from metadata token fetch")
+	}
+}
+
+func TestCanonicalURIPreservesTrailingAndRepeatedSlashes(t *testing.T) {
+	cases := []struct {
+		name string
+		path string
+		want string
+	}{
+		{name: "empty", path: "", want: "/"},
+		{name: "root", path: "/", want: "/"},
+		{name: "trailing slash", path: "/foo/bar/", want: "/foo/bar/"},
+		{name: "repeated slashes", path: "/foo//bar//baz", want: "/foo//bar//baz"},
+		{name: "no leading slash", path: "foo/bar", want: "/foo/bar"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			u := &url.URL{Path: tc.path}
+			if got := canonicalURI(u); got != tc.want {
+				t.Fatalf("canonicalURI(%q) = %q, want %q", tc.path, got, tc.want)
+			}
+		})
 	}
 }
