@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -311,5 +312,79 @@ func TestFetchTokenBadURL(t *testing.T) {
 
 	if _, _, err := fetchToken(context.Background(), "api://res", ""); err == nil {
 		t.Fatal("expected url parse error")
+	}
+}
+
+func TestFetchTokenUsesIdentityEndpoint(t *testing.T) {
+	resetCache()
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("X-IDENTITY-HEADER"); got != "secret" {
+			t.Fatalf("unexpected identity header %q", got)
+		}
+		if api := r.URL.Query().Get("api-version"); api != "2019-08-01" {
+			t.Fatalf("unexpected api-version %q", api)
+		}
+		fmt.Fprint(w, `{"access_token":"tok","expires_in":120}`)
+	}))
+	defer ts.Close()
+
+	t.Setenv("IDENTITY_ENDPOINT", ts.URL+"/token")
+	t.Setenv("IDENTITY_HEADER", "secret")
+
+	oldClient := HTTPClient
+	HTTPClient = ts.Client()
+	defer func() { HTTPClient = oldClient }()
+
+	tok, _, err := fetchToken(context.Background(), "api://res", "")
+	if err != nil {
+		t.Fatalf("fetchToken failed: %v", err)
+	}
+	if tok != "tok" {
+		t.Fatalf("unexpected token %q", tok)
+	}
+}
+
+func TestFetchTokenMissingIdentityHeader(t *testing.T) {
+	t.Setenv("IDENTITY_ENDPOINT", "http://localhost/identity")
+	t.Setenv("IDENTITY_HEADER", "")
+
+	if _, _, err := fetchToken(context.Background(), "api://res", ""); err == nil {
+		t.Fatal("expected error for missing identity header")
+	}
+}
+
+func TestFetchTokenUsesMSIEndpoint(t *testing.T) {
+	resetCache()
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("Secret"); got != "msi-secret" {
+			t.Fatalf("unexpected MSI secret %q", got)
+		}
+		if api := r.URL.Query().Get("api-version"); api != "2017-09-01" {
+			t.Fatalf("unexpected api-version %q", api)
+		}
+		fmt.Fprint(w, `{"access_token":"tok","expires_in":120}`)
+	}))
+	defer ts.Close()
+
+	t.Setenv("MSI_ENDPOINT", ts.URL+"/msi/token")
+	t.Setenv("MSI_SECRET", "msi-secret")
+	t.Setenv("IDENTITY_ENDPOINT", "")
+	t.Setenv("IDENTITY_HEADER", "")
+
+	oldClient := HTTPClient
+	HTTPClient = ts.Client()
+	defer func() { HTTPClient = oldClient }()
+
+	tok, _, err := fetchToken(context.Background(), "api://res", "")
+	if err != nil {
+		t.Fatalf("fetchToken failed: %v", err)
+	}
+	if tok != "tok" {
+		t.Fatalf("unexpected token %q", tok)
+	}
+	if got := os.Getenv("IDENTITY_ENDPOINT"); got != "" {
+		t.Fatalf("IDENTITY_ENDPOINT should be cleared, got %q", got)
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"sync"
 	"time"
@@ -88,19 +89,18 @@ func (a *AzureManagedIdentity) AddAuth(ctx context.Context, r *http.Request, par
 }
 
 func fetchToken(ctx context.Context, resource, clientID string) (string, time.Time, error) {
-	q := url.Values{}
-	q.Set("resource", resource)
-	q.Set("api-version", "2018-02-01")
-	if clientID != "" {
-		q.Set("client_id", clientID)
+	metaURL, headers, err := metadataRequest(resource, clientID)
+	if err != nil {
+		return "", time.Time{}, err
 	}
 
-	metaURL := fmt.Sprintf("%s/metadata/identity/oauth2/token?%s", MetadataHost, q.Encode())
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, metaURL, nil)
 	if err != nil {
 		return "", time.Time{}, err
 	}
-	req.Header.Set("Metadata", "true")
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
 
 	resp, err := HTTPClient.Do(req)
 	if err != nil {
@@ -125,6 +125,35 @@ func fetchToken(ctx context.Context, resource, clientID string) (string, time.Ti
 
 	exp := parseExpiry(tr.ExpiresOn, tr.ExpiresIn)
 	return tr.AccessToken, exp, nil
+}
+
+func metadataRequest(resource, clientID string) (string, map[string]string, error) {
+	q := url.Values{}
+	q.Set("resource", resource)
+	if clientID != "" {
+		q.Set("client_id", clientID)
+	}
+
+	if endpoint := os.Getenv("IDENTITY_ENDPOINT"); endpoint != "" {
+		header := os.Getenv("IDENTITY_HEADER")
+		if header == "" {
+			return "", nil, fmt.Errorf("missing IDENTITY_HEADER for IDENTITY_ENDPOINT")
+		}
+		q.Set("api-version", "2019-08-01")
+		return fmt.Sprintf("%s?%s", endpoint, q.Encode()), map[string]string{"X-IDENTITY-HEADER": header}, nil
+	}
+
+	if endpoint := os.Getenv("MSI_ENDPOINT"); endpoint != "" {
+		secret := os.Getenv("MSI_SECRET")
+		if secret == "" {
+			return "", nil, fmt.Errorf("missing MSI_SECRET for MSI_ENDPOINT")
+		}
+		q.Set("api-version", "2017-09-01")
+		return fmt.Sprintf("%s?%s", endpoint, q.Encode()), map[string]string{"Secret": secret}, nil
+	}
+
+	q.Set("api-version", "2018-02-01")
+	return fmt.Sprintf("%s/metadata/identity/oauth2/token?%s", MetadataHost, q.Encode()), map[string]string{"Metadata": "true"}, nil
 }
 
 func parseExpiry(expiresOn string, expiresIn json.Number) time.Time {
