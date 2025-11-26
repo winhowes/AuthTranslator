@@ -216,6 +216,40 @@ func TestAzureOIDCUsesExpiresOn(t *testing.T) {
 	}
 }
 
+func TestAzureOIDCParsesDateFormattedExpiresOn(t *testing.T) {
+	resetCache()
+
+	future := time.Now().Add(45 * time.Minute).UTC()
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, `{"access_token":"tok","expires_on":"%s"}`, future.Format("01/02/2006 15:04:05 -07:00"))
+	}))
+	defer ts.Close()
+
+	oldHost := MetadataHost
+	MetadataHost = ts.URL
+	defer func() { MetadataHost = oldHost }()
+
+	oldClient := HTTPClient
+	HTTPClient = ts.Client()
+	defer func() { HTTPClient = oldClient }()
+
+	p := AzureOIDC{}
+	cfg, err := p.ParseParams(map[string]interface{}{"resource": "api://res"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r := &http.Request{Header: http.Header{}}
+	if err := p.AddAuth(context.Background(), r, cfg); err != nil {
+		t.Fatal(err)
+	}
+
+	_, exp := getCachedToken("api://res|")
+	if time.Until(exp) < 40*time.Minute {
+		t.Fatalf("expected parsed expiry around 45m, got %s", exp)
+	}
+}
+
 func TestAzureOIDCParamLists(t *testing.T) {
 	p := AzureOIDC{}
 	if got := p.RequiredParams(); len(got) != 1 || got[0] != "resource" {
