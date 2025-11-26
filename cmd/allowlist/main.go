@@ -11,7 +11,12 @@ import (
 	"github.com/winhowes/AuthTranslator/cmd/allowlist/plugins"
 )
 
-var file = flag.String("file", "allowlist.yaml", "allowlist file")
+var (
+	file        = flag.String("file", "allowlist.yaml", "allowlist file")
+	yamlMarshal = yaml.Marshal
+	writeFile   = os.WriteFile
+	exitFunc    = os.Exit
+)
 
 func usage() {
 	fmt.Fprintf(flag.CommandLine.Output(), `Usage: allowlist [options] <command>\n\n`)
@@ -61,6 +66,7 @@ func addEntry(args []string) {
 	fs.Parse(args)
 	if *integ == "" || *caller == "" || *capName == "" {
 		fmt.Println("-integration, -caller and -capability required")
+		fs.Usage()
 		return
 	}
 	var params map[string]interface{}
@@ -132,16 +138,16 @@ func addEntry(args []string) {
 		callerCfg.Capabilities = append(callerCfg.Capabilities, plugins.CapabilityConfig{Name: *capName, Params: params})
 	}
 
-	out, err := yaml.Marshal(entries)
+	out, err := yamlMarshal(entries)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		exitFunc(1)
 	}
 	out = bytes.ReplaceAll(out, []byte("params: {}"), []byte("params: null"))
 
-	if err := os.WriteFile(*file, out, 0644); err != nil {
+	if err := writeFile(*file, out, 0644); err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		exitFunc(1)
 	}
 }
 
@@ -158,6 +164,7 @@ func removeEntry(args []string) {
 
 	if *integ == "" || *caller == "" || *capName == "" {
 		fmt.Println("-integration, -caller and -capability required")
+		fs.Usage()
 		return
 	}
 
@@ -208,14 +215,14 @@ func removeEntry(args []string) {
 		break
 	}
 
-	out, err := yaml.Marshal(entries)
+	out, err := yamlMarshal(entries)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		exitFunc(1)
 	}
 	out = bytes.ReplaceAll(out, []byte("params: {}"), []byte("params: null"))
-	if err := os.WriteFile(*file, out, 0644); err != nil {
+	if err := writeFile(*file, out, 0644); err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		exitFunc(1)
 	}
 }
