@@ -54,6 +54,22 @@ func (capturePlugin) RequiredParams() []string { return []string{"expect_host"} 
 
 func (capturePlugin) OptionalParams() []string { return nil }
 
+type failingPlugin struct{}
+
+func (failingPlugin) Name() string { return "failing" }
+
+func (failingPlugin) ParseParams(params map[string]interface{}) (interface{}, error) {
+	return &struct{}{}, nil
+}
+
+func (failingPlugin) AddAuth(context.Context, *http.Request, interface{}) error {
+	return fmt.Errorf("boom")
+}
+
+func (failingPlugin) RequiredParams() []string { return nil }
+
+func (failingPlugin) OptionalParams() []string { return nil }
+
 var (
 	captureAddAuthCount int
 	captureLastURL      string
@@ -61,6 +77,7 @@ var (
 
 func init() {
 	authplugins.RegisterOutgoing(capturePlugin{})
+	authplugins.RegisterOutgoing(failingPlugin{})
 }
 
 type roundTripFunc func(*http.Request) (*http.Response, error)
@@ -785,6 +802,41 @@ func TestProxyHandlerWildcardAddAuthSeesResolvedDestination(t *testing.T) {
 	}
 	if captureLastURL != "http://foo.example.com/base/test?static=1&foo=bar" {
 		t.Fatalf("unexpected URL seen by AddAuth: %s", captureLastURL)
+	}
+}
+
+func TestProxyHandlerOutgoingAuthError(t *testing.T) {
+	denylists.Lock()
+	denylists.m = make(map[string]map[string][]CallRule)
+	denylists.Unlock()
+
+	integ := Integration{
+		Name:         "fail-auth",
+		Destination:  "http://example.com",
+		InRateLimit:  1,
+		OutRateLimit: 1,
+		OutgoingAuth: []AuthPluginConfig{{Type: "failing", Params: map[string]interface{}{}}},
+	}
+	if err := AddIntegration(&integ); err != nil {
+		t.Fatalf("failed to add integration: %v", err)
+	}
+	t.Cleanup(func() {
+		integ.inLimiter.Stop()
+		integ.outLimiter.Stop()
+		DeleteIntegration("fail-auth")
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "http://fail-auth/", nil)
+	req.Host = "fail-auth"
+	rr := httptest.NewRecorder()
+
+	proxyHandler(rr, req)
+
+	if rr.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d", rr.Code)
+	}
+	if rr.Header().Get("X-AT-Error-Reason") != "authentication failed" {
+		t.Fatalf("unexpected error reason %q", rr.Header().Get("X-AT-Error-Reason"))
 	}
 }
 

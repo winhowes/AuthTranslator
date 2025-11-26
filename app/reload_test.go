@@ -277,6 +277,51 @@ func TestReloadPrepareIntegrationErrorBranch(t *testing.T) {
 	integrations.RUnlock()
 }
 
+func TestReloadPrepareIntegrationStopsLimitersOnFailure(t *testing.T) {
+	integrations.Lock()
+	integrations.m = make(map[string]*Integration)
+	integrations.Unlock()
+	allowlists.Lock()
+	allowlists.m = make(map[string]map[string]CallerConfig)
+	allowlists.Unlock()
+	resetDenylistState()
+
+	cfgFile, err := os.CreateTemp("", "cfg*.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(cfgFile.Name())
+	cfg := `{"integrations":[{"name":"first","destination":"http://example.com"},{"name":"Bad Name","destination":"http://example.org"}]}`
+	if _, err := cfgFile.WriteString(cfg); err != nil {
+		t.Fatal(err)
+	}
+	cfgFile.Close()
+
+	alFile, err := os.CreateTemp("", "al*.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(alFile.Name())
+	if err := os.WriteFile(alFile.Name(), []byte("[]"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	flag.Set("config", cfgFile.Name())
+	flag.Set("allowlist", alFile.Name())
+	flag.Set("denylist", writeEmptyDenylist(t))
+
+	if err := reload(); err == nil {
+		t.Fatal("expected prepareIntegration error")
+	}
+
+	integrations.RLock()
+	if len(integrations.m) != 0 {
+		integrations.RUnlock()
+		t.Fatalf("expected integrations to remain empty, got %d", len(integrations.m))
+	}
+	integrations.RUnlock()
+}
+
 func TestReloadDuplicateIntegrationBranch(t *testing.T) {
 	integrations.Lock()
 	integrations.m = make(map[string]*Integration)
