@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
-	yaml "gopkg.in/yaml.v3"
 	"os"
+	"slices"
 	"strings"
+
+	yaml "gopkg.in/yaml.v3"
 
 	"github.com/winhowes/AuthTranslator/cmd/allowlist/plugins"
 )
@@ -63,83 +65,19 @@ func addEntry(args []string) {
 		fmt.Println("-integration, -caller and -capability required")
 		return
 	}
-	var params map[string]interface{}
-	if *paramList != "" {
-		params = make(map[string]interface{})
-		for _, kv := range strings.Split(*paramList, ",") {
-			kv = strings.TrimSpace(kv)
-			if kv == "" {
-				continue
-			}
-			parts := strings.SplitN(kv, "=", 2)
-			if len(parts) == 2 {
-				k := strings.TrimSpace(parts[0])
-				v := strings.TrimSpace(parts[1])
-				params[k] = v
-			}
-		}
-	}
+	params := parseParams(*paramList)
 
-	// load file
-	data, err := os.ReadFile(*file)
-	if err != nil && !os.IsNotExist(err) {
+	entries, err := loadEntries(true)
+	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return
 	}
-	var entries []plugins.AllowlistEntry
-	if len(data) > 0 {
-		if err := yaml.Unmarshal(data, &entries); err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			return
-		}
-	}
-	// find integration
-	wantName := strings.ToLower(*integ)
-	var entry *plugins.AllowlistEntry
-	for i := range entries {
-		if strings.ToLower(entries[i].Integration) == wantName {
-			entry = &entries[i]
-			break
-		}
-	}
-	if entry == nil {
-		entries = append(entries, plugins.AllowlistEntry{Integration: wantName})
-		entry = &entries[len(entries)-1]
-	} else {
-		entry.Integration = wantName
-	}
-	// find caller
-	var callerCfg *plugins.CallerConfig
-	for i := range entry.Callers {
-		if entry.Callers[i].ID == *caller {
-			callerCfg = &entry.Callers[i]
-			break
-		}
-	}
-	if callerCfg == nil {
-		entry.Callers = append(entry.Callers, plugins.CallerConfig{ID: *caller})
-		callerCfg = &entry.Callers[len(entry.Callers)-1]
-	}
-	replaced := false
-	for i := range callerCfg.Capabilities {
-		if callerCfg.Capabilities[i].Name == *capName {
-			callerCfg.Capabilities[i].Params = params
-			replaced = true
-			break
-		}
-	}
-	if !replaced {
-		callerCfg.Capabilities = append(callerCfg.Capabilities, plugins.CapabilityConfig{Name: *capName, Params: params})
-	}
 
-	out, err := yaml.Marshal(entries)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-	out = bytes.ReplaceAll(out, []byte("params: {}"), []byte("params: null"))
+	entries, entry := upsertIntegration(entries, *integ)
+	callerCfg := upsertCaller(entry, *caller)
+	upsertCapability(callerCfg, *capName, params)
 
-	if err := os.WriteFile(*file, out, 0644); err != nil {
+	if err := writeEntries(entries); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
@@ -161,61 +99,149 @@ func removeEntry(args []string) {
 		return
 	}
 
-	data, err := os.ReadFile(*file)
+	entries, err := loadEntries(false)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return
+	}
+
+	entries = normalizeEntries(entries)
+	entries = removeCapability(entries, *integ, *caller, *capName)
+
+	if err := writeEntries(entries); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+
+func parseParams(paramList string) map[string]interface{} {
+	if paramList == "" {
+		return nil
+	}
+	params := make(map[string]interface{})
+	for _, kv := range strings.Split(paramList, ",") {
+		kv = strings.TrimSpace(kv)
+		if kv == "" {
+			continue
+		}
+		key, value, found := strings.Cut(kv, "=")
+		if !found {
+			continue
+		}
+		params[strings.TrimSpace(key)] = strings.TrimSpace(value)
+	}
+	return params
+}
+
+func loadEntries(allowMissing bool) ([]plugins.AllowlistEntry, error) {
+	data, err := os.ReadFile(*file)
+	if err != nil {
+		if allowMissing && os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	if len(data) == 0 {
+		return nil, nil
 	}
 	var entries []plugins.AllowlistEntry
 	if err := yaml.Unmarshal(data, &entries); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		return
+		return nil, err
 	}
+	return entries, nil
+}
 
-	wantName := strings.ToLower(*integ)
-	for ei := range entries {
-		if strings.ToLower(entries[ei].Integration) != wantName {
-			continue
-		}
-		entries[ei].Integration = wantName
-		for ci := range entries[ei].Callers {
-			if entries[ei].Callers[ci].ID != *caller {
-				continue
-			}
-			caps := entries[ei].Callers[ci].Capabilities
-			for i := 0; i < len(caps); i++ {
-				if caps[i].Name == *capName {
-					caps = append(caps[:i], caps[i+1:]...)
-					i--
-					continue
-				}
-			}
-			if len(caps) == 0 {
-				entries[ei].Callers = append(entries[ei].Callers[:ci], entries[ei].Callers[ci+1:]...)
-			} else {
-				for i := range caps {
-					if len(caps[i].Params) == 0 {
-						caps[i].Params = nil
-					}
-				}
-				entries[ei].Callers[ci].Capabilities = caps
-			}
-			break
-		}
-		if len(entries[ei].Callers) == 0 {
-			entries = append(entries[:ei], entries[ei+1:]...)
-		}
-		break
-	}
-
+func writeEntries(entries []plugins.AllowlistEntry) error {
 	out, err := yaml.Marshal(entries)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		return err
 	}
 	out = bytes.ReplaceAll(out, []byte("params: {}"), []byte("params: null"))
-	if err := os.WriteFile(*file, out, 0644); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+	return os.WriteFile(*file, out, 0644)
+}
+
+func upsertIntegration(entries []plugins.AllowlistEntry, name string) ([]plugins.AllowlistEntry, *plugins.AllowlistEntry) {
+	normalized := strings.ToLower(name)
+	idx := slices.IndexFunc(entries, func(entry plugins.AllowlistEntry) bool {
+		return strings.EqualFold(entry.Integration, normalized)
+	})
+	if idx == -1 {
+		entries = append(entries, plugins.AllowlistEntry{Integration: normalized})
+		return entries, &entries[len(entries)-1]
 	}
+	entries[idx].Integration = normalized
+	return entries, &entries[idx]
+}
+
+func upsertCaller(entry *plugins.AllowlistEntry, caller string) *plugins.CallerConfig {
+	idx := slices.IndexFunc(entry.Callers, func(cfg plugins.CallerConfig) bool {
+		return cfg.ID == caller
+	})
+	if idx == -1 {
+		entry.Callers = append(entry.Callers, plugins.CallerConfig{ID: caller})
+		return &entry.Callers[len(entry.Callers)-1]
+	}
+	return &entry.Callers[idx]
+}
+
+func upsertCapability(caller *plugins.CallerConfig, name string, params map[string]interface{}) {
+	idx := slices.IndexFunc(caller.Capabilities, func(cap plugins.CapabilityConfig) bool {
+		return cap.Name == name
+	})
+	if idx == -1 {
+		caller.Capabilities = append(caller.Capabilities, plugins.CapabilityConfig{Name: name, Params: params})
+		return
+	}
+	caller.Capabilities[idx].Params = params
+}
+
+func normalizeEntries(entries []plugins.AllowlistEntry) []plugins.AllowlistEntry {
+	for i := range entries {
+		entries[i].Integration = strings.ToLower(entries[i].Integration)
+	}
+	return entries
+}
+
+func removeCapability(entries []plugins.AllowlistEntry, integration, caller, capName string) []plugins.AllowlistEntry {
+	idx := slices.IndexFunc(entries, func(entry plugins.AllowlistEntry) bool {
+		return strings.EqualFold(entry.Integration, integration)
+	})
+	if idx == -1 {
+		return entries
+	}
+
+	entry := &entries[idx]
+	callerIdx := slices.IndexFunc(entry.Callers, func(cfg plugins.CallerConfig) bool {
+		return cfg.ID == caller
+	})
+	if callerIdx == -1 {
+		return entries
+	}
+
+	caps := entry.Callers[callerIdx].Capabilities
+	capRemoved := false
+	caps = slices.DeleteFunc(caps, func(cap plugins.CapabilityConfig) bool {
+		if cap.Name == capName {
+			capRemoved = true
+			return true
+		}
+		if len(cap.Params) == 0 {
+			cap.Params = nil
+		}
+		return false
+	})
+
+	if len(caps) == 0 {
+		entry.Callers = append(entry.Callers[:callerIdx], entry.Callers[callerIdx+1:]...)
+	} else {
+		entry.Callers[callerIdx].Capabilities = caps
+	}
+
+	if len(entry.Callers) == 0 {
+		entries = append(entries[:idx], entries[idx+1:]...)
+	} else if !capRemoved {
+		entries[idx] = *entry
+	}
+
+	return entries
 }
