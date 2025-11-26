@@ -535,6 +535,78 @@ func TestProxyHandlerRetryAfterOutLimit(t *testing.T) {
 	}
 }
 
+func TestProxyHandlerRetryAfterMinimumInLimit(t *testing.T) {
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer backend.Close()
+
+	integ := Integration{Name: "rl-min-in", Destination: backend.URL, InRateLimit: 1, OutRateLimit: 10, RateLimitWindow: "100ms"}
+	if err := AddIntegration(&integ); err != nil {
+		t.Fatalf("failed to add integration: %v", err)
+	}
+	t.Cleanup(func() { integ.inLimiter.Stop(); integ.outLimiter.Stop() })
+
+	req1 := httptest.NewRequest(http.MethodGet, "http://rl-min-in/", nil)
+	req1.Host = "rl-min-in"
+	req1.RemoteAddr = "4.5.6.7:1111"
+	rr1 := httptest.NewRecorder()
+	proxyHandler(rr1, req1)
+	if rr1.Code != http.StatusOK {
+		t.Fatalf("first request got %d", rr1.Code)
+	}
+
+	req2 := httptest.NewRequest(http.MethodGet, "http://rl-min-in/", nil)
+	req2.Host = "rl-min-in"
+	req2.RemoteAddr = "4.5.6.7:1111"
+	rr2 := httptest.NewRecorder()
+	proxyHandler(rr2, req2)
+	if rr2.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected rate limit rejection, got %d", rr2.Code)
+	}
+	if got := rr2.Header().Get("Retry-After"); got != "1" {
+		t.Fatalf("expected minimum Retry-After of 1, got %q", got)
+	}
+	if rr2.Header().Get("X-AT-Error-Reason") != "caller rate limited" {
+		t.Fatalf("unexpected error reason: %s", rr2.Header().Get("X-AT-Error-Reason"))
+	}
+}
+
+func TestProxyHandlerRetryAfterMinimumOutLimit(t *testing.T) {
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer backend.Close()
+
+	integ := Integration{Name: "rl-min-out", Destination: backend.URL, InRateLimit: 10, OutRateLimit: 1, RateLimitWindow: "100ms"}
+	if err := AddIntegration(&integ); err != nil {
+		t.Fatalf("failed to add integration: %v", err)
+	}
+	t.Cleanup(func() { integ.inLimiter.Stop(); integ.outLimiter.Stop() })
+
+	req1 := httptest.NewRequest(http.MethodGet, "http://rl-min-out/", nil)
+	req1.Host = "rl-min-out"
+	rr1 := httptest.NewRecorder()
+	proxyHandler(rr1, req1)
+	if rr1.Code != http.StatusOK {
+		t.Fatalf("first request got %d", rr1.Code)
+	}
+
+	req2 := httptest.NewRequest(http.MethodGet, "http://rl-min-out/", nil)
+	req2.Host = "rl-min-out"
+	rr2 := httptest.NewRecorder()
+	proxyHandler(rr2, req2)
+	if rr2.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected rate limit rejection, got %d", rr2.Code)
+	}
+	if got := rr2.Header().Get("Retry-After"); got != "1" {
+		t.Fatalf("expected minimum Retry-After of 1, got %q", got)
+	}
+	if rr2.Header().Get("X-AT-Error-Reason") != "integration rate limited" {
+		t.Fatalf("unexpected error reason: %s", rr2.Header().Get("X-AT-Error-Reason"))
+	}
+}
+
 func TestProxyHandlerNotFound(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "http://missing/", nil)
 	req.Host = "missing"
