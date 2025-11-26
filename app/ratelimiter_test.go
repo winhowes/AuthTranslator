@@ -162,6 +162,22 @@ func TestTokenBucketRefill(t *testing.T) {
 	}
 }
 
+func TestTokenBucketSwitchCase(t *testing.T) {
+	rl := NewRateLimiter(2, 100*time.Millisecond, "token_bucket")
+	t.Cleanup(rl.Stop)
+	key := "caller"
+
+	if !rl.Allow(key) {
+		t.Fatal("first call should be allowed")
+	}
+	if !rl.Allow(key) {
+		t.Fatal("token bucket should allow second call with remaining tokens")
+	}
+	if rl.Allow(key) {
+		t.Fatal("third call should be rate limited")
+	}
+}
+
 func TestLeakyBucketSmoothing(t *testing.T) {
 	rl := NewRateLimiter(1, 100*time.Millisecond, "leaky_bucket")
 	t.Cleanup(rl.Stop)
@@ -175,6 +191,19 @@ func TestLeakyBucketSmoothing(t *testing.T) {
 	time.Sleep(120 * time.Millisecond)
 	if !rl.Allow(key) {
 		t.Fatal("call should be allowed after leak")
+	}
+}
+
+func TestLeakyBucketSwitchCase(t *testing.T) {
+	rl := NewRateLimiter(1, 50*time.Millisecond, "leaky_bucket")
+	t.Cleanup(rl.Stop)
+	key := "caller"
+
+	if !rl.Allow(key) {
+		t.Fatal("initial call should be allowed")
+	}
+	if rl.Allow(key) {
+		t.Fatal("immediate second call should be limited by leaky bucket")
 	}
 }
 
