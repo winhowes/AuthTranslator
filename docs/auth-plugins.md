@@ -111,7 +111,7 @@ outgoing_auth:
       prefix: "Bearer "                     # optional (default: "Bearer ")
 ```
 
-Retrieves an ID token from the AWS Instance Metadata Service v2 for the provided `audience`, caches it until shortly before expiry, and attaches it to the chosen header on each outgoing request.
+Retrieves the IAM role session token from the AWS Instance Metadata Service v2, caches it until shortly before expiry, and attaches it to the chosen header on each outgoing request.
 
 ---
 

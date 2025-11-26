@@ -2,30 +2,18 @@ package awsoidc
 
 import (
 	"context"
-	"encoding/base64"
-	"fmt"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 	"time"
 )
 
-type testClaims struct {
-	Exp int64 `json:"exp"`
-}
-
-func makeJWT(exp time.Time) string {
-	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"none"}`))
-	claims := base64.RawURLEncoding.EncodeToString([]byte(`{"exp":` + fmt.Sprintf("%d", exp.Unix()) + `}`))
-	return strings.Join([]string{header, claims, "sig"}, ".")
-}
-
 func TestAddAuthFetchesAndCachesToken(t *testing.T) {
-	now := time.Now().Add(2 * time.Minute)
-	jwt := makeJWT(now)
-
+	expires := time.Now().Add(2 * time.Minute).UTC().Truncate(time.Second)
+	sessionToken := "sts-session-token"
 	metaToken := "meta123"
+	roleName := "example-role"
 	aud := "urn:test"
 	var requestCount int
 
@@ -40,15 +28,21 @@ func TestAddAuthFetchesAndCachesToken(t *testing.T) {
 				t.Fatalf("missing TTL header")
 			}
 			w.Write([]byte(metaToken))
-		case "/latest/meta-data/iam/security-credentials/oidc":
+		case "/latest/meta-data/iam/security-credentials/":
 			requestCount++
 			if got := r.Header.Get("X-aws-ec2-metadata-token"); got != metaToken {
 				t.Fatalf("expected metadata token %q, got %q", metaToken, got)
 			}
-			if got := r.URL.Query().Get("audience"); got != aud {
-				t.Fatalf("expected audience %s, got %s", aud, got)
+			w.Write([]byte(roleName))
+		case "/latest/meta-data/iam/security-credentials/" + roleName:
+			requestCount++
+			if got := r.Header.Get("X-aws-ec2-metadata-token"); got != metaToken {
+				t.Fatalf("expected metadata token %q, got %q", metaToken, got)
 			}
-			w.Write([]byte(jwt))
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"Token":      sessionToken,
+				"Expiration": expires.Format(time.RFC3339),
+			})
 		default:
 			t.Fatalf("unexpected path %s", r.URL.Path)
 		}
@@ -69,11 +63,11 @@ func TestAddAuthFetchesAndCachesToken(t *testing.T) {
 		t.Fatalf("AddAuth: %v", err)
 	}
 
-	if got := req.Header.Get("Authorization"); got != "Bearer "+jwt {
+	if got := req.Header.Get("Authorization"); got != "Bearer "+sessionToken {
 		t.Fatalf("unexpected header: %s", got)
 	}
-	if requestCount != 2 {
-		t.Fatalf("expected 2 metadata requests, got %d", requestCount)
+	if requestCount != 3 {
+		t.Fatalf("expected 3 metadata requests, got %d", requestCount)
 	}
 
 	// Second call should use cache.
@@ -81,30 +75,36 @@ func TestAddAuthFetchesAndCachesToken(t *testing.T) {
 	if err := plugin.AddAuth(context.Background(), req2, paramsRaw); err != nil {
 		t.Fatalf("AddAuth second: %v", err)
 	}
-	if requestCount != 2 {
+	if requestCount != 3 {
 		t.Fatalf("expected cached token, still %d requests", requestCount)
 	}
 }
 
 func TestExpiresSoonTriggersRefresh(t *testing.T) {
-	expSoon := time.Now().Add(30 * time.Second)
-	jwt1 := makeJWT(expSoon)
-	jwt2 := makeJWT(time.Now().Add(10 * time.Minute))
+	expSoon := time.Now().Add(30 * time.Second).UTC().Truncate(time.Second)
+	expLater := time.Now().Add(10 * time.Minute).UTC().Truncate(time.Second)
 	metaToken := "meta123"
+	roleName := "role"
+	sessionTokens := []string{"first", "second"}
 	aud := "urn:test"
-	var stage int
+	var credIndex int
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/latest/api/token":
 			w.Write([]byte(metaToken))
-		case "/latest/meta-data/iam/security-credentials/oidc":
-			if stage == 0 {
-				w.Write([]byte(jwt1))
-			} else {
-				w.Write([]byte(jwt2))
+		case "/latest/meta-data/iam/security-credentials/":
+			w.Write([]byte(roleName))
+		case "/latest/meta-data/iam/security-credentials/" + roleName:
+			exp := expSoon
+			if credIndex > 0 {
+				exp = expLater
 			}
-			stage++
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"Token":      sessionTokens[credIndex],
+				"Expiration": exp.Format(time.RFC3339),
+			})
+			credIndex++
 		default:
 			t.Fatalf("unexpected path %s", r.URL.Path)
 		}
@@ -128,8 +128,8 @@ func TestExpiresSoonTriggersRefresh(t *testing.T) {
 	if err := plugin.AddAuth(context.Background(), req2, paramsRaw); err != nil {
 		t.Fatalf("AddAuth second: %v", err)
 	}
-	if stage != 2 {
-		t.Fatalf("expected token refresh, stage %d", stage)
+	if credIndex != 2 {
+		t.Fatalf("expected token refresh, stage %d", credIndex)
 	}
 }
 
@@ -141,6 +141,9 @@ func TestErrorResponses(t *testing.T) {
 		case "/latest/api/token":
 			w.WriteHeader(http.StatusBadRequest)
 			w.Write([]byte("no token"))
+		case "/latest/meta-data/iam/security-credentials/":
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte("no role"))
 		default:
 			t.Fatalf("unexpected path %s", r.URL.Path)
 		}

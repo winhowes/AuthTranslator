@@ -2,12 +2,10 @@ package awsoidc
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -22,8 +20,8 @@ type awsOIDCParams struct {
 	Prefix   string `json:"prefix"`
 }
 
-// AWSOIDC fetches an ID token from the AWS Instance Metadata Service (IMDSv2)
-// and adds it to outgoing requests.
+// AWSOIDC fetches the IAM role session token from the AWS Instance Metadata
+// Service (IMDSv2) and adds it to outgoing requests.
 type AWSOIDC struct{}
 
 // MetadataHost is the base URL for the AWS metadata service. It can be
@@ -90,29 +88,26 @@ func fetchToken(ctx context.Context, aud string) (string, time.Time, error) {
 		return "", time.Time{}, err
 	}
 
-	metaURL := fmt.Sprintf("%s/latest/meta-data/iam/security-credentials/oidc?audience=%s", MetadataHost, url.QueryEscape(aud))
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, metaURL, nil)
+	roleName, err := fetchRoleName(ctx, metaToken)
 	if err != nil {
 		return "", time.Time{}, err
-	}
-	req.Header.Set("X-aws-ec2-metadata-token", metaToken)
-
-	resp, err := HTTPClient.Do(req)
-	if err != nil {
-		return "", time.Time{}, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return "", time.Time{}, fmt.Errorf("status %s: %s", resp.Status, body)
 	}
 
-	tokenBytes, err := io.ReadAll(resp.Body)
+	credentials, err := fetchRoleCredentials(ctx, metaToken, roleName)
 	if err != nil {
 		return "", time.Time{}, err
 	}
-	tok := string(tokenBytes)
-	return tok, parseExpiry(tok), nil
+
+	if credentials.Token == "" {
+		return "", time.Time{}, fmt.Errorf("empty session token from IMDS for role %s", roleName)
+	}
+
+	exp, err := time.Parse(time.RFC3339, credentials.Expiration)
+	if err != nil {
+		return "", time.Time{}, fmt.Errorf("parse expiration: %w", err)
+	}
+
+	return credentials.Token, exp, nil
 }
 
 func fetchMetadataToken(ctx context.Context) (string, error) {
@@ -140,22 +135,66 @@ func fetchMetadataToken(ctx context.Context) (string, error) {
 	return string(tokenBytes), nil
 }
 
-func parseExpiry(tok string) time.Time {
-	parts := strings.Split(tok, ".")
-	if len(parts) < 2 {
-		return time.Now().Add(time.Minute)
-	}
-	data, err := base64.RawURLEncoding.DecodeString(parts[1])
+func fetchRoleName(ctx context.Context, metaToken string) (string, error) {
+	roleURL := fmt.Sprintf("%s/latest/meta-data/iam/security-credentials/", MetadataHost)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, roleURL, nil)
 	if err != nil {
-		return time.Now().Add(time.Minute)
+		return "", err
 	}
-	var c struct {
-		Exp int64 `json:"exp"`
+	req.Header.Set("X-aws-ec2-metadata-token", metaToken)
+
+	resp, err := HTTPClient.Do(req)
+	if err != nil {
+		return "", err
 	}
-	if err := json.Unmarshal(data, &c); err != nil || c.Exp == 0 {
-		return time.Now().Add(time.Minute)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("role name status %s: %s", resp.Status, body)
 	}
-	return time.Unix(c.Exp, 0)
+
+	roleBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+	roleName := strings.TrimSpace(string(roleBytes))
+	if roleName == "" {
+		return "", fmt.Errorf("empty role name from IMDS")
+	}
+	return roleName, nil
+}
+
+type roleCredentials struct {
+	Expiration string `json:"Expiration"`
+	Token      string `json:"Token"`
+}
+
+func fetchRoleCredentials(ctx context.Context, metaToken, roleName string) (*roleCredentials, error) {
+	credsURL := fmt.Sprintf("%s/latest/meta-data/iam/security-credentials/%s", MetadataHost, roleName)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, credsURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("X-aws-ec2-metadata-token", metaToken)
+
+	resp, err := HTTPClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("role credentials status %s: %s", resp.Status, body)
+	}
+
+	var rc roleCredentials
+	if err := json.NewDecoder(resp.Body).Decode(&rc); err != nil {
+		return nil, err
+	}
+	if rc.Expiration == "" {
+		return nil, fmt.Errorf("missing expiration in role credentials")
+	}
+	return &rc, nil
 }
 
 func getCachedToken(aud string) (string, time.Time) {
