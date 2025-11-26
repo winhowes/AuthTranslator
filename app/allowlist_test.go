@@ -119,6 +119,60 @@ func TestFindConstraintExpandsCallerAndWildcardCapabilities(t *testing.T) {
 	}
 }
 
+func TestFindConstraintExpandsCapabilitiesOnLookup(t *testing.T) {
+	allowlists.Lock()
+	allowlists.m = make(map[string]map[string]CallerConfig)
+	allowlists.Unlock()
+
+	orig := integrationplugins.AllCapabilities()
+	snapshot := map[string]map[string]integrationplugins.CapabilitySpec{}
+	for integ, caps := range orig {
+		snapshot[integ] = map[string]integrationplugins.CapabilitySpec{}
+		for name, spec := range caps {
+			snapshot[integ][name] = spec
+		}
+	}
+	t.Cleanup(func() {
+		reg := integrationplugins.AllCapabilities()
+		for k := range reg {
+			delete(reg, k)
+		}
+		for integ, caps := range snapshot {
+			reg[integ] = caps
+		}
+	})
+
+	integrationplugins.RegisterCapability("lookup", "cap", integrationplugins.CapabilitySpec{
+		Generate: func(map[string]interface{}) ([]integrationplugins.CallRule, error) {
+			return []integrationplugins.CallRule{{
+				Path:     "/capability",
+				Methods:  map[string]integrationplugins.RequestConstraint{http.MethodGet: {}},
+				Segments: splitPath("/capability"),
+			}}, nil
+		},
+	})
+
+	allowlists.Lock()
+	allowlists.m["lookup"] = map[string]CallerConfig{
+		"direct": {
+			ID:           "direct",
+			Capabilities: []integrationplugins.CapabilityConfig{{Name: "cap"}},
+		},
+		"*": {
+			Capabilities: []integrationplugins.CapabilityConfig{{Name: "cap"}},
+		},
+	}
+	allowlists.Unlock()
+
+	integ := &Integration{Name: "lookup"}
+	if _, ok := findConstraint(integ, "direct", "/capability", http.MethodGet); !ok {
+		t.Fatal("expected capability expansion for caller during lookup")
+	}
+	if _, ok := findConstraint(integ, "other", "/capability", http.MethodGet); !ok {
+		t.Fatal("expected capability expansion for wildcard during lookup")
+	}
+}
+
 func TestSetAllowlistIndexing(t *testing.T) {
 	allowlists.Lock()
 	allowlists.m = make(map[string]map[string]CallerConfig)
@@ -205,6 +259,30 @@ func TestSetAllowlistMethodNormalization(t *testing.T) {
 	integ := &Integration{Name: "case"}
 	if _, ok := findConstraint(integ, "*", "/ok", http.MethodGet); !ok {
 		t.Fatal("expected match for uppercase method")
+	}
+}
+
+func TestMatchSegmentsDoubleStarFailure(t *testing.T) {
+	if matchSegments([]string{"**", "a"}, []string{"b"}) {
+		t.Fatal("expected pattern to fail to match path")
+	}
+}
+
+func TestValidateRequestReasonQueryValueMismatch(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/?q=two", nil)
+	constraint := RequestConstraint{Query: map[string][]string{"q": {"one"}}}
+	if ok, reason := validateRequestReason(req, constraint); ok || reason == "" {
+		t.Fatalf("expected query validation failure, got ok=%v reason=%q", ok, reason)
+	}
+}
+
+func TestValidateRequestReasonFormMismatch(t *testing.T) {
+	body := strings.NewReader("other=x")
+	req := httptest.NewRequest(http.MethodPost, "http://example.com/", body)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	constraint := RequestConstraint{Body: map[string]interface{}{"field": "value"}}
+	if ok, reason := validateRequestReason(req, constraint); ok || reason == "" {
+		t.Fatalf("expected form validation failure, got ok=%v reason=%q", ok, reason)
 	}
 }
 
