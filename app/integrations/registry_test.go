@@ -2,12 +2,14 @@ package integrationplugins
 
 import (
 	"errors"
+	"reflect"
 	"testing"
 )
 
 func TestExpandCapabilities(t *testing.T) {
 	// Save current registry state and restore after test
 	orig := capabilityRegistry
+	capabilityRegistry = map[string]map[string]CapabilitySpec{}
 	t.Cleanup(func() { capabilityRegistry = orig })
 
 	// Register a simple capability for integration "test"
@@ -46,6 +48,7 @@ func TestExpandCapabilities(t *testing.T) {
 
 func TestExpandCapabilitiesUnknown(t *testing.T) {
 	orig := capabilityRegistry
+	capabilityRegistry = map[string]map[string]CapabilitySpec{}
 	t.Cleanup(func() { capabilityRegistry = orig })
 
 	callers := []CallerConfig{{ID: "c", Capabilities: []CapabilityConfig{{Name: "unknown"}}}}
@@ -91,6 +94,20 @@ func TestCapabilitiesHelpers(t *testing.T) {
 	all := AllCapabilities()
 	if len(all) != 1 || len(all["foo"]) != 1 {
 		t.Fatalf("AllCapabilities returned %#v", all)
+	}
+}
+
+func TestGetCapabilityFallback(t *testing.T) {
+	orig := capabilityRegistry
+	capabilityRegistry = map[string]map[string]CapabilitySpec{}
+	t.Cleanup(func() { capabilityRegistry = orig })
+
+	spec, ok := getCapability("unknown", "capability")
+	if ok {
+		t.Fatalf("expected lookup to fail, got ok")
+	}
+	if !reflect.DeepEqual(spec, CapabilitySpec{}) {
+		t.Fatalf("expected zero CapabilitySpec, got %#v", spec)
 	}
 }
 
