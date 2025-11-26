@@ -1,7 +1,7 @@
 package plugins
 
 import (
-	_ "github.com/winhowes/AuthTranslator/app/auth/plugins/aws_oidc"
+        _ "github.com/winhowes/AuthTranslator/app/auth/plugins/aws_imds"
 	_ "github.com/winhowes/AuthTranslator/app/auth/plugins/azure_oidc"
 	_ "github.com/winhowes/AuthTranslator/app/auth/plugins/basic"
 	_ "github.com/winhowes/AuthTranslator/app/auth/plugins/findreplace"

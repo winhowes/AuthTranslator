@@ -1,4 +1,4 @@
-package awsoidc
+package awsimds
 
 import (
 	"context"
@@ -13,16 +13,15 @@ import (
 	authplugins "github.com/winhowes/AuthTranslator/app/auth"
 )
 
-// awsOIDCParams configures the AWS OIDC plugin.
-type awsOIDCParams struct {
-	Audience string `json:"audience"`
-	Header   string `json:"header"`
-	Prefix   string `json:"prefix"`
+// awsIMDSParams configures the AWS IMDS plugin.
+type awsIMDSParams struct {
+	Header string `json:"header"`
+	Prefix string `json:"prefix"`
 }
 
-// AWSOIDC fetches the IAM role session token from the AWS Instance Metadata
+// AWSIMDS fetches the IAM role session token from the AWS Instance Metadata
 // Service (IMDSv2) and adds it to outgoing requests.
-type AWSOIDC struct{}
+type AWSIMDS struct{}
 
 // MetadataHost is the base URL for the AWS metadata service. It can be
 // overridden in tests.
@@ -33,27 +32,31 @@ var HTTPClient = &http.Client{Timeout: 5 * time.Second}
 
 var tokenCache = struct {
 	sync.Mutex
-	m map[string]cachedToken
-}{m: make(map[string]cachedToken)}
+	ct cachedToken
+}{ct: cachedToken{}}
 
 type cachedToken struct {
 	token string
 	exp   time.Time
 }
 
+// AWSOIDC is kept as a backward-compatible alias for configurations still
+// referencing the old plugin name. It delegates all behavior to AWSIMDS but
+// advertises the legacy `aws_oidc` name.
+type AWSOIDC struct{ AWSIMDS }
+
 func (a *AWSOIDC) Name() string { return "aws_oidc" }
 
-func (a *AWSOIDC) RequiredParams() []string { return []string{"audience"} }
+func (a *AWSIMDS) Name() string { return "aws_imds" }
 
-func (a *AWSOIDC) OptionalParams() []string { return []string{"header", "prefix"} }
+func (a *AWSIMDS) RequiredParams() []string { return nil }
 
-func (a *AWSOIDC) ParseParams(m map[string]interface{}) (interface{}, error) {
-	p, err := authplugins.ParseParams[awsOIDCParams](m)
+func (a *AWSIMDS) OptionalParams() []string { return []string{"header", "prefix"} }
+
+func (a *AWSIMDS) ParseParams(m map[string]interface{}) (interface{}, error) {
+	p, err := authplugins.ParseParams[awsIMDSParams](m)
 	if err != nil {
 		return nil, err
-	}
-	if p.Audience == "" {
-		return nil, fmt.Errorf("missing audience")
 	}
 	if p.Header == "" {
 		p.Header = "Authorization"
@@ -64,25 +67,25 @@ func (a *AWSOIDC) ParseParams(m map[string]interface{}) (interface{}, error) {
 	return p, nil
 }
 
-func (a *AWSOIDC) AddAuth(ctx context.Context, r *http.Request, params interface{}) error {
-	cfg, ok := params.(*awsOIDCParams)
+func (a *AWSIMDS) AddAuth(ctx context.Context, r *http.Request, params interface{}) error {
+	cfg, ok := params.(*awsIMDSParams)
 	if !ok {
 		return fmt.Errorf("invalid config")
 	}
-	tok, exp := getCachedToken(cfg.Audience)
+	tok, exp := getCachedToken()
 	if tok == "" || time.Now().After(exp.Add(-1*time.Minute)) {
 		var err error
-		tok, exp, err = fetchToken(ctx, cfg.Audience)
+		tok, exp, err = fetchToken(ctx)
 		if err != nil {
 			return err
 		}
-		setCachedToken(cfg.Audience, tok, exp)
+		setCachedToken(tok, exp)
 	}
 	r.Header.Set(cfg.Header, cfg.Prefix+tok)
 	return nil
 }
 
-func fetchToken(ctx context.Context, aud string) (string, time.Time, error) {
+func fetchToken(ctx context.Context) (string, time.Time, error) {
 	metaToken, err := fetchMetadataToken(ctx)
 	if err != nil {
 		return "", time.Time{}, err
@@ -197,20 +200,19 @@ func fetchRoleCredentials(ctx context.Context, metaToken, roleName string) (*rol
 	return &rc, nil
 }
 
-func getCachedToken(aud string) (string, time.Time) {
+func getCachedToken() (string, time.Time) {
 	tokenCache.Lock()
 	defer tokenCache.Unlock()
-	ct, ok := tokenCache.m[aud]
-	if !ok {
-		return "", time.Time{}
-	}
-	return ct.token, ct.exp
+	return tokenCache.ct.token, tokenCache.ct.exp
 }
 
-func setCachedToken(aud, tok string, exp time.Time) {
+func setCachedToken(tok string, exp time.Time) {
 	tokenCache.Lock()
-	tokenCache.m[aud] = cachedToken{token: tok, exp: exp}
+	tokenCache.ct = cachedToken{token: tok, exp: exp}
 	tokenCache.Unlock()
 }
 
-func init() { authplugins.RegisterOutgoing(&AWSOIDC{}) }
+func init() {
+	authplugins.RegisterOutgoing(&AWSIMDS{})
+	authplugins.RegisterOutgoing(&AWSOIDC{})
+}

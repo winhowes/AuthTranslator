@@ -1,4 +1,4 @@
-package awsoidc
+package awsimds
 
 import (
 	"context"
@@ -14,7 +14,6 @@ func TestAddAuthFetchesAndCachesToken(t *testing.T) {
 	sessionToken := "sts-session-token"
 	metaToken := "meta123"
 	roleName := "example-role"
-	aud := "urn:test"
 	var requestCount int
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -51,10 +50,10 @@ func TestAddAuthFetchesAndCachesToken(t *testing.T) {
 
 	MetadataHost = srv.URL
 	HTTPClient = srv.Client()
-	tokenCache.m = map[string]cachedToken{}
+	tokenCache.ct = cachedToken{}
 
-	plugin := &AWSOIDC{}
-	paramsRaw, err := plugin.ParseParams(map[string]interface{}{"audience": aud})
+	plugin := &AWSIMDS{}
+	paramsRaw, err := plugin.ParseParams(map[string]interface{}{})
 	if err != nil {
 		t.Fatalf("parse params: %v", err)
 	}
@@ -86,7 +85,6 @@ func TestExpiresSoonTriggersRefresh(t *testing.T) {
 	metaToken := "meta123"
 	roleName := "role"
 	sessionTokens := []string{"first", "second"}
-	aud := "urn:test"
 	var credIndex int
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -113,10 +111,10 @@ func TestExpiresSoonTriggersRefresh(t *testing.T) {
 
 	MetadataHost = srv.URL
 	HTTPClient = srv.Client()
-	tokenCache.m = map[string]cachedToken{}
+	tokenCache.ct = cachedToken{}
 
-	plugin := &AWSOIDC{}
-	paramsRaw, err := plugin.ParseParams(map[string]interface{}{"audience": aud})
+	plugin := &AWSIMDS{}
+	paramsRaw, err := plugin.ParseParams(map[string]interface{}{})
 	if err != nil {
 		t.Fatalf("parse params: %v", err)
 	}
@@ -134,8 +132,6 @@ func TestExpiresSoonTriggersRefresh(t *testing.T) {
 }
 
 func TestErrorResponses(t *testing.T) {
-	aud := "urn:test"
-
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/latest/api/token":
@@ -152,10 +148,10 @@ func TestErrorResponses(t *testing.T) {
 
 	MetadataHost = srv.URL
 	HTTPClient = srv.Client()
-	tokenCache.m = map[string]cachedToken{}
+	tokenCache.ct = cachedToken{}
 
-	plugin := &AWSOIDC{}
-	paramsRaw, err := plugin.ParseParams(map[string]interface{}{"audience": aud})
+	plugin := &AWSIMDS{}
+	paramsRaw, err := plugin.ParseParams(map[string]interface{}{})
 	if err != nil {
 		t.Fatalf("parse params: %v", err)
 	}
