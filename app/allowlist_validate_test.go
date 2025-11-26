@@ -75,6 +75,17 @@ func TestValidateAllowlistEntriesMissingPath(t *testing.T) {
 	}
 }
 
+func TestValidateAllowlistEntriesWhitespaceMethod(t *testing.T) {
+	entries := []AllowlistEntry{{
+		Integration: "test",
+		Callers:     []CallerConfig{{ID: "c", Rules: []CallRule{{Path: "/x", Methods: map[string]RequestConstraint{"  ": {}}}}}},
+	}}
+	err := validateAllowlistEntries(entries)
+	if err == nil || !strings.Contains(err.Error(), "invalid method") {
+		t.Fatalf("expected invalid method error, got %v", err)
+	}
+}
+
 func TestValidateAllowlistEntriesMethodCaseIgnored(t *testing.T) {
 	entries := []AllowlistEntry{{
 		Integration: "test",
@@ -247,5 +258,36 @@ func TestValidateAllowlistEntriesGlobalCapability(t *testing.T) {
 	}}
 	if err := validateAllowlistEntries(entries); err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestCopyAllowlistCallersSkipsEmptyMethod(t *testing.T) {
+	callers := []CallerConfig{{
+		ID: "c",
+		Rules: []CallRule{{
+			Path: "/x",
+			Methods: map[string]RequestConstraint{
+				"   ":   {},
+				" get ": {},
+			},
+		}},
+		Capabilities: []integrationplugins.CapabilityConfig{{Name: "cap"}},
+	}}
+
+	copyCallers := copyAllowlistCallers(callers)
+	if len(copyCallers) != 1 || len(copyCallers[0].Rules) != 1 {
+		t.Fatalf("unexpected copy structure: %#v", copyCallers)
+	}
+
+	methods := copyCallers[0].Rules[0].Methods
+	if len(methods) != 1 {
+		t.Fatalf("expected only non-empty method retained, got %#v", methods)
+	}
+	if _, ok := methods["GET"]; !ok {
+		t.Fatalf("expected GET method to remain after trimming, got %#v", methods)
+	}
+
+	if len(copyCallers[0].Capabilities) != 1 || copyCallers[0].Capabilities[0].Name != "cap" {
+		t.Fatalf("expected capabilities to be copied: %#v", copyCallers[0].Capabilities)
 	}
 }

@@ -71,6 +71,12 @@ func validateAllowlistEntry(name string, callers []CallerConfig) error {
 			}
 		}
 	}
+	copyCallers := copyAllowlistCallers(callers)
+	expanded := integrationplugins.ExpandCapabilities(name, copyCallers)
+	return validateAllowlist(name, expanded)
+}
+
+func copyAllowlistCallers(callers []CallerConfig) []CallerConfig {
 	copyCallers := make([]CallerConfig, len(callers))
 	for i, c := range callers {
 		rules := append([]CallRule(nil), c.Rules...)
@@ -91,8 +97,7 @@ func validateAllowlistEntry(name string, callers []CallerConfig) error {
 			Capabilities: append([]integrationplugins.CapabilityConfig(nil), c.Capabilities...),
 		}
 	}
-	expanded := integrationplugins.ExpandCapabilities(name, copyCallers)
-	return validateAllowlist(name, expanded)
+	return copyCallers
 }
 
 func validateCapability(integration string, cap integrationplugins.CapabilityConfig) error {
