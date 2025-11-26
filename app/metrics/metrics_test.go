@@ -181,3 +181,21 @@ func TestWritePromPlugins(t *testing.T) {
 		t.Fatalf("custom metric missing: %s", rr.Body.String())
 	}
 }
+
+func TestWritePromSkipsMalformedUpstreamKeys(t *testing.T) {
+	Reset()
+
+	upstreamStatusCounts.Add("badkey", 3)
+	RecordStatus("foo", http.StatusOK)
+
+	rr := httptest.NewRecorder()
+	WriteProm(rr)
+
+	body := rr.Body.String()
+	if strings.Contains(body, "badkey") {
+		t.Fatalf("expected malformed upstream key to be ignored, got %q", body)
+	}
+	if !strings.Contains(body, `authtranslator_upstream_responses_total{integration="foo",code="200"} 1`) {
+		t.Fatalf("missing valid upstream status metric: %s", body)
+	}
+}
