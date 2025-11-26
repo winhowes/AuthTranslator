@@ -32,6 +32,7 @@ AuthTranslator’s behaviour is extended by **plugins** – small Go packages th
 | Outbound  | `basic`            | Adds HTTP Basic credentials to the upstream request. |
 | Outbound  | `google_oidc`      | Attaches a Google identity token from the metadata service. |
 | Outbound  | `gcp_token`        | Uses a metadata service access token. |
+| Outbound  | `azure_oidc`       | Retrieves an Azure access token from the Instance Metadata Service. |
 | Outbound  | `hmac_signature`   | Computes an HMAC for the request. |
 | Outbound  | `jwt`              | Adds a signed JWT to the request. |
 | Outbound  | `mtls`             | Sends a client certificate and exposes the CN via header. |
@@ -82,6 +83,21 @@ outgoing_auth:
 
 Replaces every occurrence of the secret referenced by `find_secret` with
 the value from `replace_secret` across the URL, headers and body.
+
+### Outbound `azure_oidc`
+
+```yaml
+outgoing_auth:
+  - type: azure_oidc
+    params:
+      resource: api://my-api-app-id
+      client_id: 00000000-0000-0000-0000-000000000000 # optional
+      header: X-Api-Token                             # optional (default: Authorization)
+      prefix: "Bearer "                               # optional (default: "Bearer ")
+```
+
+Obtains an access token from the Azure Instance Metadata Service for the specified `resource`, caches it, and attaches it to the
+configured header on each outgoing request.
 
 ---
 
