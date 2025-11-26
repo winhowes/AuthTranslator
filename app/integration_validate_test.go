@@ -47,3 +47,16 @@ func TestValidateRequiredNonStruct(t *testing.T) {
 		t.Fatalf("expected struct error, got %v", err)
 	}
 }
+
+type taggedSample struct {
+	Primary string   `json:",omitempty"`
+	Named   string   `json:"named,omitempty"`
+	Skip    []string `json:"-"`
+}
+
+func TestValidateRequiredTagParsing(t *testing.T) {
+	cfg := taggedSample{Primary: "x", Named: "y", Skip: []string{"a"}}
+	if err := validateRequired(cfg, vrules{"Primary", "named"}); err != nil {
+		t.Fatalf("unexpected error validating tagged sample: %v", err)
+	}
+}
