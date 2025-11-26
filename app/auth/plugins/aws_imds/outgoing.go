@@ -1,11 +1,18 @@
 package awsimds
 
 import (
+	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"path"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -15,8 +22,8 @@ import (
 
 // awsIMDSParams configures the AWS IMDS plugin.
 type awsIMDSParams struct {
-	Header string `json:"header"`
-	Prefix string `json:"prefix"`
+	Region  string `json:"region"`
+	Service string `json:"service"`
 }
 
 // AWSIMDS fetches the IAM role session token from the AWS Instance Metadata
@@ -30,15 +37,7 @@ var MetadataHost = "http://169.254.169.254"
 // HTTPClient is used for all metadata requests.
 var HTTPClient = &http.Client{Timeout: 5 * time.Second}
 
-var tokenCache = struct {
-	sync.Mutex
-	ct cachedToken
-}{ct: cachedToken{}}
-
-type cachedToken struct {
-	token string
-	exp   time.Time
-}
+var nowFunc = time.Now
 
 // AWSOIDC is kept as a backward-compatible alias for configurations still
 // referencing the old plugin name. It delegates all behavior to AWSIMDS but
@@ -51,20 +50,10 @@ func (a *AWSIMDS) Name() string { return "aws_imds" }
 
 func (a *AWSIMDS) RequiredParams() []string { return nil }
 
-func (a *AWSIMDS) OptionalParams() []string { return []string{"header", "prefix"} }
+func (a *AWSIMDS) OptionalParams() []string { return []string{"region", "service"} }
 
 func (a *AWSIMDS) ParseParams(m map[string]interface{}) (interface{}, error) {
-	p, err := authplugins.ParseParams[awsIMDSParams](m)
-	if err != nil {
-		return nil, err
-	}
-	if p.Header == "" {
-		p.Header = "Authorization"
-	}
-	if p.Prefix == "" {
-		p.Prefix = "Bearer "
-	}
-	return p, nil
+	return authplugins.ParseParams[awsIMDSParams](m)
 }
 
 func (a *AWSIMDS) AddAuth(ctx context.Context, r *http.Request, params interface{}) error {
@@ -72,45 +61,48 @@ func (a *AWSIMDS) AddAuth(ctx context.Context, r *http.Request, params interface
 	if !ok {
 		return fmt.Errorf("invalid config")
 	}
-	tok, exp := getCachedToken()
-	if tok == "" || time.Now().After(exp.Add(-1*time.Minute)) {
+	creds, exp := getCachedCreds()
+	if creds == nil || nowFunc().After(exp.Add(-1*time.Minute)) {
 		var err error
-		tok, exp, err = fetchToken(ctx)
+		creds, exp, err = fetchCredentials(ctx)
 		if err != nil {
 			return err
 		}
-		setCachedToken(tok, exp)
+		setCachedCreds(creds, exp)
 	}
-	r.Header.Set(cfg.Header, cfg.Prefix+tok)
-	return nil
+	region, service, err := determineRegionService(r.URL.Host, cfg)
+	if err != nil {
+		return err
+	}
+	return signRequest(r, region, service, creds)
 }
 
-func fetchToken(ctx context.Context) (string, time.Time, error) {
+func fetchCredentials(ctx context.Context) (*roleCredentials, time.Time, error) {
 	metaToken, err := fetchMetadataToken(ctx)
 	if err != nil {
-		return "", time.Time{}, err
+		return nil, time.Time{}, err
 	}
 
 	roleName, err := fetchRoleName(ctx, metaToken)
 	if err != nil {
-		return "", time.Time{}, err
+		return nil, time.Time{}, err
 	}
 
 	credentials, err := fetchRoleCredentials(ctx, metaToken, roleName)
 	if err != nil {
-		return "", time.Time{}, err
+		return nil, time.Time{}, err
 	}
 
-	if credentials.Token == "" {
-		return "", time.Time{}, fmt.Errorf("empty session token from IMDS for role %s", roleName)
+	if credentials.AccessKeyID == "" || credentials.SecretAccessKey == "" || credentials.Token == "" {
+		return nil, time.Time{}, fmt.Errorf("incomplete credentials from IMDS for role %s", roleName)
 	}
 
 	exp, err := time.Parse(time.RFC3339, credentials.Expiration)
 	if err != nil {
-		return "", time.Time{}, fmt.Errorf("parse expiration: %w", err)
+		return nil, time.Time{}, fmt.Errorf("parse expiration: %w", err)
 	}
 
-	return credentials.Token, exp, nil
+	return credentials, exp, nil
 }
 
 func fetchMetadataToken(ctx context.Context) (string, error) {
@@ -168,8 +160,10 @@ func fetchRoleName(ctx context.Context, metaToken string) (string, error) {
 }
 
 type roleCredentials struct {
-	Expiration string `json:"Expiration"`
-	Token      string `json:"Token"`
+	AccessKeyID     string `json:"AccessKeyId"`
+	SecretAccessKey string `json:"SecretAccessKey"`
+	Token           string `json:"Token"`
+	Expiration      string `json:"Expiration"`
 }
 
 func fetchRoleCredentials(ctx context.Context, metaToken, roleName string) (*roleCredentials, error) {
@@ -200,16 +194,208 @@ func fetchRoleCredentials(ctx context.Context, metaToken, roleName string) (*rol
 	return &rc, nil
 }
 
-func getCachedToken() (string, time.Time) {
-	tokenCache.Lock()
-	defer tokenCache.Unlock()
-	return tokenCache.ct.token, tokenCache.ct.exp
+type cachedCreds struct {
+	creds *roleCredentials
+	exp   time.Time
 }
 
-func setCachedToken(tok string, exp time.Time) {
-	tokenCache.Lock()
-	tokenCache.ct = cachedToken{token: tok, exp: exp}
-	tokenCache.Unlock()
+var credsCache = struct {
+	sync.Mutex
+	cc cachedCreds
+}{cc: cachedCreds{}}
+
+func getCachedCreds() (*roleCredentials, time.Time) {
+	credsCache.Lock()
+	defer credsCache.Unlock()
+	return credsCache.cc.creds, credsCache.cc.exp
+}
+
+func setCachedCreds(creds *roleCredentials, exp time.Time) {
+	credsCache.Lock()
+	credsCache.cc = cachedCreds{creds: creds, exp: exp}
+	credsCache.Unlock()
+}
+
+func determineRegionService(host string, cfg *awsIMDSParams) (string, string, error) {
+	region := strings.TrimSpace(cfg.Region)
+	service := strings.TrimSpace(cfg.Service)
+
+	if region != "" && service != "" {
+		return region, service, nil
+	}
+
+	host = strings.Split(host, ":")[0] // strip port if present
+	parts := strings.Split(host, ".")
+	if len(parts) >= 4 && parts[len(parts)-2] == "amazonaws" {
+		if service == "" {
+			service = parts[0]
+		}
+		if region == "" {
+			region = parts[1]
+		}
+	}
+
+	if region == "" || service == "" {
+		return "", "", fmt.Errorf("aws_imds requires region and service; set params or use standard AWS hostname")
+	}
+
+	return region, service, nil
+}
+
+func signRequest(r *http.Request, region, service string, creds *roleCredentials) error {
+	now := nowFunc().UTC()
+	amzDate := now.Format("20060102T150405Z")
+	dateStamp := now.Format("20060102")
+
+	if r.Header == nil {
+		r.Header = http.Header{}
+	}
+
+	host := r.Host
+	if host == "" && r.URL != nil {
+		host = r.URL.Host
+	}
+	if host == "" {
+		return fmt.Errorf("request host is required for signing")
+	}
+	r.Header.Set("Host", host)
+	r.Header.Set("X-Amz-Date", amzDate)
+	r.Header.Set("X-Amz-Security-Token", creds.Token)
+
+	body, err := readBody(r)
+	if err != nil {
+		return err
+	}
+	payloadHash := hashSHA256Hex(body)
+	r.Header.Set("X-Amz-Content-Sha256", payloadHash)
+
+	signedHeaders, canonicalHeaders := canonicalizeHeaders(r.Header)
+	canonicalQuery := canonicalizeQuery(r.URL)
+	canonicalURI := canonicalURI(r.URL)
+	canonicalRequest := strings.Join([]string{
+		r.Method,
+		canonicalURI,
+		canonicalQuery,
+		canonicalHeaders,
+		"",
+		signedHeaders,
+		payloadHash,
+	}, "\n")
+
+	credentialScope := fmt.Sprintf("%s/%s/%s/aws4_request", dateStamp, region, service)
+	stringToSign := strings.Join([]string{
+		"AWS4-HMAC-SHA256",
+		amzDate,
+		credentialScope,
+		hashSHA256Hex([]byte(canonicalRequest)),
+	}, "\n")
+
+	signingKey := buildSigningKey(creds.SecretAccessKey, dateStamp, region, service)
+	signature := hex.EncodeToString(hmacSHA256(signingKey, stringToSign))
+
+	authHeader := fmt.Sprintf("AWS4-HMAC-SHA256 Credential=%s/%s, SignedHeaders=%s, Signature=%s", creds.AccessKeyID, credentialScope, signedHeaders, signature)
+	r.Header.Set("Authorization", authHeader)
+
+	return nil
+}
+
+func readBody(r *http.Request) ([]byte, error) {
+	if r.Body == nil {
+		return []byte{}, nil
+	}
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		return nil, err
+	}
+	r.Body = io.NopCloser(bytes.NewReader(body))
+	r.ContentLength = int64(len(body))
+	return body, nil
+}
+
+func canonicalizeHeaders(h http.Header) (string, string) {
+	lowerVals := make(map[string][]string, len(h))
+	for k, v := range h {
+		lowerVals[strings.ToLower(k)] = v
+	}
+	keys := make([]string, 0, len(lowerVals))
+	for k := range lowerVals {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	var canonical strings.Builder
+	for _, k := range keys {
+		values := lowerVals[k]
+		for i := range values {
+			values[i] = strings.Join(strings.Fields(values[i]), " ")
+		}
+		canonical.WriteString(k)
+		canonical.WriteString(":")
+		canonical.WriteString(strings.Join(values, ","))
+		canonical.WriteString("\n")
+	}
+	return strings.Join(keys, ";"), canonical.String()
+}
+
+func canonicalizeQuery(u *url.URL) string {
+	if u == nil {
+		return ""
+	}
+	values, _ := url.ParseQuery(u.RawQuery)
+	if len(values) == 0 {
+		return ""
+	}
+	keys := make([]string, 0, len(values))
+	for k := range values {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	var parts []string
+	for _, k := range keys {
+		vals := values[k]
+		sort.Strings(vals)
+		for _, v := range vals {
+			parts = append(parts, fmt.Sprintf("%s=%s", escapeQueryComponent(k), escapeQueryComponent(v)))
+		}
+	}
+	return strings.Join(parts, "&")
+}
+
+func escapeQueryComponent(v string) string {
+	escaped := url.QueryEscape(v)
+	escaped = strings.ReplaceAll(escaped, "+", "%20")
+	escaped = strings.ReplaceAll(escaped, "*", "%2A")
+	escaped = strings.ReplaceAll(escaped, "%7E", "~")
+	return escaped
+}
+
+func canonicalURI(u *url.URL) string {
+	if u == nil {
+		return "/"
+	}
+	uri := u.EscapedPath()
+	if uri == "" {
+		uri = "/"
+	}
+	return path.Clean(uri)
+}
+
+func hashSHA256Hex(b []byte) string {
+	h := sha256.Sum256(b)
+	return hex.EncodeToString(h[:])
+}
+
+func hmacSHA256(key []byte, msg string) []byte {
+	h := hmac.New(sha256.New, key)
+	h.Write([]byte(msg))
+	return h.Sum(nil)
+}
+
+func buildSigningKey(secret, dateStamp, region, service string) []byte {
+	kDate := hmacSHA256([]byte("AWS4"+secret), dateStamp)
+	kRegion := hmacSHA256(kDate, region)
+	kService := hmacSHA256(kRegion, service)
+	kSigning := hmacSHA256(kService, "aws4_request")
+	return kSigning
 }
 
 func init() {

@@ -106,11 +106,11 @@ configured header on each outgoing request.
 outgoing_auth:
   - type: aws_imds
     params:
-      header: Authorization                 # optional (default: Authorization)
-      prefix: "Bearer "                     # optional (default: "Bearer ")
+      region: us-west-2                     # optional, inferred from AWS hostname if omitted
+      service: s3                           # optional, inferred from AWS hostname if omitted
 ```
 
-Retrieves the IAM role session token from the AWS Instance Metadata Service v2, caches it until shortly before expiry, and attaches it to the chosen header on each outgoing request.
+Retrieves temporary IAM role credentials from the AWS Instance Metadata Service v2, caches them until shortly before expiry, and applies SigV4 signing (including `X-Amz-Security-Token`) to each outgoing request. If the upstream hostname follows the standard `service.region.amazonaws.com` pattern, the plugin auto‑discovers the service and region; otherwise set them explicitly.
 
 > **Note:** The legacy type name `aws_oidc` remains supported for backward compatibility but now resolves to the IMDS session token flow described above. New configurations should prefer `aws_imds` to reflect the actual authentication mechanism.
 
