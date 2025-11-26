@@ -1,6 +1,7 @@
 package plugins
 
 import (
+	_ "github.com/winhowes/AuthTranslator/app/auth/plugins/azure_oidc"
 	_ "github.com/winhowes/AuthTranslator/app/auth/plugins/basic"
 	_ "github.com/winhowes/AuthTranslator/app/auth/plugins/findreplace"
 	_ "github.com/winhowes/AuthTranslator/app/auth/plugins/gcp_token"
