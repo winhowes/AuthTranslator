@@ -422,6 +422,15 @@ func TestConstraintMatchesRequestHeaderCaseInsensitive(t *testing.T) {
 	}
 }
 
+func TestConstraintMatchesRequestHeaderValueMissing(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "http://headers/path", nil)
+	req.Header.Set("X-Token", "abc123")
+	cons := RequestConstraint{Headers: map[string][]string{"X-Token": {"missing"}}}
+	if constraintMatchesRequest(req, cons) {
+		t.Fatal("expected constraint match to fail when header value is not present")
+	}
+}
+
 func TestGetDenylistReturnsCopy(t *testing.T) {
 	resetDenylists()
 
