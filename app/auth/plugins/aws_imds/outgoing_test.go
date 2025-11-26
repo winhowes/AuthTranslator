@@ -150,6 +150,17 @@ func TestExpiresSoonTriggersRefresh(t *testing.T) {
 	}
 }
 
+func TestDetermineRegionServiceWithResourcePrefix(t *testing.T) {
+	cfg := &awsIMDSParams{}
+	region, service, err := determineRegionService("mybucket.s3.us-west-2.amazonaws.com", cfg)
+	if err != nil {
+		t.Fatalf("determineRegionService: %v", err)
+	}
+	if region != "us-west-2" || service != "s3" {
+		t.Fatalf("unexpected derived values region=%s service=%s", region, service)
+	}
+}
+
 func TestErrorResponses(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {

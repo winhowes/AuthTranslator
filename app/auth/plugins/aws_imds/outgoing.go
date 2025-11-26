@@ -227,11 +227,17 @@ func determineRegionService(host string, cfg *awsIMDSParams) (string, string, er
 	host = strings.Split(host, ":")[0] // strip port if present
 	parts := strings.Split(host, ".")
 	if len(parts) >= 4 && parts[len(parts)-2] == "amazonaws" {
-		if service == "" {
-			service = parts[0]
-		}
-		if region == "" {
-			region = parts[1]
+		// Use the right-most service and region portions to support hosts with
+		// additional labels (e.g., bucket.s3.us-west-2.amazonaws.com).
+		serviceIdx := len(parts) - 4
+		regionIdx := len(parts) - 3
+		if serviceIdx >= 0 && regionIdx >= 0 {
+			if service == "" {
+				service = parts[serviceIdx]
+			}
+			if region == "" {
+				region = parts[regionIdx]
+			}
 		}
 	}
 
