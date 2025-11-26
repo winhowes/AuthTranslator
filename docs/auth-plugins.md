@@ -33,6 +33,7 @@ AuthTranslator’s behaviour is extended by **plugins** – small Go packages th
 | Outbound  | `google_oidc`      | Attaches a Google identity token from the metadata service. |
 | Outbound  | `gcp_token`        | Uses a metadata service access token. |
 | Outbound  | `azure_oidc`       | Retrieves an Azure access token from the Instance Metadata Service. |
+| Outbound  | `aws_oidc`         | Retrieves an AWS OIDC token from the Instance Metadata Service (IMDSv2). |
 | Outbound  | `hmac_signature`   | Computes an HMAC for the request. |
 | Outbound  | `jwt`              | Adds a signed JWT to the request. |
 | Outbound  | `mtls`             | Sends a client certificate and exposes the CN via header. |
@@ -98,6 +99,19 @@ outgoing_auth:
 
 Obtains an access token from the Azure Instance Metadata Service for the specified `resource`, caches it, and attaches it to the
 configured header on each outgoing request.
+
+### Outbound `aws_oidc`
+
+```yaml
+outgoing_auth:
+  - type: aws_oidc
+    params:
+      audience: urn:example
+      header: Authorization                 # optional (default: Authorization)
+      prefix: "Bearer "                     # optional (default: "Bearer ")
+```
+
+Retrieves an ID token from the AWS Instance Metadata Service v2 for the provided `audience`, caches it until shortly before expiry, and attaches it to the chosen header on each outgoing request.
 
 ---
 
