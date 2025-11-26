@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -259,6 +260,43 @@ func TestSetAllowlistMethodNormalization(t *testing.T) {
 	integ := &Integration{Name: "case"}
 	if _, ok := findConstraint(integ, "*", "/ok", http.MethodGet); !ok {
 		t.Fatal("expected match for uppercase method")
+	}
+}
+
+func TestSetAllowlistSkipsEmptyMethod(t *testing.T) {
+	allowlists.Lock()
+	allowlists.m = make(map[string]map[string]CallerConfig)
+	allowlists.Unlock()
+
+	if err := SetAllowlist("emptymethod", []CallerConfig{{
+		ID: "*",
+		Rules: []CallRule{{
+			Path: "/skip-empty",
+			Methods: map[string]RequestConstraint{
+				"   ":           {},
+				http.MethodPost: {},
+			},
+		}},
+	}}); err != nil {
+		t.Fatalf("failed to set allowlist: %v", err)
+	}
+
+	allowlists.RLock()
+	callers := allowlists.m["emptymethod"]
+	allowlists.RUnlock()
+
+	rules := callers["*"].Rules
+	if len(rules) != 1 {
+		t.Fatalf("expected one rule, got %d", len(rules))
+	}
+
+	methods := rules[0].Methods
+	constraint, ok := methods[http.MethodPost]
+	if len(methods) != 1 || !ok {
+		t.Fatalf("expected only POST constraint after skipping empty method, got: %#v", methods)
+	}
+	if !reflect.DeepEqual(constraint, RequestConstraint{}) {
+		t.Fatalf("expected zero-value constraint for POST method, got: %#v", constraint)
 	}
 }
 
