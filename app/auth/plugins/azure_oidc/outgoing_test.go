@@ -215,3 +215,101 @@ func TestAzureOIDCUsesExpiresOn(t *testing.T) {
 		t.Fatalf("expected long-lived expiry, got %s", exp)
 	}
 }
+
+func TestAzureOIDCParamLists(t *testing.T) {
+	p := AzureOIDC{}
+	if got := p.RequiredParams(); len(got) != 1 || got[0] != "resource" {
+		t.Fatalf("unexpected required params: %v", got)
+	}
+	wantOpt := []string{"client_id", "header", "prefix"}
+	if got := p.OptionalParams(); len(got) != len(wantOpt) {
+		t.Fatalf("unexpected optional params length: %v", got)
+	} else {
+		for i, v := range wantOpt {
+			if got[i] != v {
+				t.Fatalf("unexpected optional param %q at %d", got[i], i)
+			}
+		}
+	}
+}
+
+func TestAzureOIDCParseParamsInvalidType(t *testing.T) {
+	p := AzureOIDC{}
+	if _, err := p.ParseParams(map[string]interface{}{"resource": 5}); err == nil {
+		t.Fatal("expected parse error for invalid type")
+	}
+}
+
+func TestFetchTokenEmptyAccessToken(t *testing.T) {
+	resetCache()
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, `{"expires_in": 60}`)
+	}))
+	defer ts.Close()
+
+	oldHost := MetadataHost
+	MetadataHost = ts.URL
+	defer func() { MetadataHost = oldHost }()
+
+	oldClient := HTTPClient
+	HTTPClient = ts.Client()
+	defer func() { HTTPClient = oldClient }()
+
+	if _, _, err := fetchToken(context.Background(), "api://res", ""); err == nil {
+		t.Fatal("expected error for empty token")
+	}
+}
+
+func TestParseExpiryDefault(t *testing.T) {
+	now := time.Now()
+	exp := parseExpiry("", "")
+	if until := time.Until(exp); until < 50*time.Second || until > 70*time.Second {
+		t.Fatalf("unexpected default expiry window: %s (now=%s exp=%s)", until, now, exp)
+	}
+}
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+func TestFetchTokenTransportError(t *testing.T) {
+	oldClient := HTTPClient
+	HTTPClient = &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		return nil, fmt.Errorf("boom")
+	})}
+	defer func() { HTTPClient = oldClient }()
+
+	if _, _, err := fetchToken(context.Background(), "api://res", ""); err == nil {
+		t.Fatal("expected transport error")
+	}
+}
+
+func TestFetchTokenDecodeError(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, "{broken")
+	}))
+	defer ts.Close()
+
+	oldHost := MetadataHost
+	MetadataHost = ts.URL
+	defer func() { MetadataHost = oldHost }()
+
+	oldClient := HTTPClient
+	HTTPClient = ts.Client()
+	defer func() { HTTPClient = oldClient }()
+
+	if _, _, err := fetchToken(context.Background(), "api://res", ""); err == nil {
+		t.Fatal("expected decode error")
+	}
+}
+
+func TestFetchTokenBadURL(t *testing.T) {
+	oldHost := MetadataHost
+	MetadataHost = "://bad url"
+	defer func() { MetadataHost = oldHost }()
+
+	if _, _, err := fetchToken(context.Background(), "api://res", ""); err == nil {
+		t.Fatal("expected url parse error")
+	}
+}
