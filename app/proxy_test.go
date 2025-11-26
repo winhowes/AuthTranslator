@@ -54,6 +54,24 @@ func (capturePlugin) RequiredParams() []string { return []string{"expect_host"} 
 
 func (capturePlugin) OptionalParams() []string { return nil }
 
+type identifyPlugin struct{}
+
+func (identifyPlugin) Name() string { return "identify_test" }
+
+func (identifyPlugin) ParseParams(map[string]interface{}) (interface{}, error) {
+	return struct{}{}, nil
+}
+
+func (identifyPlugin) Authenticate(context.Context, *http.Request, interface{}) bool { return true }
+
+func (identifyPlugin) Identify(*http.Request, interface{}) (string, bool) {
+	return "known-caller", true
+}
+
+func (identifyPlugin) RequiredParams() []string { return nil }
+
+func (identifyPlugin) OptionalParams() []string { return nil }
+
 type failingPlugin struct{}
 
 func (failingPlugin) Name() string { return "failing" }
@@ -571,6 +589,47 @@ func TestProxyHandlerAuthFailure(t *testing.T) {
 	}
 	if ct := rr.Header().Get("Content-Type"); ct != "text/plain; charset=utf-8" {
 		t.Fatalf("unexpected content type %s", ct)
+	}
+}
+
+func TestProxyHandlerIdentifierSetsCallerID(t *testing.T) {
+	authplugins.RegisterIncoming(identifyPlugin{})
+
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer backend.Close()
+
+	integ := Integration{
+		Name:         "identify",
+		Destination:  backend.URL,
+		InRateLimit:  2,
+		OutRateLimit: 2,
+		IncomingAuth: []AuthPluginConfig{{Type: "identify_test", Params: map[string]interface{}{}}},
+	}
+	if err := AddIntegration(&integ); err != nil {
+		t.Fatalf("failed to add integration: %v", err)
+	}
+	t.Cleanup(func() { DeleteIntegration(integ.Name) })
+
+	callers := []CallerConfig{{ID: "known-caller", Rules: []CallRule{{Path: "/", Methods: map[string]RequestConstraint{"GET": {}}}}}}
+	if err := SetAllowlist(integ.Name, callers); err != nil {
+		t.Fatalf("failed to set allowlist: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "http://identify/", nil)
+	req.Host = "identify"
+	rr := httptest.NewRecorder()
+	proxyHandler(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rr.Code)
+	}
+	integ.inLimiter.mu.Lock()
+	count := integ.inLimiter.requests["known-caller"]
+	integ.inLimiter.mu.Unlock()
+	if count != 1 {
+		t.Fatalf("expected rate limit key for caller, got %d", count)
 	}
 }
 
