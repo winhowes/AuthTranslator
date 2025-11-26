@@ -232,7 +232,11 @@ func determineRegionService(host string, cfg *awsIMDSParams) (string, string, er
 		regionIdx := len(parts) - 3
 		if serviceIdx >= 0 && regionIdx >= 0 {
 			if service == "" {
-				service = parts[serviceIdx]
+				candidate := parts[serviceIdx]
+				if candidate == "dualstack" && serviceIdx > 0 {
+					candidate = parts[serviceIdx-1]
+				}
+				service = candidate
 			}
 			if region == "" {
 				region = parts[regionIdx]

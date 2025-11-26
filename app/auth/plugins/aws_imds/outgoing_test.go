@@ -162,6 +162,17 @@ func TestDetermineRegionServiceWithResourcePrefix(t *testing.T) {
 	}
 }
 
+func TestDetermineRegionServiceDualstack(t *testing.T) {
+	cfg := &awsIMDSParams{}
+	region, service, err := determineRegionService("s3.dualstack.us-east-1.amazonaws.com", cfg)
+	if err != nil {
+		t.Fatalf("determineRegionService: %v", err)
+	}
+	if region != "us-east-1" || service != "s3" {
+		t.Fatalf("unexpected derived values region=%s service=%s", region, service)
+	}
+}
+
 func TestErrorResponses(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
