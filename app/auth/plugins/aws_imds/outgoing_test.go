@@ -41,9 +41,16 @@ func TestAddAuthFetchesAndSigns(t *testing.T) {
 	}))
 	defer srv.Close()
 
+	prevHost := MetadataHost
+	prevClient := HTTPClient
 	MetadataHost = srv.URL
 	HTTPClient = srv.Client()
 	credsCache.cc = cachedCreds{}
+	defer func() {
+		MetadataHost = prevHost
+		HTTPClient = prevClient
+		credsCache.cc = cachedCreds{}
+	}()
 	prevNow := nowFunc
 	nowFunc = func() time.Time { return fixedNow }
 	defer func() { nowFunc = prevNow }()
@@ -124,9 +131,16 @@ func TestExpiresSoonTriggersRefresh(t *testing.T) {
 	}))
 	defer srv.Close()
 
+	prevHost := MetadataHost
+	prevClient := HTTPClient
 	MetadataHost = srv.URL
 	HTTPClient = srv.Client()
 	credsCache.cc = cachedCreds{}
+	defer func() {
+		MetadataHost = prevHost
+		HTTPClient = prevClient
+		credsCache.cc = cachedCreds{}
+	}()
 	prevNow := nowFunc
 	current := time.Now()
 	nowFunc = func() time.Time { return current }
@@ -188,9 +202,16 @@ func TestErrorResponses(t *testing.T) {
 	}))
 	defer srv.Close()
 
+	prevHost := MetadataHost
+	prevClient := HTTPClient
 	MetadataHost = srv.URL
 	HTTPClient = srv.Client()
 	credsCache.cc = cachedCreds{}
+	defer func() {
+		MetadataHost = prevHost
+		HTTPClient = prevClient
+		credsCache.cc = cachedCreds{}
+	}()
 
 	plugin := &AWSIMDS{}
 	paramsRaw, err := plugin.ParseParams(map[string]interface{}{})
@@ -226,5 +247,16 @@ func TestCanonicalURIPreservesTrailingAndRepeatedSlashes(t *testing.T) {
 				t.Fatalf("canonicalURI(%q) = %q, want %q", tc.path, got, tc.want)
 			}
 		})
+	}
+}
+
+func TestDefaultHTTPClientDisablesProxy(t *testing.T) {
+	client := HTTPClient
+	transport, ok := client.Transport.(*http.Transport)
+	if !ok {
+		t.Fatalf("unexpected transport type %T", client.Transport)
+	}
+	if transport.Proxy != nil {
+		t.Fatalf("expected proxy to be disabled, got %v", transport.Proxy)
 	}
 }

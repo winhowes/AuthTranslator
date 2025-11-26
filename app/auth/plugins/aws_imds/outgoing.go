@@ -34,7 +34,10 @@ type AWSIMDS struct{}
 var MetadataHost = "http://169.254.169.254"
 
 // HTTPClient is used for all metadata requests.
-var HTTPClient = &http.Client{Timeout: 5 * time.Second}
+var HTTPClient = &http.Client{
+	Timeout:   5 * time.Second,
+	Transport: defaultIMDSTransport(),
+}
 
 var nowFunc = time.Now
 
@@ -446,6 +449,16 @@ func removeLastSegment(path string) string {
 		return ""
 	}
 	return path[:idx]
+}
+
+func defaultIMDSTransport() *http.Transport {
+	if t, ok := http.DefaultTransport.(*http.Transport); ok {
+		clone := t.Clone()
+		clone.Proxy = nil
+		return clone
+	}
+
+	return &http.Transport{Proxy: nil}
 }
 
 func hashSHA256Hex(b []byte) string {
