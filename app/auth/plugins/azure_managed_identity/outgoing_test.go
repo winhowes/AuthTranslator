@@ -1,4 +1,4 @@
-package azureoidc
+package azuremanagedidentity
 
 import (
 	"context"
@@ -16,7 +16,7 @@ func resetCache() {
 	tokenCache.Unlock()
 }
 
-func TestAzureOIDCAddAuth(t *testing.T) {
+func TestAzureManagedIdentityAddAuth(t *testing.T) {
 	resetCache()
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -38,7 +38,7 @@ func TestAzureOIDCAddAuth(t *testing.T) {
 	HTTPClient = ts.Client()
 	defer func() { HTTPClient = oldClient }()
 
-	p := AzureOIDC{}
+	p := AzureManagedIdentity{}
 	cfg, err := p.ParseParams(map[string]interface{}{"resource": "api://res"})
 	if err != nil {
 		t.Fatal(err)
@@ -53,7 +53,7 @@ func TestAzureOIDCAddAuth(t *testing.T) {
 	}
 }
 
-func TestAzureOIDCCustomHeaderAndPrefix(t *testing.T) {
+func TestAzureManagedIdentityCustomHeaderAndPrefix(t *testing.T) {
 	resetCache()
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -69,7 +69,7 @@ func TestAzureOIDCCustomHeaderAndPrefix(t *testing.T) {
 	HTTPClient = ts.Client()
 	defer func() { HTTPClient = oldClient }()
 
-	p := AzureOIDC{}
+	p := AzureManagedIdentity{}
 	cfg, err := p.ParseParams(map[string]interface{}{
 		"resource":  "api://res",
 		"header":    "X-Auth",
@@ -89,7 +89,7 @@ func TestAzureOIDCCustomHeaderAndPrefix(t *testing.T) {
 	}
 }
 
-func TestAzureOIDCAddAuthFailure(t *testing.T) {
+func TestAzureManagedIdentityAddAuthFailure(t *testing.T) {
 	resetCache()
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -106,7 +106,7 @@ func TestAzureOIDCAddAuthFailure(t *testing.T) {
 	HTTPClient = ts.Client()
 	defer func() { HTTPClient = oldClient }()
 
-	p := AzureOIDC{}
+	p := AzureManagedIdentity{}
 	cfg, err := p.ParseParams(map[string]interface{}{"resource": "api://fail"})
 	if err != nil {
 		t.Fatal(err)
@@ -121,7 +121,7 @@ func TestAzureOIDCAddAuthFailure(t *testing.T) {
 	}
 }
 
-func TestAzureOIDCCache(t *testing.T) {
+func TestAzureManagedIdentityCache(t *testing.T) {
 	resetCache()
 
 	var hits int32
@@ -139,7 +139,7 @@ func TestAzureOIDCCache(t *testing.T) {
 	HTTPClient = ts.Client()
 	defer func() { HTTPClient = oldClient }()
 
-	p := AzureOIDC{}
+	p := AzureManagedIdentity{}
 	cfg, err := p.ParseParams(map[string]interface{}{"resource": "api://res"})
 	if err != nil {
 		t.Fatal(err)
@@ -159,26 +159,26 @@ func TestAzureOIDCCache(t *testing.T) {
 	}
 }
 
-func TestAzureOIDCParseParamsMissingResource(t *testing.T) {
+func TestAzureManagedIdentityParseParamsMissingResource(t *testing.T) {
 	resetCache()
 
-	p := AzureOIDC{}
+	p := AzureManagedIdentity{}
 	if _, err := p.ParseParams(map[string]interface{}{}); err == nil {
 		t.Fatal("expected error")
 	}
 }
 
-func TestAzureOIDCAddAuthWrongParams(t *testing.T) {
+func TestAzureManagedIdentityAddAuthWrongParams(t *testing.T) {
 	resetCache()
 
-	p := AzureOIDC{}
+	p := AzureManagedIdentity{}
 	r := &http.Request{Header: http.Header{}}
 	if err := p.AddAuth(context.Background(), r, 5); err == nil {
 		t.Fatal("expected error")
 	}
 }
 
-func TestAzureOIDCUsesExpiresOn(t *testing.T) {
+func TestAzureManagedIdentityUsesExpiresOn(t *testing.T) {
 	resetCache()
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -195,7 +195,7 @@ func TestAzureOIDCUsesExpiresOn(t *testing.T) {
 	HTTPClient = ts.Client()
 	defer func() { HTTPClient = oldClient }()
 
-	p := AzureOIDC{}
+	p := AzureManagedIdentity{}
 	cfg, err := p.ParseParams(map[string]interface{}{"resource": "api://res"})
 	if err != nil {
 		t.Fatal(err)
@@ -216,8 +216,8 @@ func TestAzureOIDCUsesExpiresOn(t *testing.T) {
 	}
 }
 
-func TestAzureOIDCParamLists(t *testing.T) {
-	p := AzureOIDC{}
+func TestAzureManagedIdentityParamLists(t *testing.T) {
+	p := AzureManagedIdentity{}
 	if got := p.RequiredParams(); len(got) != 1 || got[0] != "resource" {
 		t.Fatalf("unexpected required params: %v", got)
 	}
@@ -233,8 +233,8 @@ func TestAzureOIDCParamLists(t *testing.T) {
 	}
 }
 
-func TestAzureOIDCParseParamsInvalidType(t *testing.T) {
-	p := AzureOIDC{}
+func TestAzureManagedIdentityParseParamsInvalidType(t *testing.T) {
+	p := AzureManagedIdentity{}
 	if _, err := p.ParseParams(map[string]interface{}{"resource": 5}); err == nil {
 		t.Fatal("expected parse error for invalid type")
 	}
