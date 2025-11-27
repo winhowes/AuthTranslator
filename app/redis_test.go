@@ -1,13 +1,44 @@
 package main
 
 import (
-	"bufio"
-	"fmt"
-	"io"
-	"net"
-	"testing"
-	"time"
+        "bufio"
+        "fmt"
+        "io"
+        "net"
+        "strconv"
+        "strings"
+        "testing"
+        "time"
 )
+
+func readRESPCommand(t *testing.T, br *bufio.Reader) []string {
+        t.Helper()
+
+        line, err := br.ReadString('\n')
+        if err != nil {
+                t.Fatalf("read command length: %v", err)
+        }
+        if !strings.HasPrefix(line, "*") {
+                t.Fatalf("unexpected command prefix %q", line)
+        }
+        n, err := strconv.Atoi(strings.TrimSpace(line[1:]))
+        if err != nil {
+                t.Fatalf("parse command length: %v", err)
+        }
+
+        args := make([]string, n)
+        for i := 0; i < n; i++ {
+                if _, err := br.ReadString('\n'); err != nil {
+                        t.Fatalf("read bulk len: %v", err)
+                }
+                arg, err := br.ReadString('\n')
+                if err != nil {
+                        t.Fatalf("read bulk data: %v", err)
+                }
+                args[i] = strings.TrimSpace(arg)
+        }
+        return args
+}
 
 func TestRedisCmdInt(t *testing.T) {
 	srv, cli := net.Pipe()
@@ -290,9 +321,9 @@ func TestRedisCmdStringSimple(t *testing.T) {
 }
 
 func TestRedisCmdStringInteger(t *testing.T) {
-	srv, cli := net.Pipe()
-	defer srv.Close()
-	defer cli.Close()
+        srv, cli := net.Pipe()
+        defer srv.Close()
+        defer cli.Close()
 
 	go func() {
 		br := bufio.NewReader(srv)
@@ -307,5 +338,96 @@ func TestRedisCmdStringInteger(t *testing.T) {
 	}
 	if val != "5" {
 		t.Fatalf("expected 5, got %q", val)
-	}
+        }
+}
+
+func TestAllowRedisTokenBucketEmpty(t *testing.T) {
+        oldAddr := *redisAddr
+        *redisAddr = "redis://example:6379"
+        t.Cleanup(func() { *redisAddr = oldAddr })
+
+        rl := NewRateLimiter(1, time.Second, "token_bucket")
+        srv, cli := net.Pipe()
+        defer srv.Close()
+        defer cli.Close()
+
+        now := time.Now().UnixNano()
+
+        go func() {
+                br := bufio.NewReader(srv)
+
+                // GET k
+                readRESPCommand(t, br)
+                payload := fmt.Sprintf("0 %d", now)
+                srv.Write([]byte(fmt.Sprintf("$%d\r\n%s\r\n", len(payload), payload)))
+
+                // SET k <payload>
+                readRESPCommand(t, br)
+                srv.Write([]byte("+OK\r\n"))
+
+                // PEXPIRE k <ttl>
+                readRESPCommand(t, br)
+                srv.Write([]byte(":1\r\n"))
+        }()
+
+        allowed, err := rl.allowRedisTokenBucket(cli, "k")
+        if err != nil {
+                t.Fatalf("unexpected error: %v", err)
+        }
+        if allowed {
+                t.Fatal("expected request to be rate limited when bucket is empty")
+        }
+}
+
+func TestAllowRedisLeakyBucketOverLimit(t *testing.T) {
+        oldAddr := *redisAddr
+        *redisAddr = "redis://example:6379"
+        t.Cleanup(func() { *redisAddr = oldAddr })
+
+        rl := NewRateLimiter(1, time.Second, "leaky_bucket")
+        now := time.Now().UnixNano()
+        srv, cli := net.Pipe()
+        defer srv.Close()
+        defer cli.Close()
+
+        go func() {
+                br := bufio.NewReader(srv)
+
+                // GET k
+                readRESPCommand(t, br)
+                payload := fmt.Sprintf("2 %d", now)
+                srv.Write([]byte(fmt.Sprintf("$%d\r\n%s\r\n", len(payload), payload)))
+
+                // SET k <payload>
+                readRESPCommand(t, br)
+                srv.Write([]byte("+OK\r\n"))
+
+                // PEXPIRE k <ttl>
+                readRESPCommand(t, br)
+                srv.Write([]byte(":1\r\n"))
+        }()
+
+        allowed, err := rl.allowRedisLeakyBucket(cli, "k")
+        if err != nil {
+                t.Fatalf("unexpected error: %v", err)
+        }
+        if allowed {
+                t.Fatal("expected request to be rate limited when bucket is over limit")
+        }
+}
+
+func TestRetryAfterRedisTLSMissingCA(t *testing.T) {
+        oldAddr := *redisAddr
+        oldCA := *redisCA
+        *redisAddr = "rediss://example.com:6379"
+        *redisCA = "does-not-exist"
+        t.Cleanup(func() {
+                *redisAddr = oldAddr
+                *redisCA = oldCA
+        })
+
+        rl := NewRateLimiter(1, time.Second, "fixed_window")
+        if _, err := rl.retryAfterRedis("key"); err == nil {
+                t.Fatal("expected error when CA file cannot be read")
+        }
 }
