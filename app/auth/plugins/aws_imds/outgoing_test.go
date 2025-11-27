@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -12,6 +14,27 @@ import (
 	"testing"
 	"time"
 )
+
+type closingBuffer struct {
+	data     []byte
+	readIdx  int
+	closed   bool
+	closeErr error
+}
+
+func (c *closingBuffer) Read(p []byte) (int, error) {
+	if c.readIdx >= len(c.data) {
+		return 0, io.EOF
+	}
+	n := copy(p, c.data[c.readIdx:])
+	c.readIdx += n
+	return n, nil
+}
+
+func (c *closingBuffer) Close() error {
+	c.closed = true
+	return c.closeErr
+}
 
 func TestAddAuthFetchesAndSigns(t *testing.T) {
 	expires := time.Now().Add(2 * time.Minute).UTC().Truncate(time.Second)
@@ -251,6 +274,50 @@ func TestErrorResponses(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodGet, "http://example.com", nil)
 	if err := plugin.AddAuth(context.Background(), req, paramsRaw); err == nil {
 		t.Fatalf("expected error from metadata token fetch")
+	}
+}
+
+func TestReadBodyClosesOriginal(t *testing.T) {
+	recorder := &closingBuffer{data: []byte("payload")}
+	req, _ := http.NewRequest(http.MethodPost, "http://example.com", recorder)
+
+	body, err := readBody(req)
+	if err != nil {
+		t.Fatalf("readBody: %v", err)
+	}
+	if !recorder.closed {
+		t.Fatalf("expected original body to be closed")
+	}
+	if string(body) != "payload" {
+		t.Fatalf("unexpected body contents: %s", string(body))
+	}
+	if req.Body == recorder {
+		t.Fatalf("expected request body to be replaced")
+	}
+	reread, err := io.ReadAll(req.Body)
+	if err != nil {
+		t.Fatalf("reading replaced body: %v", err)
+	}
+	if string(reread) != "payload" {
+		t.Fatalf("unexpected reread body: %s", string(reread))
+	}
+	if req.ContentLength != int64(len(body)) {
+		t.Fatalf("unexpected content length: %d", req.ContentLength)
+	}
+}
+
+func TestReadBodyCloseError(t *testing.T) {
+	recorder := &closingBuffer{data: []byte("payload"), closeErr: errors.New("close failure")}
+	req, _ := http.NewRequest(http.MethodPost, "http://example.com", recorder)
+
+	if _, err := readBody(req); err == nil {
+		t.Fatalf("expected close error")
+	}
+	if !recorder.closed {
+		t.Fatalf("expected original body to be closed even on error")
+	}
+	if req.Body != recorder {
+		t.Fatalf("expected body not to be replaced on error")
 	}
 }
 

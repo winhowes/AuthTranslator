@@ -314,9 +314,14 @@ func readBody(r *http.Request) ([]byte, error) {
 	if r.Body == nil {
 		return []byte{}, nil
 	}
-	body, err := io.ReadAll(r.Body)
+	origBody := r.Body
+	body, err := io.ReadAll(origBody)
+	closeErr := origBody.Close()
 	if err != nil {
 		return nil, err
+	}
+	if closeErr != nil {
+		return nil, closeErr
 	}
 	r.Body = io.NopCloser(bytes.NewReader(body))
 	r.ContentLength = int64(len(body))
