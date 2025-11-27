@@ -2,7 +2,9 @@ package awsimds
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -84,6 +86,34 @@ func TestAddAuthFetchesAndSigns(t *testing.T) {
 	}
 	if got := req.Header.Get("X-Amz-Content-Sha256"); got != "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" {
 		t.Fatalf("unexpected payload hash: %s", got)
+	}
+
+	// Verify the canonical request and signature are fully deterministic.
+	headers := req.Header.Clone()
+	headers.Del("Authorization")
+	signedHeaders, canonicalHeaders := canonicalizeHeaders(headers)
+	canonicalQuery := canonicalizeQuery(req.URL)
+	canonicalURI := canonicalURI(req.URL)
+	canonicalRequest := strings.Join([]string{
+		req.Method,
+		canonicalURI,
+		canonicalQuery,
+		canonicalHeaders,
+		signedHeaders,
+		req.Header.Get("X-Amz-Content-Sha256"),
+	}, "\n")
+	credentialScope := fmt.Sprintf("%s/%s/%s/aws4_request", fixedNow.Format("20060102"), "us-west-2", "s3")
+	stringToSign := strings.Join([]string{
+		"AWS4-HMAC-SHA256",
+		req.Header.Get("X-Amz-Date"),
+		credentialScope,
+		hashSHA256Hex([]byte(canonicalRequest)),
+	}, "\n")
+	signingKey := buildSigningKey(creds["SecretAccessKey"].(string), fixedNow.Format("20060102"), "us-west-2", "s3")
+	expectedSig := hex.EncodeToString(hmacSHA256(signingKey, stringToSign))
+	expectedAuth := fmt.Sprintf("AWS4-HMAC-SHA256 Credential=%s/%s, SignedHeaders=%s, Signature=%s", creds["AccessKeyId"], credentialScope, signedHeaders, expectedSig)
+	if authz != expectedAuth {
+		t.Fatalf("unexpected authorization header:\nwant %s\ngot  %s", expectedAuth, authz)
 	}
 
 	if requestCount != 3 {

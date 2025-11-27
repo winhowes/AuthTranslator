@@ -289,7 +289,6 @@ func signRequest(r *http.Request, region, service string, creds *roleCredentials
 		canonicalURI,
 		canonicalQuery,
 		canonicalHeaders,
-		"",
 		signedHeaders,
 		payloadHash,
 	}, "\n")
