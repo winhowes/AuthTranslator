@@ -716,6 +716,23 @@ func TestAllowRedisTokenBucketReject(t *testing.T) {
 	<-done
 }
 
+func TestAllowRedisTokenBucketError(t *testing.T) {
+	rl := NewRateLimiter(1, time.Second, "token_bucket")
+	t.Cleanup(rl.Stop)
+	srv, cli := net.Pipe()
+	done := make(chan struct{})
+	go func() {
+		defer func() { srv.Close(); close(done) }()
+		br := bufio.NewReader(srv)
+		parseRedisCommand(t, br)
+		srv.Write([]byte("-ERR nope\r\n"))
+	}()
+	if _, err := rl.allowRedisTokenBucket(cli, "k"); err == nil {
+		t.Fatal("expected redis error")
+	}
+	<-done
+}
+
 func TestAllowRedisLeakyBucketPoolFullClosesConnection(t *testing.T) {
 	old := *redisAddr
 	*redisAddr = "dummy"
@@ -811,6 +828,23 @@ func TestAllowRedisLeakyBucketReject(t *testing.T) {
 	}
 	if ok {
 		t.Fatal("expected leaky bucket reject")
+	}
+	<-done
+}
+
+func TestAllowRedisLeakyBucketError(t *testing.T) {
+	rl := NewRateLimiter(1, time.Second, "leaky_bucket")
+	t.Cleanup(rl.Stop)
+	srv, cli := net.Pipe()
+	done := make(chan struct{})
+	go func() {
+		defer func() { srv.Close(); close(done) }()
+		br := bufio.NewReader(srv)
+		parseRedisCommand(t, br)
+		srv.Write([]byte("-ERR boom\r\n"))
+	}()
+	if _, err := rl.allowRedisLeakyBucket(cli, "k"); err == nil {
+		t.Fatal("expected redis GET error")
 	}
 	<-done
 }
