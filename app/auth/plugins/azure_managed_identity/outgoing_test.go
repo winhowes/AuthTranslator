@@ -270,6 +270,15 @@ func TestParseExpiryDefault(t *testing.T) {
 	}
 }
 
+func TestParseExpiryDateString(t *testing.T) {
+	// App Service managed identity responses return expires_on as a date string
+	// (MM/DD/YYYY HH:MM:SS +/-HH:MM) per Microsoft docs.
+	exp := parseExpiry("04/24/2020 17:20:42 +00:00", "")
+	if exp.Year() != 2020 || exp.Month() != time.April || exp.Day() != 24 {
+		t.Fatalf("unexpected parsed expiry: %s", exp)
+	}
+}
+
 type roundTripFunc func(*http.Request) (*http.Response, error)
 
 func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
