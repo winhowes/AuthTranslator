@@ -162,6 +162,22 @@ func TestTokenBucketRefill(t *testing.T) {
 	}
 }
 
+func TestTokenBucketSwitchCase(t *testing.T) {
+	rl := NewRateLimiter(2, 100*time.Millisecond, "token_bucket")
+	t.Cleanup(rl.Stop)
+	key := "caller"
+
+	if !rl.Allow(key) {
+		t.Fatal("first call should be allowed")
+	}
+	if !rl.Allow(key) {
+		t.Fatal("token bucket should allow second call with remaining tokens")
+	}
+	if rl.Allow(key) {
+		t.Fatal("third call should be rate limited")
+	}
+}
+
 func TestLeakyBucketSmoothing(t *testing.T) {
 	rl := NewRateLimiter(1, 100*time.Millisecond, "leaky_bucket")
 	t.Cleanup(rl.Stop)
@@ -175,6 +191,19 @@ func TestLeakyBucketSmoothing(t *testing.T) {
 	time.Sleep(120 * time.Millisecond)
 	if !rl.Allow(key) {
 		t.Fatal("call should be allowed after leak")
+	}
+}
+
+func TestLeakyBucketSwitchCase(t *testing.T) {
+	rl := NewRateLimiter(1, 50*time.Millisecond, "leaky_bucket")
+	t.Cleanup(rl.Stop)
+	key := "caller"
+
+	if !rl.Allow(key) {
+		t.Fatal("initial call should be allowed")
+	}
+	if rl.Allow(key) {
+		t.Fatal("immediate second call should be limited by leaky bucket")
 	}
 }
 
@@ -292,6 +321,58 @@ func TestRetryAfterLeakyBucketAfterLeak(t *testing.T) {
 	if d := rl.RetryAfter(key); d != 0 {
 		t.Fatalf("expected 0 after leak, got %v", d)
 	}
+}
+
+func TestRetryAfterFixedWindowNegativeDuration(t *testing.T) {
+	rl := NewRateLimiter(1, 10*time.Millisecond, "")
+	rl.mu.Lock()
+	rl.resetTime = time.Now().Add(-20 * time.Millisecond)
+	rl.mu.Unlock()
+
+	if d := rl.RetryAfter("k"); d != 0 {
+		t.Fatalf("expected 0 due to negative duration, got %v", d)
+	}
+
+	rl.Stop()
+}
+
+func TestRetryAfterTokenBucketNeedNonPositive(t *testing.T) {
+	rl := NewRateLimiter(1, 100*time.Millisecond, "token_bucket")
+	rl.mu.Lock()
+	rl.buckets["k"] = &tokenBucket{tokens: 2, last: time.Now()}
+	rl.mu.Unlock()
+
+	if d := rl.RetryAfter("k"); d != 0 {
+		t.Fatalf("expected 0 when need <= 0, got %v", d)
+	}
+
+	rl.Stop()
+}
+
+func TestRetryAfterNegativeRateSeconds(t *testing.T) {
+	rl := NewRateLimiter(1, -time.Second, "token_bucket")
+	rl.mu.Lock()
+	rl.buckets["k"] = &tokenBucket{tokens: 0, last: time.Now()}
+	rl.mu.Unlock()
+
+	if d := rl.RetryAfter("k"); d != 0 {
+		t.Fatalf("expected 0 for negative rate seconds, got %v", d)
+	}
+
+	rl.Stop()
+}
+
+func TestRetryAfterNegativeRateSecondsLeakyBucket(t *testing.T) {
+	rl := NewRateLimiter(1, -time.Second, "leaky_bucket")
+	rl.mu.Lock()
+	rl.leaky["k"] = &leakyBucket{level: 5, last: time.Now()}
+	rl.mu.Unlock()
+
+	if d := rl.RetryAfter("k"); d != 0 {
+		t.Fatalf("expected 0 for negative rate in leaky bucket, got %v", d)
+	}
+
+	rl.Stop()
 }
 
 func TestRetryAfterNoLimit(t *testing.T) {

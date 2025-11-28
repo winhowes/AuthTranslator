@@ -1,4 +1,4 @@
-package azureoidc
+package azuremanagedidentity
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"sync"
 	"time"
@@ -14,17 +15,17 @@ import (
 	authplugins "github.com/winhowes/AuthTranslator/app/auth"
 )
 
-// azureOIDCParams configures the Azure OIDC plugin.
-type azureOIDCParams struct {
+// azureManagedIdentityParams configures the Azure Managed Identity plugin.
+type azureManagedIdentityParams struct {
 	Resource string `json:"resource"`
 	ClientID string `json:"client_id"`
 	Header   string `json:"header"`
 	Prefix   string `json:"prefix"`
 }
 
-// AzureOIDC obtains an access token from the Azure Instance Metadata Service and
-// attaches it to outgoing requests.
-type AzureOIDC struct{}
+// AzureManagedIdentity obtains an access token from the Azure Instance Metadata
+// Service and attaches it to outgoing requests.
+type AzureManagedIdentity struct{}
 
 // MetadataHost is the base URL for the Azure metadata service. It can be
 // overridden in tests.
@@ -43,14 +44,16 @@ type cachedToken struct {
 	exp   time.Time
 }
 
-func (a *AzureOIDC) Name() string { return "azure_oidc" }
+func (a *AzureManagedIdentity) Name() string { return "azure_managed_identity" }
 
-func (a *AzureOIDC) RequiredParams() []string { return []string{"resource"} }
+func (a *AzureManagedIdentity) RequiredParams() []string { return []string{"resource"} }
 
-func (a *AzureOIDC) OptionalParams() []string { return []string{"client_id", "header", "prefix"} }
+func (a *AzureManagedIdentity) OptionalParams() []string {
+	return []string{"client_id", "header", "prefix"}
+}
 
-func (a *AzureOIDC) ParseParams(m map[string]interface{}) (interface{}, error) {
-	p, err := authplugins.ParseParams[azureOIDCParams](m)
+func (a *AzureManagedIdentity) ParseParams(m map[string]interface{}) (interface{}, error) {
+	p, err := authplugins.ParseParams[azureManagedIdentityParams](m)
 	if err != nil {
 		return nil, err
 	}
@@ -66,8 +69,8 @@ func (a *AzureOIDC) ParseParams(m map[string]interface{}) (interface{}, error) {
 	return p, nil
 }
 
-func (a *AzureOIDC) AddAuth(ctx context.Context, r *http.Request, params interface{}) error {
-	cfg, ok := params.(*azureOIDCParams)
+func (a *AzureManagedIdentity) AddAuth(ctx context.Context, r *http.Request, params interface{}) error {
+	cfg, ok := params.(*azureManagedIdentityParams)
 	if !ok {
 		return fmt.Errorf("invalid config")
 	}
@@ -86,19 +89,18 @@ func (a *AzureOIDC) AddAuth(ctx context.Context, r *http.Request, params interfa
 }
 
 func fetchToken(ctx context.Context, resource, clientID string) (string, time.Time, error) {
-	q := url.Values{}
-	q.Set("resource", resource)
-	q.Set("api-version", "2018-02-01")
-	if clientID != "" {
-		q.Set("client_id", clientID)
+	metaURL, headers, err := metadataRequest(resource, clientID)
+	if err != nil {
+		return "", time.Time{}, err
 	}
 
-	metaURL := fmt.Sprintf("%s/metadata/identity/oauth2/token?%s", MetadataHost, q.Encode())
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, metaURL, nil)
 	if err != nil {
 		return "", time.Time{}, err
 	}
-	req.Header.Set("Metadata", "true")
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
 
 	resp, err := HTTPClient.Do(req)
 	if err != nil {
@@ -123,6 +125,35 @@ func fetchToken(ctx context.Context, resource, clientID string) (string, time.Ti
 
 	exp := parseExpiry(tr.ExpiresOn, tr.ExpiresIn)
 	return tr.AccessToken, exp, nil
+}
+
+func metadataRequest(resource, clientID string) (string, map[string]string, error) {
+	q := url.Values{}
+	q.Set("resource", resource)
+	if clientID != "" {
+		q.Set("client_id", clientID)
+	}
+
+	if endpoint := os.Getenv("IDENTITY_ENDPOINT"); endpoint != "" {
+		header := os.Getenv("IDENTITY_HEADER")
+		if header == "" {
+			return "", nil, fmt.Errorf("missing IDENTITY_HEADER for IDENTITY_ENDPOINT")
+		}
+		q.Set("api-version", "2019-08-01")
+		return fmt.Sprintf("%s?%s", endpoint, q.Encode()), map[string]string{"X-IDENTITY-HEADER": header}, nil
+	}
+
+	if endpoint := os.Getenv("MSI_ENDPOINT"); endpoint != "" {
+		secret := os.Getenv("MSI_SECRET")
+		if secret == "" {
+			return "", nil, fmt.Errorf("missing MSI_SECRET for MSI_ENDPOINT")
+		}
+		q.Set("api-version", "2017-09-01")
+		return fmt.Sprintf("%s?%s", endpoint, q.Encode()), map[string]string{"Secret": secret}, nil
+	}
+
+	q.Set("api-version", "2018-02-01")
+	return fmt.Sprintf("%s/metadata/identity/oauth2/token?%s", MetadataHost, q.Encode()), map[string]string{"Metadata": "true"}, nil
 }
 
 func parseExpiry(expiresOn string, expiresIn json.Number) time.Time {
@@ -155,4 +186,4 @@ func setCachedToken(key, tok string, exp time.Time) {
 	tokenCache.Unlock()
 }
 
-func init() { authplugins.RegisterOutgoing(&AzureOIDC{}) }
+func init() { authplugins.RegisterOutgoing(&AzureManagedIdentity{}) }

@@ -3,6 +3,8 @@ package main
 import (
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -67,6 +69,108 @@ func TestAllowlist(t *testing.T) {
 	}
 	if rr2.Header().Get("X-AT-Error-Reason") == "" {
 		t.Fatal("missing X-AT-Error-Reason header")
+	}
+}
+
+func TestFindConstraintExpandsCallerAndWildcardCapabilities(t *testing.T) {
+	allowlists.Lock()
+	allowlists.m = make(map[string]map[string]CallerConfig)
+	allowlists.Unlock()
+
+	orig := integrationplugins.AllCapabilities()
+	snapshot := map[string]map[string]integrationplugins.CapabilitySpec{}
+	for integ, caps := range orig {
+		snapshot[integ] = map[string]integrationplugins.CapabilitySpec{}
+		for name, spec := range caps {
+			snapshot[integ][name] = spec
+		}
+	}
+	t.Cleanup(func() {
+		reg := integrationplugins.AllCapabilities()
+		for k := range reg {
+			delete(reg, k)
+		}
+		for integ, caps := range snapshot {
+			reg[integ] = caps
+		}
+	})
+
+	integrationplugins.RegisterCapability("capboth", "cap", integrationplugins.CapabilitySpec{
+		Generate: func(map[string]interface{}) ([]integrationplugins.CallRule, error) {
+			return []integrationplugins.CallRule{{
+				Path:    "/capability",
+				Methods: map[string]integrationplugins.RequestConstraint{http.MethodGet: {}},
+			}}, nil
+		},
+	})
+
+	if err := SetAllowlist("capboth", []CallerConfig{
+		{ID: "direct", Capabilities: []integrationplugins.CapabilityConfig{{Name: "cap"}}},
+		{ID: "*", Capabilities: []integrationplugins.CapabilityConfig{{Name: "cap"}}},
+	}); err != nil {
+		t.Fatalf("failed to set allowlist: %v", err)
+	}
+
+	integ := &Integration{Name: "capboth"}
+	if _, ok := findConstraint(integ, "direct", "/capability", http.MethodGet); !ok {
+		t.Fatal("expected capability expansion for specific caller")
+	}
+	if _, ok := findConstraint(integ, "other", "/capability", http.MethodGet); !ok {
+		t.Fatal("expected capability expansion for wildcard caller")
+	}
+}
+
+func TestFindConstraintExpandsCapabilitiesOnLookup(t *testing.T) {
+	allowlists.Lock()
+	allowlists.m = make(map[string]map[string]CallerConfig)
+	allowlists.Unlock()
+
+	orig := integrationplugins.AllCapabilities()
+	snapshot := map[string]map[string]integrationplugins.CapabilitySpec{}
+	for integ, caps := range orig {
+		snapshot[integ] = map[string]integrationplugins.CapabilitySpec{}
+		for name, spec := range caps {
+			snapshot[integ][name] = spec
+		}
+	}
+	t.Cleanup(func() {
+		reg := integrationplugins.AllCapabilities()
+		for k := range reg {
+			delete(reg, k)
+		}
+		for integ, caps := range snapshot {
+			reg[integ] = caps
+		}
+	})
+
+	integrationplugins.RegisterCapability("lookup", "cap", integrationplugins.CapabilitySpec{
+		Generate: func(map[string]interface{}) ([]integrationplugins.CallRule, error) {
+			return []integrationplugins.CallRule{{
+				Path:     "/capability",
+				Methods:  map[string]integrationplugins.RequestConstraint{http.MethodGet: {}},
+				Segments: splitPath("/capability"),
+			}}, nil
+		},
+	})
+
+	allowlists.Lock()
+	allowlists.m["lookup"] = map[string]CallerConfig{
+		"direct": {
+			ID:           "direct",
+			Capabilities: []integrationplugins.CapabilityConfig{{Name: "cap"}},
+		},
+		"*": {
+			Capabilities: []integrationplugins.CapabilityConfig{{Name: "cap"}},
+		},
+	}
+	allowlists.Unlock()
+
+	integ := &Integration{Name: "lookup"}
+	if _, ok := findConstraint(integ, "direct", "/capability", http.MethodGet); !ok {
+		t.Fatal("expected capability expansion for caller during lookup")
+	}
+	if _, ok := findConstraint(integ, "other", "/capability", http.MethodGet); !ok {
+		t.Fatal("expected capability expansion for wildcard during lookup")
 	}
 }
 
@@ -156,6 +260,67 @@ func TestSetAllowlistMethodNormalization(t *testing.T) {
 	integ := &Integration{Name: "case"}
 	if _, ok := findConstraint(integ, "*", "/ok", http.MethodGet); !ok {
 		t.Fatal("expected match for uppercase method")
+	}
+}
+
+func TestSetAllowlistSkipsEmptyMethod(t *testing.T) {
+	allowlists.Lock()
+	allowlists.m = make(map[string]map[string]CallerConfig)
+	allowlists.Unlock()
+
+	if err := SetAllowlist("emptymethod", []CallerConfig{{
+		ID: "*",
+		Rules: []CallRule{{
+			Path: "/skip-empty",
+			Methods: map[string]RequestConstraint{
+				"   ":           {},
+				http.MethodPost: {},
+			},
+		}},
+	}}); err != nil {
+		t.Fatalf("failed to set allowlist: %v", err)
+	}
+
+	allowlists.RLock()
+	callers := allowlists.m["emptymethod"]
+	allowlists.RUnlock()
+
+	rules := callers["*"].Rules
+	if len(rules) != 1 {
+		t.Fatalf("expected one rule, got %d", len(rules))
+	}
+
+	methods := rules[0].Methods
+	constraint, ok := methods[http.MethodPost]
+	if len(methods) != 1 || !ok {
+		t.Fatalf("expected only POST constraint after skipping empty method, got: %#v", methods)
+	}
+	if !reflect.DeepEqual(constraint, RequestConstraint{}) {
+		t.Fatalf("expected zero-value constraint for POST method, got: %#v", constraint)
+	}
+}
+
+func TestMatchSegmentsDoubleStarFailure(t *testing.T) {
+	if matchSegments([]string{"**", "a"}, []string{"b"}) {
+		t.Fatal("expected pattern to fail to match path")
+	}
+}
+
+func TestValidateRequestReasonQueryValueMismatch(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/?q=two", nil)
+	constraint := RequestConstraint{Query: map[string][]string{"q": {"one"}}}
+	if ok, reason := validateRequestReason(req, constraint); ok || reason == "" {
+		t.Fatalf("expected query validation failure, got ok=%v reason=%q", ok, reason)
+	}
+}
+
+func TestValidateRequestReasonFormMismatch(t *testing.T) {
+	body := strings.NewReader("other=x")
+	req := httptest.NewRequest(http.MethodPost, "http://example.com/", body)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	constraint := RequestConstraint{Body: map[string]interface{}{"field": "value"}}
+	if ok, reason := validateRequestReason(req, constraint); ok || reason == "" {
+		t.Fatalf("expected form validation failure, got ok=%v reason=%q", ok, reason)
 	}
 }
 
@@ -269,5 +434,53 @@ func TestValidateRequestReasonFormContentTypeCaseInsensitive(t *testing.T) {
 	cons := RequestConstraint{Body: map[string]interface{}{"foo": "bar"}}
 	if ok, reason := validateRequestReason(req, cons); !ok {
 		t.Fatalf("expected form constraint to pass regardless of content type case: %s", reason)
+	}
+}
+
+func TestMatchValueNotOkBranches(t *testing.T) {
+	if matchValue("not-a-map", map[string]interface{}{"a": 1}) {
+		t.Fatal("expected map type mismatch to fail")
+	}
+	if matchValue(map[string]interface{}{"a": 1}, map[string]interface{}{"a": 1, "b": 2}) {
+		t.Fatal("expected missing map key to fail")
+	}
+	if matchValue("not-an-array", []interface{}{"a"}) {
+		t.Fatal("expected array type mismatch to fail")
+	}
+}
+
+func TestMatchValueReasonNotOkBranches(t *testing.T) {
+	if ok, reason := matchValueReason("not-a-map", map[string]interface{}{"a": 1}, ""); ok {
+		t.Fatalf("expected map type mismatch to fail, got reason: %s", reason)
+	}
+	if ok, reason := matchValueReason(map[string]interface{}{"a": 1}, map[string]interface{}{"a": 1, "b": 2}, ""); ok {
+		t.Fatalf("expected missing field to fail, got reason: %s", reason)
+	}
+	if ok, reason := matchValueReason("not-an-array", []interface{}{"a"}, "items"); ok {
+		t.Fatalf("expected array type mismatch to fail, got reason: %s", reason)
+	}
+	if ok, reason := matchValueReason([]interface{}{"x"}, []interface{}{"y"}, "items"); ok {
+		t.Fatalf("expected missing array element to fail, got reason: %s", reason)
+	}
+	if ok, reason := matchValueReason(map[string]interface{}{"a": "b"}, map[string]interface{}{"a": "c"}, ""); ok {
+		t.Fatalf("expected value mismatch to fail, got reason: %s", reason)
+	}
+}
+
+func TestMatchFormReasonAndValidateRequestFailures(t *testing.T) {
+	vals := url.Values{"foo": {"bar"}}
+	if ok, reason := matchFormReason(vals, map[string]interface{}{"foo": "baz"}); ok {
+		t.Fatalf("expected form value mismatch to fail, got reason: %s", reason)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "http://example.com", strings.NewReader("foo=bar"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("X-Test", "wrong")
+	cons := RequestConstraint{
+		Headers: map[string][]string{"X-Test": {"expected"}},
+		Body:    map[string]interface{}{"foo": "baz"},
+	}
+	if ok, reason := validateRequestReason(req, cons); ok {
+		t.Fatalf("expected validateRequestReason to fail, got success with reason: %s", reason)
 	}
 }

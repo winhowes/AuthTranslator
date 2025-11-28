@@ -421,3 +421,88 @@ func TestConstraintMatchesRequestHeaderCaseInsensitive(t *testing.T) {
 		t.Fatal("expected header constraint to be case insensitive")
 	}
 }
+
+func TestConstraintMatchesRequestHeaderValueMissing(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "http://headers/path", nil)
+	req.Header.Set("X-Token", "abc123")
+	cons := RequestConstraint{Headers: map[string][]string{"X-Token": {"missing"}}}
+	if constraintMatchesRequest(req, cons) {
+		t.Fatal("expected constraint match to fail when header value is not present")
+	}
+}
+
+func TestGetDenylistReturnsCopy(t *testing.T) {
+	resetDenylists()
+
+	callers := []DenylistCaller{{
+		ID: "caller",
+		Rules: []CallRule{{
+			Path:    "/path",
+			Methods: map[string]RequestConstraint{"GET": {}},
+		}},
+	}}
+	if err := SetDenylist("Integration", callers); err != nil {
+		t.Fatalf("failed to set denylist: %v", err)
+	}
+
+	got := GetDenylist("Integration")
+	if len(got) != 1 || got[0].ID != "caller" {
+		t.Fatalf("unexpected callers returned: %+v", got)
+	}
+	if got[0].Rules[0].Path != "/path" {
+		t.Fatalf("unexpected rule path: %s", got[0].Rules[0].Path)
+	}
+
+	got[0].Rules[0].Path = "/mutated"
+	again := GetDenylist("Integration")
+	if again[0].Rules[0].Path != "/path" {
+		t.Fatalf("expected denylist copy to remain unchanged, got %s", again[0].Rules[0].Path)
+	}
+}
+
+func TestMatchDenylistRulesMethodMissing(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "http://example.com/match", nil)
+	rules := []CallRule{
+		{Path: "/match", Segments: splitPath("/match"), Methods: map[string]RequestConstraint{}},
+		{Path: "/match", Segments: splitPath("/match"), Methods: map[string]RequestConstraint{"POST": {}}},
+	}
+
+	matched, path := matchDenylistRules(req, rules, splitPath(req.URL.Path), strings.ToUpper(req.Method))
+	if !matched || path != "/match" {
+		t.Fatalf("expected later rule to match, got matched=%v path=%q", matched, path)
+	}
+}
+
+func TestConstraintMatchesRequestQueryMissingValue(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "http://query.test/path?foo=bar", nil)
+	cons := RequestConstraint{Query: map[string][]string{"foo": {"baz"}}}
+	if constraintMatchesRequest(req, cons) {
+		t.Fatal("expected constraint match to fail when query value not found")
+	}
+}
+
+func TestConstraintMatchesRequestQueryMissingKey(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "http://query.test/path?foo=bar", nil)
+	cons := RequestConstraint{Query: map[string][]string{"missing": {"bar"}}}
+	if constraintMatchesRequest(req, cons) {
+		t.Fatal("expected constraint match to fail when query key missing")
+	}
+}
+
+func TestConstraintMatchesRequestJSONUnmarshalError(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "http://json/error", strings.NewReader("{"))
+	req.Header.Set("Content-Type", "application/json")
+	cons := RequestConstraint{Body: map[string]interface{}{"foo": "bar"}}
+	if constraintMatchesRequest(req, cons) {
+		t.Fatal("expected JSON unmarshal error to fail constraint match")
+	}
+}
+
+func TestConstraintMatchesRequestFormParseError(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "http://form/error", strings.NewReader("bad%%encoding"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	cons := RequestConstraint{Body: map[string]interface{}{"foo": "bar"}}
+	if constraintMatchesRequest(req, cons) {
+		t.Fatal("expected form parse error to fail constraint match")
+	}
+}

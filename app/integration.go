@@ -21,6 +21,8 @@ import (
 	"github.com/winhowes/AuthTranslator/app/secrets"
 )
 
+var parseURL = url.Parse
+
 // paramRules is the interface every auth-plugin already satisfies.
 type paramRules interface {
 	RequiredParams() []string
@@ -174,7 +176,7 @@ func prepareIntegration(i *Integration) error {
 		return errors.New("invalid integration name")
 	}
 
-	u, err := url.Parse(i.Destination)
+	u, err := parseURL(i.Destination)
 	if err != nil {
 		return fmt.Errorf("invalid destination URL: %w", err)
 	}
@@ -183,13 +185,19 @@ func prepareIntegration(i *Integration) error {
 	hostPattern := u.Hostname()
 	hasWildcard := strings.Contains(hostPattern, "*")
 	if hasWildcard {
+		port := u.Port()
+		if port == "" {
+			if pos := strings.LastIndex(u.Host, ":"); pos >= 0 {
+				port = u.Host[pos+1:]
+			}
+		}
 		if u.User != nil {
 			return fmt.Errorf("invalid destination URL: wildcard destinations cannot include user info")
 		}
 		if strings.Contains(u.Scheme, "*") || strings.Contains(u.Path, "*") || strings.Contains(u.RawQuery, "*") || strings.Contains(u.Fragment, "*") {
 			return fmt.Errorf("invalid destination URL: wildcard destinations must not include * outside the host")
 		}
-		if strings.Contains(u.Port(), "*") {
+		if strings.Contains(port, "*") {
 			return fmt.Errorf("invalid destination URL: wildcard destinations must not include * in the port")
 		}
 		trimmed := strings.Trim(strings.ReplaceAll(hostPattern, "*", ""), ".")
@@ -488,7 +496,7 @@ func matchWildcardHost(pattern, host string) bool {
 			if strings.HasPrefix(pattern, "*") && len(host) == len(segment) {
 				return false
 			}
-			return true
+			break
 		}
 		pos := strings.Index(host, segment)
 		if pos < 0 {

@@ -100,6 +100,47 @@ func TestFindReplaceAddAuthNoMatch(t *testing.T) {
 	}
 }
 
+func TestFindReplaceAddAuthRawPathAndNilBody(t *testing.T) {
+	r := &http.Request{
+		URL: &url.URL{ // RawPath should also be rewritten
+			Scheme:   "PLACE",
+			Host:     "PLACE.example.com",
+			Path:     "/foo/PLACE",
+			RawPath:  "/foo/%2FPLACE",
+			RawQuery: "x=PLACE",
+		},
+		Header: http.Header{"PLACE-Header": []string{"PLACE"}},
+		Body:   nil,
+		Host:   "PLACE.example.com",
+	}
+	p := FindReplace{}
+	t.Setenv("FIND", "PLACE")
+	t.Setenv("REP", "SECRET")
+	cfg, err := p.ParseParams(map[string]interface{}{"find_secret": "env:FIND", "replace_secret": "env:REP"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := p.AddAuth(context.Background(), r, cfg); err != nil {
+		t.Fatal(err)
+	}
+
+	if r.URL.Scheme != "SECRET" || r.URL.Host != "SECRET.example.com" {
+		t.Fatalf("unexpected url scheme/host %s://%s", r.URL.Scheme, r.URL.Host)
+	}
+	if r.URL.Path != "/foo/SECRET" || r.URL.RawPath != "/foo/%2FSECRET" {
+		t.Fatalf("unexpected path/rawpath %s %s", r.URL.Path, r.URL.RawPath)
+	}
+	if r.URL.RawQuery != "x=SECRET" || r.RequestURI != r.URL.RequestURI() {
+		t.Fatalf("unexpected query/requestURI %s %s", r.URL.RawQuery, r.RequestURI)
+	}
+	if v := r.Header.Get("SECRET-Header"); v != "SECRET" {
+		t.Fatalf("unexpected header %q", v)
+	}
+	if r.Body != nil {
+		t.Fatal("expected body to remain nil")
+	}
+}
+
 type failPlugin struct{}
 
 func (failPlugin) Prefix() string                               { return "fail" }

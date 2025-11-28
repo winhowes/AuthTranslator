@@ -54,6 +54,40 @@ func (capturePlugin) RequiredParams() []string { return []string{"expect_host"} 
 
 func (capturePlugin) OptionalParams() []string { return nil }
 
+type identifyPlugin struct{}
+
+func (identifyPlugin) Name() string { return "identify_test" }
+
+func (identifyPlugin) ParseParams(map[string]interface{}) (interface{}, error) {
+	return struct{}{}, nil
+}
+
+func (identifyPlugin) Authenticate(context.Context, *http.Request, interface{}) bool { return true }
+
+func (identifyPlugin) Identify(*http.Request, interface{}) (string, bool) {
+	return "known-caller", true
+}
+
+func (identifyPlugin) RequiredParams() []string { return nil }
+
+func (identifyPlugin) OptionalParams() []string { return nil }
+
+type failingPlugin struct{}
+
+func (failingPlugin) Name() string { return "failing" }
+
+func (failingPlugin) ParseParams(params map[string]interface{}) (interface{}, error) {
+	return &struct{}{}, nil
+}
+
+func (failingPlugin) AddAuth(context.Context, *http.Request, interface{}) error {
+	return fmt.Errorf("boom")
+}
+
+func (failingPlugin) RequiredParams() []string { return nil }
+
+func (failingPlugin) OptionalParams() []string { return nil }
+
 var (
 	captureAddAuthCount int
 	captureLastURL      string
@@ -61,6 +95,7 @@ var (
 
 func init() {
 	authplugins.RegisterOutgoing(capturePlugin{})
+	authplugins.RegisterOutgoing(failingPlugin{})
 }
 
 type roundTripFunc func(*http.Request) (*http.Response, error)
@@ -500,6 +535,78 @@ func TestProxyHandlerRetryAfterOutLimit(t *testing.T) {
 	}
 }
 
+func TestProxyHandlerRetryAfterMinimumInLimit(t *testing.T) {
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer backend.Close()
+
+	integ := Integration{Name: "rl-min-in", Destination: backend.URL, InRateLimit: 1, OutRateLimit: 10, RateLimitWindow: "100ms"}
+	if err := AddIntegration(&integ); err != nil {
+		t.Fatalf("failed to add integration: %v", err)
+	}
+	t.Cleanup(func() { integ.inLimiter.Stop(); integ.outLimiter.Stop() })
+
+	req1 := httptest.NewRequest(http.MethodGet, "http://rl-min-in/", nil)
+	req1.Host = "rl-min-in"
+	req1.RemoteAddr = "4.5.6.7:1111"
+	rr1 := httptest.NewRecorder()
+	proxyHandler(rr1, req1)
+	if rr1.Code != http.StatusOK {
+		t.Fatalf("first request got %d", rr1.Code)
+	}
+
+	req2 := httptest.NewRequest(http.MethodGet, "http://rl-min-in/", nil)
+	req2.Host = "rl-min-in"
+	req2.RemoteAddr = "4.5.6.7:1111"
+	rr2 := httptest.NewRecorder()
+	proxyHandler(rr2, req2)
+	if rr2.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected rate limit rejection, got %d", rr2.Code)
+	}
+	if got := rr2.Header().Get("Retry-After"); got != "1" {
+		t.Fatalf("expected minimum Retry-After of 1, got %q", got)
+	}
+	if rr2.Header().Get("X-AT-Error-Reason") != "caller rate limited" {
+		t.Fatalf("unexpected error reason: %s", rr2.Header().Get("X-AT-Error-Reason"))
+	}
+}
+
+func TestProxyHandlerRetryAfterMinimumOutLimit(t *testing.T) {
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer backend.Close()
+
+	integ := Integration{Name: "rl-min-out", Destination: backend.URL, InRateLimit: 10, OutRateLimit: 1, RateLimitWindow: "100ms"}
+	if err := AddIntegration(&integ); err != nil {
+		t.Fatalf("failed to add integration: %v", err)
+	}
+	t.Cleanup(func() { integ.inLimiter.Stop(); integ.outLimiter.Stop() })
+
+	req1 := httptest.NewRequest(http.MethodGet, "http://rl-min-out/", nil)
+	req1.Host = "rl-min-out"
+	rr1 := httptest.NewRecorder()
+	proxyHandler(rr1, req1)
+	if rr1.Code != http.StatusOK {
+		t.Fatalf("first request got %d", rr1.Code)
+	}
+
+	req2 := httptest.NewRequest(http.MethodGet, "http://rl-min-out/", nil)
+	req2.Host = "rl-min-out"
+	rr2 := httptest.NewRecorder()
+	proxyHandler(rr2, req2)
+	if rr2.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected rate limit rejection, got %d", rr2.Code)
+	}
+	if got := rr2.Header().Get("Retry-After"); got != "1" {
+		t.Fatalf("expected minimum Retry-After of 1, got %q", got)
+	}
+	if rr2.Header().Get("X-AT-Error-Reason") != "integration rate limited" {
+		t.Fatalf("unexpected error reason: %s", rr2.Header().Get("X-AT-Error-Reason"))
+	}
+}
+
 func TestProxyHandlerNotFound(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "http://missing/", nil)
 	req.Host = "missing"
@@ -554,6 +661,47 @@ func TestProxyHandlerAuthFailure(t *testing.T) {
 	}
 	if ct := rr.Header().Get("Content-Type"); ct != "text/plain; charset=utf-8" {
 		t.Fatalf("unexpected content type %s", ct)
+	}
+}
+
+func TestProxyHandlerIdentifierSetsCallerID(t *testing.T) {
+	authplugins.RegisterIncoming(identifyPlugin{})
+
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer backend.Close()
+
+	integ := Integration{
+		Name:         "identify",
+		Destination:  backend.URL,
+		InRateLimit:  2,
+		OutRateLimit: 2,
+		IncomingAuth: []AuthPluginConfig{{Type: "identify_test", Params: map[string]interface{}{}}},
+	}
+	if err := AddIntegration(&integ); err != nil {
+		t.Fatalf("failed to add integration: %v", err)
+	}
+	t.Cleanup(func() { DeleteIntegration(integ.Name) })
+
+	callers := []CallerConfig{{ID: "known-caller", Rules: []CallRule{{Path: "/", Methods: map[string]RequestConstraint{"GET": {}}}}}}
+	if err := SetAllowlist(integ.Name, callers); err != nil {
+		t.Fatalf("failed to set allowlist: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "http://identify/", nil)
+	req.Host = "identify"
+	rr := httptest.NewRecorder()
+	proxyHandler(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rr.Code)
+	}
+	integ.inLimiter.mu.Lock()
+	count := integ.inLimiter.requests["known-caller"]
+	integ.inLimiter.mu.Unlock()
+	if count != 1 {
+		t.Fatalf("expected rate limit key for caller, got %d", count)
 	}
 }
 
@@ -785,6 +933,41 @@ func TestProxyHandlerWildcardAddAuthSeesResolvedDestination(t *testing.T) {
 	}
 	if captureLastURL != "http://foo.example.com/base/test?static=1&foo=bar" {
 		t.Fatalf("unexpected URL seen by AddAuth: %s", captureLastURL)
+	}
+}
+
+func TestProxyHandlerOutgoingAuthError(t *testing.T) {
+	denylists.Lock()
+	denylists.m = make(map[string]map[string][]CallRule)
+	denylists.Unlock()
+
+	integ := Integration{
+		Name:         "fail-auth",
+		Destination:  "http://example.com",
+		InRateLimit:  1,
+		OutRateLimit: 1,
+		OutgoingAuth: []AuthPluginConfig{{Type: "failing", Params: map[string]interface{}{}}},
+	}
+	if err := AddIntegration(&integ); err != nil {
+		t.Fatalf("failed to add integration: %v", err)
+	}
+	t.Cleanup(func() {
+		integ.inLimiter.Stop()
+		integ.outLimiter.Stop()
+		DeleteIntegration("fail-auth")
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "http://fail-auth/", nil)
+	req.Host = "fail-auth"
+	rr := httptest.NewRecorder()
+
+	proxyHandler(rr, req)
+
+	if rr.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d", rr.Code)
+	}
+	if rr.Header().Get("X-AT-Error-Reason") != "authentication failed" {
+		t.Fatalf("unexpected error reason %q", rr.Header().Get("X-AT-Error-Reason"))
 	}
 }
 

@@ -514,6 +514,14 @@ func TestVerifyRS256FailurePaths(t *testing.T) {
 	if verifyRS256(parts, pemData) {
 		t.Fatal("expected false for parse error")
 	}
+	pemData = pem.EncodeToMemory(&pem.Block{Type: "RSA PUBLIC KEY", Bytes: []byte("bad")})
+	if verifyRS256(parts, pemData) {
+		t.Fatal("expected false for RSA PUBLIC KEY parse error")
+	}
+	pemData = pem.EncodeToMemory(&pem.Block{Type: "UNHANDLED", Bytes: []byte("bad")})
+	if verifyRS256(parts, pemData) {
+		t.Fatal("expected false for unsupported block type")
+	}
 	eckey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	pubBytes, _ := x509.MarshalPKIXPublicKey(&eckey.PublicKey)
 	pemData = pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: pubBytes})

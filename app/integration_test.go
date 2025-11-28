@@ -6,6 +6,7 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
+	"errors"
 	"math/big"
 	"net/http"
 	"net/http/httptest"
@@ -15,12 +16,78 @@ import (
 	"testing"
 	"time"
 
+	authplugins "github.com/winhowes/AuthTranslator/app/auth"
 	_ "github.com/winhowes/AuthTranslator/app/auth/plugins/basic"
 	_ "github.com/winhowes/AuthTranslator/app/auth/plugins/google_oidc"
 	mtls "github.com/winhowes/AuthTranslator/app/auth/plugins/mtls"
 	_ "github.com/winhowes/AuthTranslator/app/auth/plugins/token"
 	_ "github.com/winhowes/AuthTranslator/app/secrets/plugins"
 )
+
+type outgoingTransportPlugin struct {
+	transport *http.Transport
+}
+
+func (o *outgoingTransportPlugin) Name() string { return "testtransport" }
+func (o *outgoingTransportPlugin) ParseParams(map[string]interface{}) (interface{}, error) {
+	return struct{}{}, nil
+}
+func (o *outgoingTransportPlugin) AddAuth(ctx context.Context, r *http.Request, params interface{}) error {
+	return nil
+}
+func (o *outgoingTransportPlugin) RequiredParams() []string              { return nil }
+func (o *outgoingTransportPlugin) OptionalParams() []string              { return nil }
+func (o *outgoingTransportPlugin) Transport(interface{}) *http.Transport { return o.transport }
+
+type failingIncomingPlugin struct{}
+
+func (f failingIncomingPlugin) Name() string { return "failing-incoming" }
+func (f failingIncomingPlugin) ParseParams(map[string]interface{}) (interface{}, error) {
+	return struct{ Missing string }{}, nil
+}
+func (f failingIncomingPlugin) Authenticate(ctx context.Context, r *http.Request, params interface{}) bool {
+	return true
+}
+func (f failingIncomingPlugin) RequiredParams() []string { return []string{"missing"} }
+func (f failingIncomingPlugin) OptionalParams() []string { return nil }
+
+type failingOutgoingPlugin struct{}
+
+func (f failingOutgoingPlugin) Name() string { return "failing-outgoing" }
+func (f failingOutgoingPlugin) ParseParams(map[string]interface{}) (interface{}, error) {
+	return nil, errors.New("parse failure")
+}
+func (f failingOutgoingPlugin) AddAuth(ctx context.Context, r *http.Request, params interface{}) error {
+	return nil
+}
+func (f failingOutgoingPlugin) RequiredParams() []string { return nil }
+func (f failingOutgoingPlugin) OptionalParams() []string { return nil }
+
+type missingFieldOutgoingPlugin struct{}
+
+func (m missingFieldOutgoingPlugin) Name() string { return "missing-field-out" }
+func (m missingFieldOutgoingPlugin) ParseParams(map[string]interface{}) (interface{}, error) {
+	return struct{}{}, nil
+}
+func (m missingFieldOutgoingPlugin) AddAuth(ctx context.Context, r *http.Request, params interface{}) error {
+	return nil
+}
+func (m missingFieldOutgoingPlugin) RequiredParams() []string { return []string{"needed"} }
+func (m missingFieldOutgoingPlugin) OptionalParams() []string { return nil }
+
+type secretFailOutgoingPlugin struct{}
+
+func (s secretFailOutgoingPlugin) Name() string { return "secret-fail-out" }
+func (s secretFailOutgoingPlugin) ParseParams(map[string]interface{}) (interface{}, error) {
+	return struct {
+		Secrets []string `json:"secrets"`
+	}{Secrets: []string{"bogus:VAL"}}, nil
+}
+func (s secretFailOutgoingPlugin) AddAuth(ctx context.Context, r *http.Request, params interface{}) error {
+	return nil
+}
+func (s secretFailOutgoingPlugin) RequiredParams() []string { return nil }
+func (s secretFailOutgoingPlugin) OptionalParams() []string { return nil }
 
 func TestAddIntegrationMissingParam(t *testing.T) {
 	i := &Integration{
@@ -192,6 +259,30 @@ func TestUpdateIntegration(t *testing.T) {
 	})
 }
 
+func TestUpdateIntegrationCreatesNew(t *testing.T) {
+	updated := &Integration{
+		Name:         "update-new",
+		Destination:  "http://c.com",
+		InRateLimit:  1,
+		OutRateLimit: 2,
+	}
+	if err := UpdateIntegration(updated); err != nil {
+		t.Fatalf("update new: %v", err)
+	}
+	got, ok := GetIntegration("update-new")
+	if !ok {
+		t.Fatalf("integration not created via update")
+	}
+	t.Cleanup(func() {
+		got.inLimiter.Stop()
+		got.outLimiter.Stop()
+		DeleteIntegration("update-new")
+	})
+	if got.inLimiter == nil || got.outLimiter == nil {
+		t.Fatalf("rate limiters not initialized")
+	}
+}
+
 func TestResolveRequestDestinationWildcard(t *testing.T) {
 	integ := &Integration{Name: "wild", Destination: "https://*.example.com/base"}
 	if err := prepareIntegration(integ); err != nil {
@@ -345,6 +436,16 @@ func TestContextWithResolvedDestination(t *testing.T) {
 	}
 }
 
+func TestResolvedDestinationMissing(t *testing.T) {
+	ctx := context.Background()
+	if dest, ok := resolvedDestinationFromContext(ctx); ok || dest != nil {
+		t.Fatalf("expected no destination in empty context, got %v", dest)
+	}
+	if resolvedDestinationApplied(ctx) {
+		t.Fatal("destination should not be marked applied when absent")
+	}
+}
+
 func TestApplyResolvedDestination(t *testing.T) {
 	dest, err := url.Parse("https://backend.example.com:8443/base?token=1")
 	if err != nil {
@@ -378,6 +479,47 @@ func TestApplyResolvedDestination(t *testing.T) {
 	got, ok := resolvedDestinationFromContext(req.Context())
 	if !ok || got != dest {
 		t.Fatal("expected destination to remain in context after application")
+	}
+}
+
+func TestPrepareIntegrationWildcardDirector(t *testing.T) {
+	integ := &Integration{Name: "wilddir", Destination: "https://*.example.com/base"}
+	if err := prepareIntegration(integ); err != nil {
+		t.Fatalf("prepareIntegration: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "http://wilddir/original", nil)
+	integ.proxy.Director(req)
+	if req.Host != integ.destinationURL.Host {
+		t.Fatalf("expected host to be %q, got %q", integ.destinationURL.Host, req.Host)
+	}
+
+	dest, err := url.Parse("https://foo.example.com/newbase")
+	if err != nil {
+		t.Fatalf("parse dest: %v", err)
+	}
+	req = httptest.NewRequest(http.MethodGet, "http://wilddir/target", nil)
+	req = req.WithContext(contextWithResolvedDestination(req.Context(), dest))
+	integ.proxy.Director(req)
+	if req.Host != "foo.example.com" || req.URL.Path != "/newbase/target" {
+		t.Fatalf("destination not applied: host=%s path=%s", req.Host, req.URL.Path)
+	}
+
+	appliedCtx := contextWithResolvedDestination(context.Background(), dest)
+	markResolvedDestinationApplied(appliedCtx)
+	req = httptest.NewRequest(http.MethodGet, "http://wilddir/skip", nil)
+	req = req.WithContext(appliedCtx)
+	integ.proxy.Director(req)
+	if req.Host == "foo.example.com" {
+		t.Fatalf("director should skip already-applied destination")
+	}
+
+	resp := &http.Response{StatusCode: http.StatusInternalServerError, Header: http.Header{}, Request: req}
+	if err := integ.proxy.ModifyResponse(resp); err != nil {
+		t.Fatalf("modify response: %v", err)
+	}
+	if resp.Header.Get("X-AT-Upstream-Error") != "true" {
+		t.Fatalf("expected upstream error header to be set")
 	}
 }
 
@@ -428,6 +570,20 @@ func TestPrepareIntegrationWildcardCatchAll(t *testing.T) {
 	}
 }
 
+func TestPrepareIntegrationWildcardPortStar(t *testing.T) {
+	integ := &Integration{Name: "portstar", Destination: "https://*.example.com:*"}
+	if err := prepareIntegration(integ); err == nil {
+		t.Fatal("expected error for wildcard port")
+	}
+}
+
+func TestPrepareIntegrationWildcardMissingBase(t *testing.T) {
+	integ := &Integration{Name: "missingbase", Destination: "https://*./"}
+	if err := prepareIntegration(integ); err == nil {
+		t.Fatal("expected error for missing base domain")
+	}
+}
+
 func TestMatchWildcardHost(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -442,8 +598,14 @@ func TestMatchWildcardHost(t *testing.T) {
 		{name: "wildcard_requires_subdomain", pattern: "*.example.com", host: "example.com", expected: false},
 		{name: "wildcard_suffix", pattern: "api.*.example.com", host: "api.foo.example.com", expected: true},
 		{name: "wildcard_suffix_miss", pattern: "api.*.example.com", host: "api.example.com", expected: false},
+		{name: "prefix_mismatch", pattern: "api.*.example.com", host: "foo.example.com", expected: false},
+		{name: "missing_middle_segment", pattern: "api.*.example.com", host: "api.example.org", expected: false},
+		{name: "multi_segment_match", pattern: "a*b*c", host: "axbyc", expected: true},
+		{name: "catch_all", pattern: "*", host: "example.com", expected: true},
+		{name: "missing_middle", pattern: "a*b*c", host: "ac", expected: false},
 		{name: "no_pattern", pattern: "", host: "", expected: true},
 		{name: "no_pattern_host", pattern: "", host: "example.com", expected: false},
+		{name: "missing_subdomain_same_length", pattern: "*.example.com", host: ".example.com", expected: false},
 	}
 
 	for _, tc := range tests {
@@ -834,5 +996,166 @@ func TestAddIntegrationDefaultStrategy(t *testing.T) {
 	})
 	if i.RateLimitStrategy != "fixed_window" {
 		t.Fatalf("expected default strategy fixed_window, got %s", i.RateLimitStrategy)
+	}
+}
+
+func TestPrepareIntegrationTransportSettings(t *testing.T) {
+	i := &Integration{
+		Name:                  "transport",
+		Destination:           "https://example.com/base",
+		IdleConnTimeout:       "2s",
+		TLSHandshakeTimeout:   "3s",
+		ResponseHeaderTimeout: "4s",
+		TLSInsecureSkipVerify: true,
+		DisableKeepAlives:     true,
+		MaxIdleConns:          10,
+		MaxIdleConnsPerHost:   5,
+		RateLimitWindow:       "2s",
+		RateLimitStrategy:     "token_bucket",
+	}
+	if err := prepareIntegration(i); err != nil {
+		t.Fatalf("prepareIntegration: %v", err)
+	}
+
+	tr, ok := i.proxy.Transport.(*http.Transport)
+	if !ok {
+		t.Fatalf("expected *http.Transport, got %T", i.proxy.Transport)
+	}
+	if tr.IdleConnTimeout != 2*time.Second || tr.TLSHandshakeTimeout != 3*time.Second || tr.ResponseHeaderTimeout != 4*time.Second {
+		t.Fatalf("transport durations not applied: %+v", tr)
+	}
+	if !tr.DisableKeepAlives || tr.MaxIdleConns != 10 || tr.MaxIdleConnsPerHost != 5 {
+		t.Fatalf("transport numeric settings not applied: %+v", tr)
+	}
+	if tr.TLSClientConfig == nil || !tr.TLSClientConfig.InsecureSkipVerify {
+		t.Fatalf("TLS settings not applied: %+v", tr.TLSClientConfig)
+	}
+}
+
+func TestPrepareIntegrationOutgoingTransport(t *testing.T) {
+	plugin := &outgoingTransportPlugin{transport: &http.Transport{DisableCompression: true}}
+	authplugins.RegisterOutgoing(plugin)
+
+	i := &Integration{
+		Name:         "outtransport",
+		Destination:  "http://example.com",
+		OutgoingAuth: []AuthPluginConfig{{Type: plugin.Name(), Params: map[string]interface{}{}}},
+	}
+	if err := prepareIntegration(i); err != nil {
+		t.Fatalf("prepareIntegration: %v", err)
+	}
+	tr, ok := i.proxy.Transport.(*http.Transport)
+	if !ok || !tr.DisableCompression {
+		t.Fatalf("expected proxy transport override to be cloned: %+v", i.proxy.Transport)
+	}
+}
+
+func TestPrepareIntegrationTLSInsecureConfig(t *testing.T) {
+	oldConfig := http.DefaultTransport.(*http.Transport).TLSClientConfig
+	http.DefaultTransport.(*http.Transport).TLSClientConfig = nil
+	t.Cleanup(func() {
+		http.DefaultTransport.(*http.Transport).TLSClientConfig = oldConfig
+	})
+
+	integ := &Integration{Name: "tls-skip", Destination: "https://example.com", TLSInsecureSkipVerify: true}
+	if err := prepareIntegration(integ); err != nil {
+		t.Fatalf("prepareIntegration: %v", err)
+	}
+	tr, ok := integ.proxy.Transport.(*http.Transport)
+	if !ok || tr.TLSClientConfig == nil || !tr.TLSClientConfig.InsecureSkipVerify {
+		t.Fatalf("expected TLS client config with insecure skip verify enabled: %+v", integ.proxy.Transport)
+	}
+}
+
+func TestPrepareIntegrationAuthValidationErrors(t *testing.T) {
+	authplugins.RegisterIncoming(failingIncomingPlugin{})
+	authplugins.RegisterOutgoing(failingOutgoingPlugin{})
+
+	badIncoming := &Integration{
+		Name:         "authfail-in",
+		Destination:  "http://example.com",
+		IncomingAuth: []AuthPluginConfig{{Type: "failing-incoming", Params: map[string]interface{}{}}},
+	}
+	if err := prepareIntegration(badIncoming); err == nil || !strings.Contains(err.Error(), "required param") {
+		t.Fatalf("expected missing param error, got %v", err)
+	}
+
+	badOutgoing := &Integration{
+		Name:         "authfail-out",
+		Destination:  "http://example.com",
+		OutgoingAuth: []AuthPluginConfig{{Type: "failing-outgoing", Params: map[string]interface{}{}}},
+	}
+	if err := prepareIntegration(badOutgoing); err == nil || !strings.Contains(err.Error(), "parse failure") {
+		t.Fatalf("expected outgoing parse failure, got %v", err)
+	}
+}
+
+func TestPrepareIntegrationOutgoingValidateRequired(t *testing.T) {
+	authplugins.RegisterOutgoing(missingFieldOutgoingPlugin{})
+	integ := &Integration{
+		Name:         "missing-field-out",
+		Destination:  "http://example.com",
+		OutgoingAuth: []AuthPluginConfig{{Type: "missing-field-out", Params: map[string]interface{}{}}},
+	}
+	if err := prepareIntegration(integ); err == nil || !strings.Contains(err.Error(), "required param") {
+		t.Fatalf("expected required param error, got %v", err)
+	}
+}
+
+func TestPrepareIntegrationOutgoingSecretValidation(t *testing.T) {
+	authplugins.RegisterOutgoing(secretFailOutgoingPlugin{})
+	integ := &Integration{
+		Name:         "secret-out",
+		Destination:  "http://example.com",
+		OutgoingAuth: []AuthPluginConfig{{Type: "secret-fail-out", Params: map[string]interface{}{}}},
+	}
+	if err := prepareIntegration(integ); err == nil || !strings.Contains(err.Error(), "unknown secret source") {
+		t.Fatalf("expected secret validation error, got %v", err)
+	}
+}
+
+func TestPrepareIntegrationWildcardPortHook(t *testing.T) {
+	orig := parseURL
+	parseURL = func(string) (*url.URL, error) {
+		return &url.URL{Scheme: "https", Host: "*.example.com:*"}, nil
+	}
+	t.Cleanup(func() { parseURL = orig })
+
+	integ := &Integration{Name: "port-hook", Destination: "https://*.example.com:*"}
+	if err := prepareIntegration(integ); err == nil || !strings.Contains(err.Error(), "port") {
+		t.Fatalf("expected port error, got %v", err)
+	}
+}
+
+func TestUpdateIntegrationRespectsWindow(t *testing.T) {
+	integ := &Integration{
+		Name:              "update-window",
+		Destination:       "http://example.com",
+		InRateLimit:       1,
+		OutRateLimit:      1,
+		RateLimitWindow:   "2s",
+		RateLimitStrategy: "token_bucket",
+	}
+	if err := UpdateIntegration(integ); err != nil {
+		t.Fatalf("update integration: %v", err)
+	}
+	got, ok := GetIntegration("update-window")
+	if !ok {
+		t.Fatalf("integration missing after update")
+	}
+	t.Cleanup(func() {
+		got.inLimiter.Stop()
+		got.outLimiter.Stop()
+		DeleteIntegration("update-window")
+	})
+	if got.inLimiter.window != 2*time.Second || got.outLimiter.window != 2*time.Second {
+		t.Fatalf("expected 2s window, got %v and %v", got.inLimiter.window, got.outLimiter.window)
+	}
+}
+
+func TestUpdateIntegrationError(t *testing.T) {
+	bad := &Integration{Name: "bad|name", Destination: "http://example.com"}
+	if err := UpdateIntegration(bad); err == nil {
+		t.Fatal("expected validation error")
 	}
 }

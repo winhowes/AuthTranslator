@@ -1,6 +1,9 @@
 package plugins
 
-import "strings"
+import (
+	"sort"
+	"strings"
+)
 
 // Builder defines a function that parses CLI args into an Integration.
 type Builder func(args []string) (Integration, error)
@@ -19,5 +22,6 @@ func List() []string {
 	for n := range registry {
 		names = append(names, n)
 	}
+	sort.Strings(names)
 	return names
 }

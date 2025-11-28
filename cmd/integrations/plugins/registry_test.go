@@ -1,6 +1,9 @@
 package plugins
 
-import "testing"
+import (
+	"sort"
+	"testing"
+)
 
 func TestListReturnsAllRegisteredNames(t *testing.T) {
 	names := List()
@@ -46,5 +49,24 @@ func TestGetCaseInsensitive(t *testing.T) {
 	t.Cleanup(func() { delete(registry, "ci") })
 	if Get("cI") == nil {
 		t.Fatal("case-insensitive Get failed")
+	}
+}
+
+func TestListIsSorted(t *testing.T) {
+	original := registry
+	registry = map[string]Builder{
+		"beta":    nil,
+		"alpha":   nil,
+		"gamma":   nil,
+		"delta":   nil,
+		"epsilon": nil,
+	}
+	t.Cleanup(func() { registry = original })
+
+	for i := 0; i < 20; i++ {
+		names := List()
+		if !sort.StringsAreSorted(names) {
+			t.Fatalf("List returned unsorted names: %v", names)
+		}
 	}
 }

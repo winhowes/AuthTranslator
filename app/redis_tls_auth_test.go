@@ -205,6 +205,100 @@ func TestRateLimiterRedisTLSAuth(t *testing.T) {
 	<-done
 }
 
+func TestRateLimiterRedisTLSWithCA(t *testing.T) {
+	key, _ := rsa.GenerateKey(rand.Reader, 1024)
+	tmpl := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "srv"},
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		KeyUsage:     x509.KeyUsageDigitalSignature,
+		NotBefore:    time.Now().Add(-time.Hour),
+		NotAfter:     time.Now().Add(time.Hour),
+		IPAddresses:  []net.IP{net.ParseIP("127.0.0.1")},
+	}
+	der, _ := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
+	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})
+	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)})
+	cert, _ := tls.X509KeyPair(certPEM, keyPEM)
+
+	caFile, err := os.CreateTemp("", "redis-ca*.pem")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(caFile.Name())
+	if _, err := caFile.Write(certPEM); err != nil {
+		t.Fatal(err)
+	}
+	caFile.Close()
+
+	ln, err := tls.Listen("tcp", "127.0.0.1:0", &tls.Config{Certificates: []tls.Certificate{cert}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+	go func() {
+		c, err := ln.Accept()
+		if err != nil {
+			return
+		}
+		defer c.Close()
+		br := bufio.NewReader(c)
+		if cmd, _ := readCommand(t, br); cmd != "INCR" {
+			t.Errorf("cmd %s, want INCR", cmd)
+		}
+		c.Write([]byte(":1\r\n"))
+		if cmd, _ := readCommand(t, br); cmd != "EXPIRE" {
+			t.Errorf("cmd %s, want EXPIRE", cmd)
+		}
+		c.Write([]byte(":1\r\n"))
+	}()
+
+	oldAddr := *redisAddr
+	oldTimeout := *redisTimeout
+	oldCA := *redisCA
+	*redisAddr = "rediss://" + ln.Addr().String()
+	*redisTimeout = time.Second
+	*redisCA = caFile.Name()
+	rl := NewRateLimiter(1, time.Second, "")
+	defer func() {
+		rl.Stop()
+		*redisAddr = oldAddr
+		*redisTimeout = oldTimeout
+		*redisCA = oldCA
+	}()
+
+	if !rl.Allow("k") {
+		t.Fatal("allow failed with CA")
+	}
+}
+
+func TestRateLimiterRedisTLSInvalidCA(t *testing.T) {
+	oldAddr := *redisAddr
+	oldCA := *redisCA
+	*redisAddr = "rediss://127.0.0.1:0"
+	badCA, err := os.CreateTemp("", "bad-ca*.pem")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(badCA.Name())
+	if _, err := badCA.Write([]byte("not a cert")); err != nil {
+		t.Fatal(err)
+	}
+	badCA.Close()
+	*redisCA = badCA.Name()
+
+	rl := NewRateLimiter(1, time.Second, "")
+	defer func() {
+		rl.Stop()
+		*redisAddr = oldAddr
+		*redisCA = oldCA
+	}()
+
+	if _, err := rl.allowRedis("k"); err == nil {
+		t.Fatal("expected CA load error")
+	}
+}
+
 func TestRateLimiterRedisTLSVerify(t *testing.T) {
 	caKey, _ := rsa.GenerateKey(rand.Reader, 1024)
 	caTmpl := &x509.Certificate{

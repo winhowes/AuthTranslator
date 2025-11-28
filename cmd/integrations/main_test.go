@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"flag"
 	"io"
 	"os"
@@ -12,6 +13,12 @@ import (
 
 	"github.com/winhowes/AuthTranslator/cmd/integrations/plugins"
 )
+
+type marshalError struct{}
+
+func (marshalError) MarshalYAML() (interface{}, error) {
+	return nil, errors.New("marshal failure")
+}
 
 func TestAddUpdateDeleteList(t *testing.T) {
 	dir := t.TempDir()
@@ -201,6 +208,16 @@ func TestWriteConfigError(t *testing.T) {
 	err := writeConfig([]plugins.Integration{{Name: "x"}})
 	if err == nil {
 		t.Fatalf("expected error")
+	}
+}
+
+func TestWriteConfigMarshalError(t *testing.T) {
+	err := writeConfig([]plugins.Integration{{
+		Name:         "bad",
+		IncomingAuth: []plugins.AuthPluginConfig{{Params: map[string]interface{}{"fail": marshalError{}}}},
+	}})
+	if err == nil {
+		t.Fatalf("expected marshal error")
 	}
 }
 
@@ -433,6 +450,20 @@ func TestDeleteIntegrationWriteError(t *testing.T) {
 	cfg := filepath.Join(dir, "sub", "config.yaml")
 	cmd := exec.Command(os.Args[0], "-test.run=TestDeleteIntegrationHelper", "--")
 	cmd.Env = append(os.Environ(), "GO_WANT_DELETE_HELPER=1", "CFG="+cfg)
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("expected error")
+	}
+	if len(out) == 0 {
+		t.Fatalf("expected error output")
+	}
+}
+
+func TestDeleteIntegrationReadError(t *testing.T) {
+	dir := t.TempDir()
+	// Point to a directory so readConfig fails before writeConfig is attempted.
+	cmd := exec.Command(os.Args[0], "-test.run=TestDeleteIntegrationHelper", "--")
+	cmd.Env = append(os.Environ(), "GO_WANT_DELETE_HELPER=1", "CFG="+dir)
 	out, err := cmd.CombinedOutput()
 	if err == nil {
 		t.Fatalf("expected error")
