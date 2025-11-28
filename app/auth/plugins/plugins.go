@@ -1,6 +1,7 @@
 package plugins
 
 import (
+	_ "github.com/winhowes/AuthTranslator/app/auth/plugins/aws_imds"
 	_ "github.com/winhowes/AuthTranslator/app/auth/plugins/azure_managed_identity"
 	_ "github.com/winhowes/AuthTranslator/app/auth/plugins/basic"
 	_ "github.com/winhowes/AuthTranslator/app/auth/plugins/findreplace"
