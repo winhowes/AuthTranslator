@@ -161,6 +161,9 @@ func parseExpiry(expiresOn string, expiresIn json.Number) time.Time {
 		if ts, err := strconv.ParseInt(expiresOn, 10, 64); err == nil && ts > 0 {
 			return time.Unix(ts, 0)
 		}
+		if ts, err := time.Parse("01/02/2006 15:04:05 -07:00", expiresOn); err == nil {
+			return ts
+		}
 	}
 	if expiresIn != "" {
 		if secs, err := expiresIn.Int64(); err == nil && secs > 0 {
