@@ -32,6 +32,7 @@ AuthTranslator’s behaviour is extended by **plugins** – small Go packages th
 | Outbound  | `basic`            | Adds HTTP Basic credentials to the upstream request. |
 | Outbound  | `google_oidc`      | Attaches a Google identity token from the metadata service. |
 | Outbound  | `gcp_token`        | Uses a metadata service access token. |
+| Outbound  | `aws_imds`         | Retrieves an AWS IMDS session token from the Instance Metadata Service (IMDSv2). |
 | Outbound  | `azure_managed_identity` | Retrieves an Azure access token from the Instance Metadata Service. |
 | Outbound  | `hmac_signature`   | Computes an HMAC for the request. |
 | Outbound  | `jwt`              | Adds a signed JWT to the request. |
@@ -98,6 +99,20 @@ outgoing_auth:
 
 Obtains an access token from the Azure Instance Metadata Service for the specified `resource`, caches it, and attaches it to the
 configured header on each outgoing request.
+
+### Outbound `aws_imds`
+
+```yaml
+outgoing_auth:
+  - type: aws_imds
+    params:
+      region: us-west-2                     # optional, inferred from AWS hostname if omitted
+      service: s3                           # optional, inferred from AWS hostname if omitted
+```
+
+Retrieves temporary IAM role credentials from the AWS Instance Metadata Service v2, caches them until shortly before expiry, and applies SigV4 signing (including `X-Amz-Security-Token`) to each outgoing request. If the upstream hostname follows the standard `service.region.amazonaws.com` pattern, the plugin auto‑discovers the service and region; otherwise set them explicitly.
+
+> **Note:** The legacy type name `aws_oidc` remains supported for backward compatibility but now resolves to the IMDS session token flow described above. New configurations should prefer `aws_imds` to reflect the actual authentication mechanism.
 
 ---
 
