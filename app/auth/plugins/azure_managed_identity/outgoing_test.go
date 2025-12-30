@@ -355,12 +355,23 @@ func TestFetchTokenUsesIdentityEndpoint(t *testing.T) {
 }
 
 func TestFetchTokenMissingIdentityHeader(t *testing.T) {
-	t.Setenv("IDENTITY_ENDPOINT", "http://localhost/identity")
-	t.Setenv("IDENTITY_HEADER", "")
+        t.Setenv("IDENTITY_ENDPOINT", "http://localhost/identity")
+        t.Setenv("IDENTITY_HEADER", "")
 
-	if _, _, err := fetchToken(context.Background(), "api://res", ""); err == nil {
-		t.Fatal("expected error for missing identity header")
-	}
+        if _, _, err := fetchToken(context.Background(), "api://res", ""); err == nil {
+                t.Fatal("expected error for missing identity header")
+        }
+}
+
+func TestFetchTokenMissingMSISecret(t *testing.T) {
+        t.Setenv("IDENTITY_ENDPOINT", "")
+        t.Setenv("IDENTITY_HEADER", "")
+        t.Setenv("MSI_ENDPOINT", "http://localhost/msi")
+        t.Setenv("MSI_SECRET", "")
+
+        if _, _, err := fetchToken(context.Background(), "api://res", ""); err == nil {
+                t.Fatal("expected error for missing MSI secret")
+        }
 }
 
 func TestFetchTokenUsesMSIEndpoint(t *testing.T) {
