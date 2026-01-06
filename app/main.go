@@ -181,6 +181,13 @@ func applyRemoteFetchTimeout() {
 	httpClient.Timeout = *remoteFetchTimeout
 }
 
+func configSource() string {
+	if *configURL != "" {
+		return *configURL
+	}
+	return *configFile
+}
+
 func loadConfig(filename string) (*Config, error) {
 	f, err := openSource(filename)
 	if err != nil {
@@ -227,13 +234,10 @@ func parseLevel(s string) slog.Level {
 func reload() error {
 	logger.Info("reloading configuration")
 
-	src := *configFile
-	if *configURL != "" {
-		src = *configURL
-	}
+	src := configSource()
 	cfg, err := loadConfig(src)
 	if err != nil {
-		return err
+		return fmt.Errorf("reload failed for %s: %w", src, err)
 	}
 
 	// Build new integration set without mutating the existing one so we can
@@ -1365,13 +1369,13 @@ func main() {
 		select {
 		case <-reloadSig:
 			if err := reload(); err != nil {
-				logger.Error("reload failed", "error", err)
+				logger.Error("reload failed; keeping existing configuration", "source", configSource(), "error", err)
 			} else {
 				logger.Info("reloaded configuration")
 			}
 		case <-watchSig:
 			if err := reload(); err != nil {
-				logger.Error("reload failed", "error", err)
+				logger.Error("reload failed; keeping existing configuration", "source", configSource(), "error", err)
 			} else {
 				logger.Info("reloaded configuration")
 			}
