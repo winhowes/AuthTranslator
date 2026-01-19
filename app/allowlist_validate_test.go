@@ -123,6 +123,25 @@ func TestValidateAllowlistEntriesMethodWhitespaceDuplicate(t *testing.T) {
 	}
 }
 
+func TestValidateAllowlistEntriesInvalidBodySchema(t *testing.T) {
+	entries := []AllowlistEntry{{
+		Integration: "test",
+		Callers: []CallerConfig{{
+			ID: "c",
+			Rules: []CallRule{{
+				Path: "/x",
+				Methods: map[string]RequestConstraint{
+					"POST": {Body: map[string]interface{}{"type": "object", "properties": "bad"}},
+				},
+			}},
+		}},
+	}}
+	err := validateAllowlistEntries(entries)
+	if err == nil || !strings.Contains(err.Error(), "invalid body schema") {
+		t.Fatalf("expected invalid body schema error, got %v", err)
+	}
+}
+
 func TestValidateAllowlistEntriesCapabilityParamErrors(t *testing.T) {
 	entries := []AllowlistEntry{{
 		Integration: "slack",

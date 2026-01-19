@@ -6,7 +6,7 @@ AuthTranslator loads up to **three** YAML (or pure‑JSON) documents at runtime:
 | ---------------- | --------- | ----------- | ---------------------------------------------------------------------------------- |
 | `config.yaml`    | ✅         | ✅           | Declares *integrations* – where to proxy traffic and how to authenticate outwards. |
 | `allowlist.yaml` | –          | ✅           | Grants each *caller ID* a set of capabilities **or** low‑level request filters.    |
-| `denylist.yaml`  | –          | ✅           | Blocks requests whose headers/query/body match predefined subsets for a path/method. |
+| `denylist.yaml`  | –          | ✅           | Blocks requests whose headers/query/body schema match for a path/method. |
 
 If no allowlist is provided, every request is permitted once inbound authentication succeeds.
 Running without an allowlist effectively gives all authenticated callers unrestricted access, so supplying `allowlist.yaml` is **strongly recommended** even if it just contains a single wildcard entry to start. The denylist stays optional as well; omit it when you have no hard blocks to enforce.
@@ -110,14 +110,20 @@ Two ways to authorise a caller:
               query:
                 channel: [C12345678]           # workspace channel IDs (exact match)
               body:
-                text: "Hello world"            # match the whole value exactly
+                type: object
+                properties:
+                  text:
+                    type: string
+                    pattern: "^Hello"
+                required: ["text"]
                 # format detection uses Content-Type; other types skip body matching
               headers:
                 X-Custom-Trace: [abc123]
 ```
 
-Values for `query`, `headers`, and `body` are compared using **exact string equality**.
-Regular expressions are not supported.
+Values for `query` and `headers` are compared using **exact string equality**. Body
+constraints are JSON Schema draft‑07, which supports regex patterns, string length
+checks, and numeric ranges.
 
 ### Entry fields
 
@@ -144,7 +150,7 @@ authorised to use it.
 | `methods`     | map[string]RequestConstraint | Keys are HTTP verbs. Map a verb to `{}` to allow it without extra checks. |
 | `methods.<name>.query`   | map[string][]string | Each element is a list of allowed values per query key. All must match. |
 | `methods.<name>.headers` | map[string][]string | Header names and required values. Empty list checks only presence. |
-| `methods.<name>.body` | map[string]interface{} | Recursive subset of the request body (JSON or form). Arrays matched unordered. The proxy inspects `Content-Type`; unknown types skip body checks. |
+| `methods.<name>.body` | map[string]interface{} | JSON Schema (draft‑07) evaluated against the request body (JSON or form). The proxy inspects `Content-Type`; unknown types skip body checks. |
 
 ---
 
@@ -170,10 +176,15 @@ Denylists complement allowlists by describing requests that must never be forwar
               headers:
                 X-Feature-Flag: [disabled]
               body:
-                channel: forbidden-room
+                type: object
+                properties:
+                  channel:
+                    type: string
+                    const: forbidden-room
+                required: [channel]
 ```
 
-* Only the provided fields must match; extra headers/query/body keys are ignored.
+* Only the provided headers/query values must match; extra headers/query keys are ignored.
 * JSON/form bodies are parsed using `Content-Type`. Unknown types cause the rule to be skipped (no deny).
 * Duplicate path/method combinations fail validation during reload, mirroring the allowlist behaviour.
 
@@ -215,4 +226,3 @@ CI fails fast on typos so you never ship an invalid proxy.
 * [Auth Plugins](auth-plugins.md)
 * [Secret Back-Ends](secret-backends.md)
 * [Rate-Limiting](rate-limiting.md)
-

@@ -49,11 +49,17 @@ func TestSendgridCapabilities(t *testing.T) {
 			continue
 		}
 		if tt.name == "send_email" {
-			if rc.Body["from"] != "me@example.com" {
+			props, ok := rc.Body["properties"].(map[string]interface{})
+			if !ok {
+				t.Fatalf("expected body properties for send_email")
+			}
+			from, ok := props["from"].(map[string]interface{})
+			if !ok || from["const"] != "me@example.com" {
 				t.Errorf("from not propagated")
 			}
-			if rc.Body["reply_to"] != nil {
-				t.Errorf("reply_to default unexpected: %#v", rc.Body["reply_to"])
+			replyTo, ok := props["reply_to"].(map[string]interface{})
+			if !ok || replyTo["const"] != nil {
+				t.Errorf("reply_to default unexpected: %#v", replyTo)
 			}
 		}
 	}
@@ -68,7 +74,12 @@ func TestSendgridCapabilities(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	rc := rules[0].Methods["POST"]
-	if rc.Body["reply_to"] != "r@example.com" {
+	props, ok := rc.Body["properties"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected body properties for reply_to")
+	}
+	replyTo, ok := props["reply_to"].(map[string]interface{})
+	if !ok || replyTo["const"] != "r@example.com" {
 		t.Errorf("reply_to value not propagated")
 	}
 
@@ -77,7 +88,12 @@ func TestSendgridCapabilities(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	rc = rules[0].Methods["POST"]
-	if rc.Body["reply_to"] != nil {
+	props, ok = rc.Body["properties"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected body properties for reply_to nil")
+	}
+	replyTo, ok = props["reply_to"].(map[string]interface{})
+	if !ok || replyTo["const"] != nil {
 		t.Errorf("reply_to nil not set")
 	}
 }

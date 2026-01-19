@@ -14,7 +14,17 @@ func init() {
 			if user == "" {
 				return nil, fmt.Errorf("username required")
 			}
-			rule := integrationplugins.CallRule{Path: "/api/chat.postMessage", Methods: map[string]integrationplugins.RequestConstraint{"POST": {Body: map[string]interface{}{"username": user}}}}
+			body := map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"username": map[string]interface{}{
+						"type":  "string",
+						"const": user,
+					},
+				},
+				"required": []interface{}{"username"},
+			}
+			rule := integrationplugins.CallRule{Path: "/api/chat.postMessage", Methods: map[string]integrationplugins.RequestConstraint{"POST": {Body: body}}}
 			return []integrationplugins.CallRule{rule}, nil
 		},
 	})
@@ -31,7 +41,21 @@ func init() {
 			for i, c := range ch {
 				allowed[i] = c
 			}
-			rule := integrationplugins.CallRule{Path: "/api/chat.postMessage", Methods: map[string]integrationplugins.RequestConstraint{"POST": {Body: map[string]interface{}{"username": user, "channel": allowed}}}}
+			body := map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"username": map[string]interface{}{
+						"type":  "string",
+						"const": user,
+					},
+					"channel": map[string]interface{}{
+						"type": "string",
+						"enum": allowed,
+					},
+				},
+				"required": []interface{}{"username", "channel"},
+			}
+			rule := integrationplugins.CallRule{Path: "/api/chat.postMessage", Methods: map[string]integrationplugins.RequestConstraint{"POST": {Body: body}}}
 			return []integrationplugins.CallRule{rule}, nil
 		},
 	})
@@ -47,7 +71,17 @@ func init() {
 			for i, c := range ch {
 				allowed[i] = c
 			}
-			rule := integrationplugins.CallRule{Path: "/api/chat.postMessage", Methods: map[string]integrationplugins.RequestConstraint{"POST": {Body: map[string]interface{}{"channel": allowed}}}}
+			body := map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"channel": map[string]interface{}{
+						"type": "string",
+						"enum": allowed,
+					},
+				},
+				"required": []interface{}{"channel"},
+			}
+			rule := integrationplugins.CallRule{Path: "/api/chat.postMessage", Methods: map[string]integrationplugins.RequestConstraint{"POST": {Body: body}}}
 			return []integrationplugins.CallRule{rule}, nil
 		},
 	})

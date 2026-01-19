@@ -79,19 +79,24 @@ rules:
           channel: [C12345678]
         headers:                           # header=value list; empty list checks only presence
           X-Custom-Trace: [abc123]
-        body:                              # optional JSON or form filters
-          text: "Hello world"              # matched recursively
+        body:                              # optional JSON Schema for JSON/form bodies
+          type: object
+          properties:
+            text:
+              type: string
+              pattern: "^Hello"
+          required: [text]
           # body format is detected via Content-Type; other types skip matching
 ```
 
-Allowed values are matched **exactly**; the proxy does not interpret regular expressions.
+Allowed values are matched **exactly** for headers and query parameters. Body constraints use
+JSON Schema draft‑07 so you can express regex patterns, string lengths, and numeric ranges.
 
 Each key under `methods:` represents an HTTP method. Mapping a method to `{}`
 means the request is allowed for that verb as soon as the path matches. Add
 `query`, `headers`, or `body` constraints inside a method block to further limit
-which requests are permitted.
-
-> **Subset principle** *Every* field you specify must match the request; unspecified fields are ignored. This means your rule must be a **subset** of the incoming request.
+which requests are permitted. Body constraints are evaluated against the parsed JSON or
+form payload.
 
 | Request part | Matching logic                                                                                      |
 | ------------ | --------------------------------------------------------------------------------------------------- |
@@ -99,20 +104,7 @@ which requests are permitted.
 | Method       | Case-insensitive string compare. Each method key contains its own constraints. |
 | Query params | In `methods.<HTTP_METHOD>.query`, each key maps to allowed value list. Extra params allowed. Values match exactly.
 | Headers      | In `methods.<HTTP_METHOD>.headers`, each key has required values; an empty list only checks for presence. Values match exactly.
-| Body         | `methods.<HTTP_METHOD>.body` must be a recursive subset of the request body (JSON or form). Arrays matched unordered. Detection relies on the `Content-Type` header; if it's neither JSON nor form, body checks are skipped.
-
-A rule like:
-
-```yaml
-  body:
-    obj:
-      inner:
-        more_inner: x
-      arr: [2, 1]
-```
-
-matches a request body
-`{"obj": {"inner": {"more_inner": "x", "extra_more_inner": "y"}, "arr": [1, 2, 3], "extra": true}}`.
+| Body         | `methods.<HTTP_METHOD>.body` is a JSON Schema (draft‑07) evaluated against the JSON or form body. Detection relies on the `Content-Type` header; if it's neither JSON nor form, body checks are skipped.
 
 A request passes if **any** rule (or capability‑expanded rule) matches.
 

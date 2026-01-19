@@ -6,4 +6,10 @@
           methods:
             POST:
               body:
-                channel: bad-channel
+                type: object
+                properties:
+                  channel:
+                    type: string
+                    const: bad-channel
+                required:
+                  - channel

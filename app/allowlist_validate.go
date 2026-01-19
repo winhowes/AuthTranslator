@@ -64,6 +64,11 @@ func validateAllowlistEntry(name string, callers []CallerConfig) error {
 					return fmt.Errorf("caller %q rule %d invalid method %q", id, ri, m)
 				}
 				upper := strings.ToUpper(trimmed)
+				if len(r.Methods[m].Body) > 0 {
+					if err := validateBodySchemaDefinition(r.Methods[m].Body); err != nil {
+						return fmt.Errorf("caller %q rule %d invalid body schema for method %s: %w", id, ri, upper, err)
+					}
+				}
 				if _, dup := ruleSeen[normPath][upper]; dup {
 					return fmt.Errorf("duplicate rule for caller %q path %q method %s", id, r.Path, upper)
 				}

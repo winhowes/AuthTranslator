@@ -55,11 +55,11 @@ Denylist rules reuse the same `RequestConstraint` syntax as granular allowlist r
 strict:
 
 * **Path and method must match first.** Paths are anchored and support `*` (single segment) and `**` (remainder) wildcards.
-* **Every listed constraint must be present.** Headers, query parameters, and body fragments are all ANDed together. If a rule
+* **Every listed constraint must be present.** Headers, query parameters, and body schemas are all ANDed together. If a rule
   references both a query parameter and a header, for example, **both must be present with one of the listed values** for the rule to fire.
-* **Value comparisons are exact string matches.** There is no regex or partial matching.
-* **Bodies require a supported content type.** JSON and form bodies are parsed; other types skip matching and the rule will not
-  apply.
+* **Value comparisons are exact string matches** for headers and query parameters.
+* **Bodies are validated with JSON Schema (draft‑07).** JSON and form bodies are parsed; other types skip matching and the rule will not
+  apply. This makes regex patterns, ranges, and string length checks available in denylist rules.
 
 > **Need an OR?** Create multiple rules (or duplicate caller entries) that each express one alternative. The proxy only blocks a
 > request when a *single* rule’s entire constraint set matches the request. This makes it safe to layer narrow kill-switches

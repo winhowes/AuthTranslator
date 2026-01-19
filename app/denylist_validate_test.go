@@ -1,6 +1,9 @@
 package main
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestValidateDenylistEntriesDuplicateIntegration(t *testing.T) {
 	entries := []DenylistEntry{{Integration: "a"}, {Integration: "a"}}
@@ -52,5 +55,24 @@ func TestValidateDenylistEntries(t *testing.T) {
 	}}
 	if err := validateDenylistEntries(entries); err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestValidateDenylistEntriesInvalidBodySchema(t *testing.T) {
+	entries := []DenylistEntry{{
+		Integration: "test",
+		Callers: []DenylistCaller{{
+			ID: "caller",
+			Rules: []CallRule{{
+				Path: "/blocked",
+				Methods: map[string]RequestConstraint{
+					"POST": {Body: map[string]interface{}{"type": "object", "properties": "bad"}},
+				},
+			}},
+		}},
+	}}
+	err := validateDenylistEntries(entries)
+	if err == nil || !strings.Contains(err.Error(), "invalid body schema") {
+		t.Fatalf("expected invalid body schema error, got %v", err)
 	}
 }
