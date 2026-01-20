@@ -85,6 +85,9 @@ func SetDenylist(name string, callers []DenylistCaller) error {
 			methods := make(map[string]RequestConstraint, len(r.Methods))
 			for method, cons := range r.Methods {
 				cleaned := strings.ToUpper(strings.TrimSpace(method))
+				if err := compileBodySchemaInto(&cons); err != nil {
+					return fmt.Errorf("invalid body schema for %s %s: %w", r.Path, cleaned, err)
+				}
 				methods[cleaned] = cons
 			}
 			r.Methods = methods
@@ -218,7 +221,7 @@ func constraintMatchesRequest(r *http.Request, c RequestConstraint) bool {
 		if err != nil {
 			return false
 		}
-		ok, _ := validateBodySchema(c.Body, data)
+		ok, _ := validateBodySchemaCompiled(c.BodySchema, c.Body, data)
 		return ok
 	case strings.Contains(ct, "application/x-www-form-urlencoded"):
 		vals, err := url.ParseQuery(string(bodyBytes))
@@ -226,7 +229,7 @@ func constraintMatchesRequest(r *http.Request, c RequestConstraint) bool {
 			return false
 		}
 		data := formValuesToJSON(vals)
-		ok, _ := validateBodySchema(c.Body, data)
+		ok, _ := validateBodySchemaCompiled(c.BodySchema, c.Body, data)
 		return ok
 	default:
 		return false

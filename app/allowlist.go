@@ -80,6 +80,9 @@ func SetAllowlist(name string, callers []CallerConfig) error {
 				if method == "" {
 					continue
 				}
+				if err := compileBodySchemaInto(&cons); err != nil {
+					return fmt.Errorf("invalid body schema for %s %s: %w", r.Path, method, err)
+				}
 				methods[strings.ToUpper(method)] = cons
 			}
 			r.Methods = methods
@@ -204,7 +207,7 @@ func validateRequestReason(r *http.Request, c RequestConstraint) (bool, string) 
 		if err != nil {
 			return false, "invalid json"
 		}
-		if ok, reason := validateBodySchema(c.Body, data); !ok {
+		if ok, reason := validateBodySchemaCompiled(c.BodySchema, c.Body, data); !ok {
 			return false, reason
 		}
 		return true, ""
@@ -215,7 +218,7 @@ func validateRequestReason(r *http.Request, c RequestConstraint) (bool, string) 
 			return false, "invalid form encoding"
 		}
 		data := formValuesToJSON(vals)
-		if ok, reason := validateBodySchema(c.Body, data); !ok {
+		if ok, reason := validateBodySchemaCompiled(c.BodySchema, c.Body, data); !ok {
 			return false, reason
 		}
 		return true, ""

@@ -30,6 +30,23 @@ func validateBodySchema(schema map[string]interface{}, data interface{}) (bool, 
 	return true, ""
 }
 
+func validateBodySchemaCompiled(compiled *jsonschema.Schema, schema map[string]interface{}, data interface{}) (bool, string) {
+	if len(schema) == 0 {
+		return true, ""
+	}
+	if compiled == nil {
+		var err error
+		compiled, err = compileBodySchema(schema)
+		if err != nil {
+			return false, fmt.Sprintf("invalid body schema: %v", err)
+		}
+	}
+	if err := compiled.Validate(data); err != nil {
+		return false, fmt.Sprintf("body schema mismatch: %v", err)
+	}
+	return true, ""
+}
+
 func compileBodySchema(schema map[string]interface{}) (*jsonschema.Schema, error) {
 	compiler := jsonschema.NewCompiler()
 	compiler.DefaultDraft(jsonschema.Draft7)
@@ -37,6 +54,18 @@ func compileBodySchema(schema map[string]interface{}) (*jsonschema.Schema, error
 		return nil, err
 	}
 	return compiler.Compile("body-schema.json")
+}
+
+func compileBodySchemaInto(cons *RequestConstraint) error {
+	if len(cons.Body) == 0 {
+		return nil
+	}
+	compiled, err := compileBodySchema(cons.Body)
+	if err != nil {
+		return err
+	}
+	cons.BodySchema = compiled
+	return nil
 }
 
 func decodeJSONBody(bodyBytes []byte) (interface{}, error) {
