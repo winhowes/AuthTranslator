@@ -142,6 +142,25 @@ func TestValidateAllowlistEntriesInvalidBodySchema(t *testing.T) {
 	}
 }
 
+func TestValidateAllowlistEntriesLegacyBodyRejected(t *testing.T) {
+	entries := []AllowlistEntry{{
+		Integration: "test",
+		Callers: []CallerConfig{{
+			ID: "c",
+			Rules: []CallRule{{
+				Path: "/x",
+				Methods: map[string]RequestConstraint{
+					"POST": {Body: map[string]interface{}{"text": "Hello"}},
+				},
+			}},
+		}},
+	}}
+	err := validateAllowlistEntries(entries)
+	if err == nil || !strings.Contains(err.Error(), "body schema must use JSON Schema keywords") {
+		t.Fatalf("expected legacy body schema error, got %v", err)
+	}
+}
+
 func TestValidateAllowlistEntriesCapabilityParamErrors(t *testing.T) {
 	entries := []AllowlistEntry{{
 		Integration: "slack",

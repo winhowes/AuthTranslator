@@ -12,6 +12,9 @@ func validateBodySchemaDefinition(schema map[string]interface{}) error {
 	if len(schema) == 0 {
 		return nil
 	}
+	if !looksLikeJSONSchema(schema) {
+		return fmt.Errorf("body schema must use JSON Schema keywords (example: type, properties, $schema)")
+	}
 	_, err := compileBodySchema(schema)
 	return err
 }
@@ -19,6 +22,9 @@ func validateBodySchemaDefinition(schema map[string]interface{}) error {
 func validateBodySchema(schema map[string]interface{}, data interface{}) (bool, string) {
 	if len(schema) == 0 {
 		return true, ""
+	}
+	if !looksLikeJSONSchema(schema) {
+		return false, "body schema must use JSON Schema keywords (example: type, properties, $schema)"
 	}
 	compiled, err := compileBodySchema(schema)
 	if err != nil {
@@ -33,6 +39,9 @@ func validateBodySchema(schema map[string]interface{}, data interface{}) (bool, 
 func validateBodySchemaCompiled(compiled *jsonschema.Schema, schema map[string]interface{}, data interface{}) (bool, string) {
 	if len(schema) == 0 {
 		return true, ""
+	}
+	if !looksLikeJSONSchema(schema) {
+		return false, "body schema must use JSON Schema keywords (example: type, properties, $schema)"
 	}
 	if compiled == nil {
 		var err error
@@ -60,12 +69,28 @@ func compileBodySchemaInto(cons *RequestConstraint) error {
 	if len(cons.Body) == 0 {
 		return nil
 	}
+	if !looksLikeJSONSchema(cons.Body) {
+		return fmt.Errorf("body schema must use JSON Schema keywords (example: type, properties, $schema)")
+	}
 	compiled, err := compileBodySchema(cons.Body)
 	if err != nil {
 		return err
 	}
 	cons.BodySchema = compiled
 	return nil
+}
+
+func looksLikeJSONSchema(schema map[string]interface{}) bool {
+	for key := range schema {
+		switch key {
+		case "$schema", "$id", "type", "properties", "items", "required", "additionalProperties",
+			"pattern", "minimum", "maximum", "minLength", "maxLength", "minItems", "maxItems",
+			"enum", "const", "anyOf", "allOf", "oneOf", "not", "if", "then", "else",
+			"patternProperties", "dependentRequired", "dependentSchemas", "$defs", "definitions":
+			return true
+		}
+	}
+	return false
 }
 
 func decodeJSONBody(bodyBytes []byte) (interface{}, error) {
