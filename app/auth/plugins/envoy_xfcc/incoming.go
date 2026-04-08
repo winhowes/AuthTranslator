@@ -46,7 +46,7 @@ func (e *EnvoyXFCCAuth) Identify(r *http.Request, p interface{}) (string, bool) 
 	if !ok {
 		return "", false
 	}
-	identity, ok := extractCallerIdentity(r.Header.Get(cfg.Header), cfg)
+	identity, ok := extractCallerIdentity(joinHeaderValues(r.Header, cfg.Header), cfg)
 	if !ok {
 		return "", false
 	}
@@ -118,6 +118,14 @@ func extractCallerIdentity(raw string, cfg *inParams) (string, bool) {
 		return "", false
 	}
 	return selected, true
+}
+
+func joinHeaderValues(h http.Header, header string) string {
+	values := h.Values(header)
+	if len(values) == 0 {
+		return ""
+	}
+	return strings.Join(values, ",")
 }
 
 func splitXFCC(raw string, sep rune) ([]string, bool) {

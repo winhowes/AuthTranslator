@@ -110,6 +110,27 @@ func TestEnvoyXFCCIdentifyReturnsCallerURI(t *testing.T) {
 	}
 }
 
+func TestEnvoyXFCCMultipleHeaderValuesCombined(t *testing.T) {
+	p := EnvoyXFCCAuth{}
+	cfg, err := p.ParseParams(map[string]interface{}{
+		"allowed_uris": []string{"spiffe://cluster.local/ns/team/sa/caller"},
+		"ignored_uris": []string{"spiffe://cluster.local/ns/gateway/sa/envoy"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := &http.Request{Header: http.Header{}}
+	r.Header.Add("X-Forwarded-Client-Cert", "URI=spiffe://cluster.local/ns/gateway/sa/envoy")
+	r.Header.Add("X-Forwarded-Client-Cert", "URI=spiffe://cluster.local/ns/team/sa/caller")
+	if !p.Authenticate(context.Background(), r, cfg) {
+		t.Fatal("expected auth success when caller URI is in a later header value")
+	}
+	id, ok := p.Identify(r, cfg)
+	if !ok || id != "spiffe://cluster.local/ns/team/sa/caller" {
+		t.Fatalf("unexpected identify result id=%q ok=%v", id, ok)
+	}
+}
+
 func TestEnvoyXFCCStripHeaderWhenEnabled(t *testing.T) {
 	p := EnvoyXFCCAuth{}
 	cfg, err := p.ParseParams(map[string]interface{}{"allowed_uris": []string{"spiffe://allowed"}})
@@ -225,6 +246,15 @@ func TestEnvoyXFCCCoverageEdges(t *testing.T) {
 	}
 	if v, ok := decodeFieldValue("\"abc\\\""); ok || v != "" {
 		t.Fatal("expected dangling escape inside quoted value to fail decoding")
+	}
+	h := http.Header{}
+	if joined := joinHeaderValues(h, "X-Forwarded-Client-Cert"); joined != "" {
+		t.Fatalf("expected empty joined header, got %q", joined)
+	}
+	h.Add("X-Forwarded-Client-Cert", "URI=spiffe://ok/one")
+	h.Add("X-Forwarded-Client-Cert", "URI=spiffe://ok/two")
+	if joined := joinHeaderValues(h, "X-Forwarded-Client-Cert"); joined != "URI=spiffe://ok/one,URI=spiffe://ok/two" {
+		t.Fatalf("unexpected joined header %q", joined)
 	}
 
 	cfgIgnoredOnly, err := p.ParseParams(map[string]interface{}{
