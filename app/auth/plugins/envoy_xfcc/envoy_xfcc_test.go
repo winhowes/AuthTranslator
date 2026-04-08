@@ -2,6 +2,7 @@ package envoy_xfcc
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"testing"
 )
@@ -181,6 +182,11 @@ func TestEnvoyXFCCJSONMalformedOrMixedFails(t *testing.T) {
 	if p.Authenticate(context.Background(), duplicateURIKeys, cfg) {
 		t.Fatal("expected duplicate case-insensitive URI keys to fail")
 	}
+	duplicateExactURIKeys := &http.Request{Header: http.Header{}}
+	duplicateExactURIKeys.Header.Set("X-Forwarded-Client-Cert", `{"URI":"spiffe://cluster.local/ns/other/sa/caller","URI":"spiffe://cluster.local/ns/team/sa/caller"}`)
+	if p.Authenticate(context.Background(), duplicateExactURIKeys, cfg) {
+		t.Fatal("expected duplicate exact URI keys to fail")
+	}
 
 	mixed := &http.Request{Header: http.Header{}}
 	mixed.Header.Add("X-Forwarded-Client-Cert", `{"URI":"spiffe://cluster.local/ns/team/sa/caller"}`)
@@ -232,6 +238,9 @@ func TestEnvoyXFCCJSONCoverageEdges(t *testing.T) {
 	if _, ok := extractJSONURIs(`{"URI":[""]}`); ok {
 		t.Fatal("expected empty URI array entry to fail")
 	}
+	if _, ok := extractJSONURIs(`[`); ok {
+		t.Fatal("expected malformed JSON array to fail")
+	}
 	if _, ok := extractJSONURIs(""); ok {
 		t.Fatal("expected empty JSON string to fail")
 	}
@@ -242,17 +251,29 @@ func TestEnvoyXFCCJSONCoverageEdges(t *testing.T) {
 		t.Fatal("expected non-string URI to fail")
 	}
 
-	objNoURI := map[string]interface{}{"By": "proxy"}
-	if uri, ok := extractURIFromJSONObject(objNoURI); !ok || uri != "" {
+	if uri, ok := extractURIFromJSONObject(json.RawMessage(`{"By":"proxy"}`)); !ok || uri != "" {
 		t.Fatalf("expected no URI in object: uri=%q ok=%v", uri, ok)
 	}
-	objURIArray := map[string]interface{}{"URI": []interface{}{"spiffe://ok/a"}}
-	if uri, ok := extractURIFromJSONObject(objURIArray); !ok || uri != "spiffe://ok/a" {
+	if uri, ok := extractURIFromJSONObject(json.RawMessage(`{"URI":["spiffe://ok/a"]}`)); !ok || uri != "spiffe://ok/a" {
 		t.Fatalf("unexpected URI array decode: uri=%q ok=%v", uri, ok)
 	}
-	objBlankURI := map[string]interface{}{"URI": " "}
-	if uri, ok := extractURIFromJSONObject(objBlankURI); ok || uri != "" {
+	if uri, ok := extractURIFromJSONObject(json.RawMessage(`{"URI":" "}`)); ok || uri != "" {
 		t.Fatalf("expected blank URI string to fail: uri=%q ok=%v", uri, ok)
+	}
+	if uri, ok := extractURIFromJSONObject(json.RawMessage(`[]`)); ok || uri != "" {
+		t.Fatalf("expected non-object JSON to fail: uri=%q ok=%v", uri, ok)
+	}
+	if uri, ok := extractURIFromJSONObject(json.RawMessage(``)); ok || uri != "" {
+		t.Fatalf("expected empty JSON object bytes to fail: uri=%q ok=%v", uri, ok)
+	}
+	if uri, ok := extractURIFromJSONObject(json.RawMessage(`{"URI":"spiffe://ok/a"`)); ok || uri != "" {
+		t.Fatalf("expected unterminated JSON object to fail: uri=%q ok=%v", uri, ok)
+	}
+	if uri, ok := extractURIFromJSONObject(json.RawMessage(`{"URI":}`)); ok || uri != "" {
+		t.Fatalf("expected invalid JSON URI value to fail: uri=%q ok=%v", uri, ok)
+	}
+	if uri, ok := extractURIFromJSONObject(json.RawMessage(`{"URI":"spiffe://ok/a",`)); ok || uri != "" {
+		t.Fatalf("expected malformed trailing-comma object to fail: uri=%q ok=%v", uri, ok)
 	}
 }
 

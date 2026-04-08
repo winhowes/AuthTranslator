@@ -1,6 +1,7 @@
 package envoy_xfcc
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -195,7 +196,7 @@ func extractJSONURIs(raw string) ([]string, bool) {
 		return nil, false
 	}
 	if strings.HasPrefix(trimmed, "[") {
-		var arr []map[string]interface{}
+		var arr []json.RawMessage
 		if err := json.Unmarshal([]byte(trimmed), &arr); err != nil {
 			return nil, false
 		}
@@ -212,11 +213,7 @@ func extractJSONURIs(raw string) ([]string, bool) {
 		return uris, true
 	}
 
-	var obj map[string]interface{}
-	if err := json.Unmarshal([]byte(trimmed), &obj); err != nil {
-		return nil, false
-	}
-	uri, ok := extractURIFromJSONObject(obj)
+	uri, ok := extractURIFromJSONObject(json.RawMessage(trimmed))
 	if !ok {
 		return nil, false
 	}
@@ -226,10 +223,29 @@ func extractJSONURIs(raw string) ([]string, bool) {
 	return []string{uri}, true
 }
 
-func extractURIFromJSONObject(obj map[string]interface{}) (string, bool) {
-	var uriValue interface{}
+func extractURIFromJSONObject(raw json.RawMessage) (string, bool) {
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	start, err := dec.Token()
+	if err != nil {
+		return "", false
+	}
+	startDelim, ok := start.(json.Delim)
+	if !ok || startDelim != '{' {
+		return "", false
+	}
+
+	var uriRaw json.RawMessage
 	seenURIKey := false
-	for key, value := range obj {
+	for dec.More() {
+		keyToken, err := dec.Token()
+		if err != nil {
+			return "", false
+		}
+		key := keyToken.(string)
+		var value json.RawMessage
+		if err := dec.Decode(&value); err != nil {
+			return "", false
+		}
 		if !strings.EqualFold(key, "URI") {
 			continue
 		}
@@ -237,29 +253,31 @@ func extractURIFromJSONObject(obj map[string]interface{}) (string, bool) {
 			return "", false
 		}
 		seenURIKey = true
-		uriValue = value
+		uriRaw = value
 	}
+	end, err := dec.Token()
+	if err != nil {
+		return "", false
+	}
+	_ = end
 	if !seenURIKey {
 		return "", true
 	}
-	switch v := uriValue.(type) {
-	case string:
-		if strings.TrimSpace(v) == "" {
-			return "", false
-		}
-		return v, true
-	case []interface{}:
-		if len(v) != 1 {
-			return "", false
-		}
-		uri, ok := v[0].(string)
-		if !ok || strings.TrimSpace(uri) == "" {
+	var uri string
+	if err := json.Unmarshal(uriRaw, &uri); err == nil {
+		if strings.TrimSpace(uri) == "" {
 			return "", false
 		}
 		return uri, true
-	default:
-		return "", false
 	}
+	var uriList []string
+	if err := json.Unmarshal(uriRaw, &uriList); err == nil {
+		if len(uriList) != 1 || strings.TrimSpace(uriList[0]) == "" {
+			return "", false
+		}
+		return uriList[0], true
+	}
+	return "", false
 }
 
 func splitXFCC(raw string, sep rune) ([]string, bool) {
