@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"strings"
 
@@ -260,6 +261,9 @@ func extractURIFromJSONObject(raw json.RawMessage) (string, bool) {
 		return "", false
 	}
 	_ = end
+	if _, err := dec.Token(); err != io.EOF {
+		return "", false
+	}
 	if !seenURIKey {
 		return "", true
 	}

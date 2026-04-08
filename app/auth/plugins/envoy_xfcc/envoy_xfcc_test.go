@@ -187,6 +187,11 @@ func TestEnvoyXFCCJSONMalformedOrMixedFails(t *testing.T) {
 	if p.Authenticate(context.Background(), duplicateExactURIKeys, cfg) {
 		t.Fatal("expected duplicate exact URI keys to fail")
 	}
+	jsonWithTrailingGarbage := &http.Request{Header: http.Header{}}
+	jsonWithTrailingGarbage.Header.Set("X-Forwarded-Client-Cert", `{"URI":"spiffe://cluster.local/ns/team/sa/caller"},URI=spiffe://cluster.local/ns/other/sa/caller`)
+	if p.Authenticate(context.Background(), jsonWithTrailingGarbage, cfg) {
+		t.Fatal("expected JSON XFCC header with trailing garbage to fail")
+	}
 
 	mixed := &http.Request{Header: http.Header{}}
 	mixed.Header.Add("X-Forwarded-Client-Cert", `{"URI":"spiffe://cluster.local/ns/team/sa/caller"}`)
@@ -274,6 +279,9 @@ func TestEnvoyXFCCJSONCoverageEdges(t *testing.T) {
 	}
 	if uri, ok := extractURIFromJSONObject(json.RawMessage(`{"URI":"spiffe://ok/a",`)); ok || uri != "" {
 		t.Fatalf("expected malformed trailing-comma object to fail: uri=%q ok=%v", uri, ok)
+	}
+	if uri, ok := extractURIFromJSONObject(json.RawMessage(`{"URI":"spiffe://ok/a"} trailing`)); ok || uri != "" {
+		t.Fatalf("expected trailing tokens after JSON object to fail: uri=%q ok=%v", uri, ok)
 	}
 }
 
