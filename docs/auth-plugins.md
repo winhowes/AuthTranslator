@@ -24,6 +24,7 @@ AuthTranslator’s behaviour is extended by **plugins** – small Go packages th
 | Inbound   | `hmac_signature`   | Generic HMAC validation using a shared secret. |
 | Inbound   | `jwt`              | Verifies JWTs with provided keys. |
 | Inbound   | `mtls`             | Requires a trusted client certificate. |
+| Inbound   | `envoy_xfcc`       | Validates caller SPIFFE URI from Envoy `X-Forwarded-Client-Cert`. |
 | Inbound   | `slack_signature`  | Validates Slack request signatures. |
 | Inbound   | `twilio_signature`  | Validates Twilio webhook signatures. |
 | Inbound   | `token`            | Compares a shared token header. |
@@ -70,6 +71,29 @@ outgoing_auth:
 ```
 
 Adds the configured token to the `X-Api-Key` header on each request.
+
+### Inbound `envoy_xfcc`
+
+```yaml
+incoming_auth:
+  - type: envoy_xfcc
+    params:
+      allowed_uris:
+        - spiffe://cluster.local/ns/team/sa/caller
+      ignored_uris:
+        - spiffe://cluster.local/ns/gateway/sa/envoy
+      allowed_uri_prefixes:
+        - spiffe://cluster.local/ns/team/
+      header: X-Forwarded-Client-Cert # optional
+      strip_header: true              # optional, default true
+```
+
+Reads Envoy's XFCC header and extracts a single caller `URI=` identity (SPIFFE).
+It fails closed when the header is missing, malformed, ambiguous, or not
+allowed by either `allowed_uris` or `allowed_uri_prefixes`.
+
+Use this only when your edge Envoy/Gateway is trusted to sanitize and set the
+XFCC header.
 
 ### Outbound `find_replace`
 
