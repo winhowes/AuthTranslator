@@ -131,7 +131,7 @@ func TestEnvoyXFCCCoverageEdges(t *testing.T) {
 	if len(p.RequiredParams()) != 0 {
 		t.Fatal("expected no required params")
 	}
-	if len(p.OptionalParams()) != 5 {
+	if len(p.OptionalParams()) != 4 {
 		t.Fatal("unexpected optional params")
 	}
 
@@ -142,7 +142,7 @@ func TestEnvoyXFCCCoverageEdges(t *testing.T) {
 		t.Fatal("expected type mismatch")
 	}
 
-	cfgAny, err := p.ParseParams(map[string]interface{}{"allowed_uri_prefixes": []string{"spiffe://ok/"}, "strip_header": false, "header": "X-Custom-XFCC"})
+	cfgAny, err := p.ParseParams(map[string]interface{}{"allowed_uri_prefixes": []string{"spiffe://ok/"}, "header": "X-Custom-XFCC"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -165,8 +165,8 @@ func TestEnvoyXFCCCoverageEdges(t *testing.T) {
 		t.Fatal("expected identify false with invalid params")
 	}
 	p.StripAuth(r, cfgAny)
-	if got := r.Header.Get("X-Custom-XFCC"); got == "" {
-		t.Fatal("expected header not stripped when strip_header false")
+	if got := r.Header.Get("X-Custom-XFCC"); got != "" {
+		t.Fatal("expected header stripped")
 	}
 	p.StripAuth(r, nil)
 

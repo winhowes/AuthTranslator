@@ -13,7 +13,6 @@ type inParams struct {
 	AllowedURIPrefix []string `json:"allowed_uri_prefixes"`
 	Header           string   `json:"header"`
 	IgnoredURIs      []string `json:"ignored_uris"`
-	StripHeader      *bool    `json:"strip_header"`
 }
 
 type EnvoyXFCCAuth struct{}
@@ -23,7 +22,7 @@ func (e *EnvoyXFCCAuth) Name() string { return "envoy_xfcc" }
 func (e *EnvoyXFCCAuth) RequiredParams() []string { return []string{} }
 
 func (e *EnvoyXFCCAuth) OptionalParams() []string {
-	return []string{"allowed_uris", "allowed_uri_prefixes", "header", "ignored_uris", "strip_header"}
+	return []string{"allowed_uris", "allowed_uri_prefixes", "header", "ignored_uris"}
 }
 
 func (e *EnvoyXFCCAuth) ParseParams(m map[string]interface{}) (interface{}, error) {
@@ -33,10 +32,6 @@ func (e *EnvoyXFCCAuth) ParseParams(m map[string]interface{}) (interface{}, erro
 	}
 	if cfg.Header == "" {
 		cfg.Header = "X-Forwarded-Client-Cert"
-	}
-	if cfg.StripHeader == nil {
-		defaultStrip := true
-		cfg.StripHeader = &defaultStrip
 	}
 	return cfg, nil
 }
@@ -63,9 +58,7 @@ func (e *EnvoyXFCCAuth) StripAuth(r *http.Request, p interface{}) {
 	if !ok {
 		return
 	}
-	if cfg.StripHeader != nil && *cfg.StripHeader {
-		r.Header.Del(cfg.Header)
-	}
+	r.Header.Del(cfg.Header)
 }
 
 func extractCallerIdentity(raw string, cfg *inParams) (string, bool) {
