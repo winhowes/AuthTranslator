@@ -131,6 +131,126 @@ func TestEnvoyXFCCMultipleHeaderValuesCombined(t *testing.T) {
 	}
 }
 
+func TestEnvoyXFCCJSONHeaderSupported(t *testing.T) {
+	p := EnvoyXFCCAuth{}
+	cfg, err := p.ParseParams(map[string]interface{}{
+		"allowed_uris": []string{"spiffe://cluster.local/ns/team/sa/caller"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := &http.Request{Header: http.Header{}}
+	r.Header.Set("X-Forwarded-Client-Cert", `{"URI":"spiffe://cluster.local/ns/team/sa/caller","Subject":"CN=client"}`)
+	if !p.Authenticate(context.Background(), r, cfg) {
+		t.Fatal("expected JSON XFCC header to authenticate")
+	}
+}
+
+func TestEnvoyXFCCJSONArrayWithIgnoredIdentity(t *testing.T) {
+	p := EnvoyXFCCAuth{}
+	cfg, err := p.ParseParams(map[string]interface{}{
+		"allowed_uris": []string{"spiffe://cluster.local/ns/team/sa/caller"},
+		"ignored_uris": []string{"spiffe://cluster.local/ns/gateway/sa/envoy"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := &http.Request{Header: http.Header{}}
+	r.Header.Set("X-Forwarded-Client-Cert", `[{"URI":"spiffe://cluster.local/ns/gateway/sa/envoy"},{"URI":"spiffe://cluster.local/ns/team/sa/caller"}]`)
+	if !p.Authenticate(context.Background(), r, cfg) {
+		t.Fatal("expected JSON XFCC array with ignored gateway to authenticate")
+	}
+}
+
+func TestEnvoyXFCCJSONMalformedOrMixedFails(t *testing.T) {
+	p := EnvoyXFCCAuth{}
+	cfg, err := p.ParseParams(map[string]interface{}{
+		"allowed_uri_prefixes": []string{"spiffe://cluster.local/ns/team/"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	malformed := &http.Request{Header: http.Header{}}
+	malformed.Header.Set("X-Forwarded-Client-Cert", `{"URI":`)
+	if p.Authenticate(context.Background(), malformed, cfg) {
+		t.Fatal("expected malformed JSON header to fail")
+	}
+
+	mixed := &http.Request{Header: http.Header{}}
+	mixed.Header.Add("X-Forwarded-Client-Cert", `{"URI":"spiffe://cluster.local/ns/team/sa/caller"}`)
+	mixed.Header.Add("X-Forwarded-Client-Cert", `URI=spiffe://cluster.local/ns/team/sa/caller`)
+	if p.Authenticate(context.Background(), mixed, cfg) {
+		t.Fatal("expected mixed JSON/text XFCC header values to fail")
+	}
+}
+
+func TestEnvoyXFCCJSONCoverageEdges(t *testing.T) {
+	p := EnvoyXFCCAuth{}
+	cfg, err := p.ParseParams(map[string]interface{}{
+		"allowed_uri_prefixes": []string{"spiffe://ok/"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := extractCallerIdentityFromValues(nil, cfg.(*inParams)); ok {
+		t.Fatal("expected empty header values to fail")
+	}
+	if _, ok := extractCallerIdentityFromValues([]string{"   "}, cfg.(*inParams)); ok {
+		t.Fatal("expected blank header value to fail")
+	}
+	if _, ok := extractCallerIdentity("", cfg.(*inParams)); ok {
+		t.Fatal("expected blank text XFCC to fail")
+	}
+	if detectHeaderFormat("") != headerFormatUnknown {
+		t.Fatal("expected unknown format for empty value")
+	}
+	if detectHeaderFormat("{\"URI\":\"spiffe://ok/a\"}") != headerFormatJSON {
+		t.Fatal("expected JSON format detection")
+	}
+	if detectHeaderFormat("URI=spiffe://ok/a") != headerFormatText {
+		t.Fatal("expected text format detection")
+	}
+
+	if uris, ok := extractJSONURIs(`{"By":"proxy"}`); !ok || len(uris) != 0 {
+		t.Fatalf("expected JSON object without URI to succeed with empty URIs: uris=%v ok=%v", uris, ok)
+	}
+	if uris, ok := extractJSONURIs(`[{"URI":"spiffe://ok/a"}]`); !ok || len(uris) != 1 || uris[0] != "spiffe://ok/a" {
+		t.Fatalf("unexpected JSON array parse uris=%v ok=%v", uris, ok)
+	}
+	if _, ok := extractJSONURIs(`["bad"]`); ok {
+		t.Fatal("expected invalid JSON array element to fail")
+	}
+	if _, ok := extractJSONURIs(`{"URI":["a","b"]}`); ok {
+		t.Fatal("expected URI array with multiple entries to fail")
+	}
+	if _, ok := extractJSONURIs(`{"URI":[""]}`); ok {
+		t.Fatal("expected empty URI array entry to fail")
+	}
+	if _, ok := extractJSONURIs(""); ok {
+		t.Fatal("expected empty JSON string to fail")
+	}
+	if _, ok := extractJSONURIs(`[{"URI":1}]`); ok {
+		t.Fatal("expected JSON array element with invalid URI to fail")
+	}
+	if _, ok := extractJSONURIs(`{"URI":1}`); ok {
+		t.Fatal("expected non-string URI to fail")
+	}
+
+	objNoURI := map[string]interface{}{"By": "proxy"}
+	if uri, ok := extractURIFromJSONObject(objNoURI); !ok || uri != "" {
+		t.Fatalf("expected no URI in object: uri=%q ok=%v", uri, ok)
+	}
+	objURIArray := map[string]interface{}{"URI": []interface{}{"spiffe://ok/a"}}
+	if uri, ok := extractURIFromJSONObject(objURIArray); !ok || uri != "spiffe://ok/a" {
+		t.Fatalf("unexpected URI array decode: uri=%q ok=%v", uri, ok)
+	}
+	objBlankURI := map[string]interface{}{"URI": " "}
+	if uri, ok := extractURIFromJSONObject(objBlankURI); ok || uri != "" {
+		t.Fatalf("expected blank URI string to fail: uri=%q ok=%v", uri, ok)
+	}
+}
+
 func TestEnvoyXFCCStripHeaderWhenEnabled(t *testing.T) {
 	p := EnvoyXFCCAuth{}
 	cfg, err := p.ParseParams(map[string]interface{}{"allowed_uris": []string{"spiffe://allowed"}})
@@ -247,13 +367,12 @@ func TestEnvoyXFCCCoverageEdges(t *testing.T) {
 	if v, ok := decodeFieldValue("\"abc\\\""); ok || v != "" {
 		t.Fatal("expected dangling escape inside quoted value to fail decoding")
 	}
-	h := http.Header{}
-	if joined := joinHeaderValues(h, "X-Forwarded-Client-Cert"); joined != "" {
+	values := []string{}
+	if joined := joinHeaderValues(values); joined != "" {
 		t.Fatalf("expected empty joined header, got %q", joined)
 	}
-	h.Add("X-Forwarded-Client-Cert", "URI=spiffe://ok/one")
-	h.Add("X-Forwarded-Client-Cert", "URI=spiffe://ok/two")
-	if joined := joinHeaderValues(h, "X-Forwarded-Client-Cert"); joined != "URI=spiffe://ok/one,URI=spiffe://ok/two" {
+	values = append(values, "URI=spiffe://ok/one", "URI=spiffe://ok/two")
+	if joined := joinHeaderValues(values); joined != "URI=spiffe://ok/one,URI=spiffe://ok/two" {
 		t.Fatalf("unexpected joined header %q", joined)
 	}
 

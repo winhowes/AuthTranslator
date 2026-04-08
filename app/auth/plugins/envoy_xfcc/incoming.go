@@ -2,6 +2,7 @@ package envoy_xfcc
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"strings"
 
@@ -46,7 +47,7 @@ func (e *EnvoyXFCCAuth) Identify(r *http.Request, p interface{}) (string, bool) 
 	if !ok {
 		return "", false
 	}
-	identity, ok := extractCallerIdentity(joinHeaderValues(r.Header, cfg.Header), cfg)
+	identity, ok := extractCallerIdentityFromValues(r.Header.Values(cfg.Header), cfg)
 	if !ok {
 		return "", false
 	}
@@ -61,6 +62,42 @@ func (e *EnvoyXFCCAuth) StripAuth(r *http.Request, p interface{}) {
 	r.Header.Del(cfg.Header)
 }
 
+func extractCallerIdentityFromValues(values []string, cfg *inParams) (string, bool) {
+	if len(values) == 0 {
+		return "", false
+	}
+	format := headerFormatUnknown
+	jsonURIs := []string{}
+	textValues := []string{}
+	for _, raw := range values {
+		valueFormat := detectHeaderFormat(raw)
+		if valueFormat == headerFormatUnknown {
+			return "", false
+		}
+		if format == headerFormatUnknown {
+			format = valueFormat
+		}
+		if format != valueFormat {
+			return "", false
+		}
+		switch valueFormat {
+		case headerFormatText:
+			textValues = append(textValues, raw)
+		case headerFormatJSON:
+			uris, ok := extractJSONURIs(raw)
+			if !ok {
+				return "", false
+			}
+			jsonURIs = append(jsonURIs, uris...)
+		}
+	}
+
+	if format == headerFormatText {
+		return extractCallerIdentity(joinHeaderValues(textValues), cfg)
+	}
+	return selectIdentity(jsonURIs, cfg)
+}
+
 func extractCallerIdentity(raw string, cfg *inParams) (string, bool) {
 	if strings.TrimSpace(raw) == "" {
 		return "", false
@@ -69,12 +106,7 @@ func extractCallerIdentity(raw string, cfg *inParams) (string, bool) {
 	if !ok {
 		return "", false
 	}
-	ignored := map[string]struct{}{}
-	for _, uri := range cfg.IgnoredURIs {
-		ignored[uri] = struct{}{}
-	}
-
-	selected := ""
+	candidates := []string{}
 	for _, elem := range elements {
 		fields, ok := splitXFCC(elem, ';')
 		if !ok {
@@ -102,15 +134,26 @@ func extractCallerIdentity(raw string, cfg *inParams) (string, bool) {
 		if elementURI == "" {
 			continue
 		}
-		if _, isIgnored := ignored[elementURI]; isIgnored {
+		candidates = append(candidates, elementURI)
+	}
+	return selectIdentity(candidates, cfg)
+}
+
+func selectIdentity(candidates []string, cfg *inParams) (string, bool) {
+	ignored := map[string]struct{}{}
+	for _, uri := range cfg.IgnoredURIs {
+		ignored[uri] = struct{}{}
+	}
+	selected := ""
+	for _, candidate := range candidates {
+		if _, isIgnored := ignored[candidate]; isIgnored {
 			continue
 		}
 		if selected != "" {
 			return "", false
 		}
-		selected = elementURI
+		selected = candidate
 	}
-
 	if selected == "" {
 		return "", false
 	}
@@ -120,12 +163,94 @@ func extractCallerIdentity(raw string, cfg *inParams) (string, bool) {
 	return selected, true
 }
 
-func joinHeaderValues(h http.Header, header string) string {
-	values := h.Values(header)
+func joinHeaderValues(values []string) string {
 	if len(values) == 0 {
 		return ""
 	}
 	return strings.Join(values, ",")
+}
+
+type xfccHeaderFormat int
+
+const (
+	headerFormatUnknown xfccHeaderFormat = iota
+	headerFormatText
+	headerFormatJSON
+)
+
+func detectHeaderFormat(raw string) xfccHeaderFormat {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return headerFormatUnknown
+	}
+	if strings.HasPrefix(trimmed, "{") || strings.HasPrefix(trimmed, "[") {
+		return headerFormatJSON
+	}
+	return headerFormatText
+}
+
+func extractJSONURIs(raw string) ([]string, bool) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return nil, false
+	}
+	if strings.HasPrefix(trimmed, "[") {
+		var arr []map[string]interface{}
+		if err := json.Unmarshal([]byte(trimmed), &arr); err != nil {
+			return nil, false
+		}
+		uris := []string{}
+		for _, element := range arr {
+			uri, ok := extractURIFromJSONObject(element)
+			if !ok {
+				return nil, false
+			}
+			if uri != "" {
+				uris = append(uris, uri)
+			}
+		}
+		return uris, true
+	}
+
+	var obj map[string]interface{}
+	if err := json.Unmarshal([]byte(trimmed), &obj); err != nil {
+		return nil, false
+	}
+	uri, ok := extractURIFromJSONObject(obj)
+	if !ok {
+		return nil, false
+	}
+	if uri == "" {
+		return []string{}, true
+	}
+	return []string{uri}, true
+}
+
+func extractURIFromJSONObject(obj map[string]interface{}) (string, bool) {
+	for key, value := range obj {
+		if !strings.EqualFold(key, "URI") {
+			continue
+		}
+		switch v := value.(type) {
+		case string:
+			if strings.TrimSpace(v) == "" {
+				return "", false
+			}
+			return v, true
+		case []interface{}:
+			if len(v) != 1 {
+				return "", false
+			}
+			uri, ok := v[0].(string)
+			if !ok || strings.TrimSpace(uri) == "" {
+				return "", false
+			}
+			return uri, true
+		default:
+			return "", false
+		}
+	}
+	return "", true
 }
 
 func splitXFCC(raw string, sep rune) ([]string, bool) {

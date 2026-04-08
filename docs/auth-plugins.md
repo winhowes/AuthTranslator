@@ -90,6 +90,7 @@ incoming_auth:
 Reads Envoy's XFCC header and extracts a single caller `URI=` identity (SPIFFE).
 It fails closed when the header is missing, malformed, ambiguous, or not
 allowed by either `allowed_uris` or `allowed_uri_prefixes`.
+Supports both Envoy's legacy text XFCC and JSON XFCC header formats.
 
 Use this only when your edge Envoy/Gateway is trusted to sanitize and set the
 XFCC header.
