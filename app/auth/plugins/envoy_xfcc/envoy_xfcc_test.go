@@ -176,6 +176,11 @@ func TestEnvoyXFCCJSONMalformedOrMixedFails(t *testing.T) {
 	if p.Authenticate(context.Background(), malformed, cfg) {
 		t.Fatal("expected malformed JSON header to fail")
 	}
+	duplicateURIKeys := &http.Request{Header: http.Header{}}
+	duplicateURIKeys.Header.Set("X-Forwarded-Client-Cert", `{"URI":"spiffe://cluster.local/ns/team/sa/caller","uri":"spiffe://cluster.local/ns/other/sa/caller"}`)
+	if p.Authenticate(context.Background(), duplicateURIKeys, cfg) {
+		t.Fatal("expected duplicate case-insensitive URI keys to fail")
+	}
 
 	mixed := &http.Request{Header: http.Header{}}
 	mixed.Header.Add("X-Forwarded-Client-Cert", `{"URI":"spiffe://cluster.local/ns/team/sa/caller"}`)

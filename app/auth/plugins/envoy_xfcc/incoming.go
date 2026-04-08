@@ -227,30 +227,39 @@ func extractJSONURIs(raw string) ([]string, bool) {
 }
 
 func extractURIFromJSONObject(obj map[string]interface{}) (string, bool) {
+	var uriValue interface{}
+	seenURIKey := false
 	for key, value := range obj {
 		if !strings.EqualFold(key, "URI") {
 			continue
 		}
-		switch v := value.(type) {
-		case string:
-			if strings.TrimSpace(v) == "" {
-				return "", false
-			}
-			return v, true
-		case []interface{}:
-			if len(v) != 1 {
-				return "", false
-			}
-			uri, ok := v[0].(string)
-			if !ok || strings.TrimSpace(uri) == "" {
-				return "", false
-			}
-			return uri, true
-		default:
+		if seenURIKey {
 			return "", false
 		}
+		seenURIKey = true
+		uriValue = value
 	}
-	return "", true
+	if !seenURIKey {
+		return "", true
+	}
+	switch v := uriValue.(type) {
+	case string:
+		if strings.TrimSpace(v) == "" {
+			return "", false
+		}
+		return v, true
+	case []interface{}:
+		if len(v) != 1 {
+			return "", false
+		}
+		uri, ok := v[0].(string)
+		if !ok || strings.TrimSpace(uri) == "" {
+			return "", false
+		}
+		return uri, true
+	default:
+		return "", false
+	}
 }
 
 func splitXFCC(raw string, sep rune) ([]string, bool) {
