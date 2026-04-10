@@ -117,6 +117,28 @@ func verifyRS256(parts []string, pemData []byte) bool {
 	return rsa.VerifyPKCS1v15(rsaPub, crypto.SHA256, hash[:], sig) == nil
 }
 
+func isRSAPublicPEM(data []byte) bool {
+	block, _ := pem.Decode(data)
+	if block == nil {
+		return false
+	}
+
+	switch block.Type {
+	case "PUBLIC KEY":
+		pub, err := x509.ParsePKIXPublicKey(block.Bytes)
+		if err != nil {
+			return false
+		}
+		_, ok := pub.(*rsa.PublicKey)
+		return ok
+	case "RSA PUBLIC KEY":
+		_, err := x509.ParsePKCS1PublicKey(block.Bytes)
+		return err == nil
+	default:
+		return false
+	}
+}
+
 func matchAudience(claim interface{}, want string) bool {
 	switch v := claim.(type) {
 	case string:
@@ -154,6 +176,9 @@ func (j *JWTAuth) Authenticate(ctx context.Context, r *http.Request, p interface
 		}
 		switch alg {
 		case "HS256":
+			if isRSAPublicPEM([]byte(key)) {
+				continue
+			}
 			if verifyHS256(parts, []byte(key)) {
 				verified = true
 			}
