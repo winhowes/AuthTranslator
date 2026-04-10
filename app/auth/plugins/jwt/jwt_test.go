@@ -208,6 +208,31 @@ func TestJWTAuthRS256PKCS1PublicKey(t *testing.T) {
 	}
 }
 
+func TestJWTAuthRejectsHS256WithRSAPublicKeySecret(t *testing.T) {
+	secrets.ClearCache()
+	key, err := rsa.GenerateKey(rand.Reader, 1024)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pubBytes, err := x509.MarshalPKIXPublicKey(&key.PublicKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pemBytes := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: pubBytes})
+	publicKey := string(pemBytes)
+	tok := makeHS256Token("aud", "user", publicKey, time.Now().Add(time.Hour).Unix())
+	r := &http.Request{Header: http.Header{"Authorization": []string{"Bearer " + tok}}}
+	p := JWTAuth{}
+	t.Setenv("PUB", publicKey)
+	cfg, err := p.ParseParams(map[string]interface{}{"secrets": []string{"env:PUB"}, "audience": "aud"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Authenticate(context.Background(), r, cfg) {
+		t.Fatal("expected authentication to fail for HS256 token signed with RSA public key")
+	}
+}
+
 func TestJWTAuthUnsupportedAlgo(t *testing.T) {
 	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"none"}`))
 	payload := base64.RawURLEncoding.EncodeToString([]byte(`{}`))
@@ -540,5 +565,39 @@ func TestVerifyRS256FailurePaths(t *testing.T) {
 	badParts := []string{parts[0], parts[1], "!!"}
 	if verifyRS256(badParts, pemData) {
 		t.Fatal("expected false for bad signature")
+	}
+}
+
+func TestIsRSAPublicPEM(t *testing.T) {
+	rsaKey, err := rsa.GenerateKey(rand.Reader, 1024)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pubBytes, err := x509.MarshalPKIXPublicKey(&rsaKey.PublicKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !isRSAPublicPEM(pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: pubBytes})) {
+		t.Fatal("expected PUBLIC KEY rsa pem to be detected")
+	}
+	if !isRSAPublicPEM(pem.EncodeToMemory(&pem.Block{Type: "RSA PUBLIC KEY", Bytes: x509.MarshalPKCS1PublicKey(&rsaKey.PublicKey)})) {
+		t.Fatal("expected RSA PUBLIC KEY pem to be detected")
+	}
+	if isRSAPublicPEM([]byte("not pem")) {
+		t.Fatal("expected non-pem data to return false")
+	}
+	if isRSAPublicPEM(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: []byte("x")})) {
+		t.Fatal("expected non-key pem block to return false")
+	}
+	ecKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ecPubBytes, err := x509.MarshalPKIXPublicKey(&ecKey.PublicKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if isRSAPublicPEM(pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: ecPubBytes})) {
+		t.Fatal("expected non-rsa public key to return false")
 	}
 }
