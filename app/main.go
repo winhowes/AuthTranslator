@@ -248,8 +248,8 @@ func reload() error {
 
 	newMap := make(map[string]*Integration)
 	for i := range cfg.Integrations {
-		integ := cfg.Integrations[i]
-		if err := prepareIntegration(&integ); err != nil {
+		integ := &cfg.Integrations[i]
+		if err := prepareIntegration(integ); err != nil {
 			// cleanup any created limiters
 			for _, ni := range newMap {
 				ni.inLimiter.Stop()
@@ -270,7 +270,7 @@ func reload() error {
 		}
 		integ.inLimiter = NewRateLimiter(integ.InRateLimit, window, integ.RateLimitStrategy)
 		integ.outLimiter = NewRateLimiter(integ.OutRateLimit, window, integ.RateLimitStrategy)
-		newMap[integ.Name] = &integ
+		newMap[integ.Name] = integ
 	}
 
 	// Replace integrations and stop the old ones after success.

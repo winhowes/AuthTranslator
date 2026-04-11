@@ -183,6 +183,65 @@ func TestReloadMissingConfig(t *testing.T) {
 	}
 }
 
+func TestReloadMultipleIntegrationsRemainDistinct(t *testing.T) {
+	integrations.Lock()
+	integrations.m = make(map[string]*Integration)
+	integrations.Unlock()
+	allowlists.Lock()
+	allowlists.m = make(map[string]map[string]CallerConfig)
+	allowlists.Unlock()
+	resetDenylistState()
+
+	cfgFile, err := os.CreateTemp("", "cfg*.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(cfgFile.Name())
+	cfg := `{"integrations":[{"name":"one","destination":"http://one.example.com"},{"name":"two","destination":"http://two.example.com"}]}`
+	if _, err := cfgFile.WriteString(cfg); err != nil {
+		t.Fatal(err)
+	}
+	cfgFile.Close()
+
+	alFile, err := os.CreateTemp("", "al*.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(alFile.Name())
+	if err := os.WriteFile(alFile.Name(), []byte("[]"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := flag.Set("config", cfgFile.Name()); err != nil {
+		t.Fatal(err)
+	}
+	if err := flag.Set("allowlist", alFile.Name()); err != nil {
+		t.Fatal(err)
+	}
+	if err := flag.Set("denylist", writeEmptyDenylist(t)); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := reload(); err != nil {
+		t.Fatalf("reload failed: %v", err)
+	}
+
+	one, ok := GetIntegration("one")
+	if !ok {
+		t.Fatal("integration one not loaded")
+	}
+	two, ok := GetIntegration("two")
+	if !ok {
+		t.Fatal("integration two not loaded")
+	}
+	if one == two {
+		t.Fatal("integrations alias the same pointer")
+	}
+	if one.Destination == two.Destination {
+		t.Fatalf("expected distinct destinations, got one=%q two=%q", one.Destination, two.Destination)
+	}
+}
+
 func TestReloadIntegrationError(t *testing.T) {
 	// reset global state
 	integrations.Lock()
