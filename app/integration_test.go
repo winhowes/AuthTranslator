@@ -822,6 +822,7 @@ func TestIntegrationPluginTransport(t *testing.T) {
 	if baseTr == nil {
 		t.Fatal("missing base transport")
 	}
+	baseIdleConnTimeout := baseTr.IdleConnTimeout
 
 	i := &Integration{
 		Name:              "plug",
@@ -853,7 +854,7 @@ func TestIntegrationPluginTransport(t *testing.T) {
 	if tr.IdleConnTimeout != time.Second || !tr.DisableKeepAlives {
 		t.Fatalf("integration settings not applied")
 	}
-	if baseTr.IdleConnTimeout != 0 {
+	if baseTr.IdleConnTimeout != baseIdleConnTimeout {
 		t.Fatalf("base transport mutated")
 	}
 	if tr.TLSClientConfig == nil || len(tr.TLSClientConfig.Certificates) == 0 {

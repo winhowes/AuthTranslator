@@ -229,6 +229,24 @@ func TestTokenBucketMaxTokens(t *testing.T) {
 	}
 }
 
+func TestTokenBucketEvictsIdleBuckets(t *testing.T) {
+	rl := NewRateLimiter(1, 30*time.Millisecond, "token_bucket")
+	t.Cleanup(rl.Stop)
+
+	if !rl.Allow("idle-caller") {
+		t.Fatal("initial call should be allowed")
+	}
+
+	time.Sleep(80 * time.Millisecond)
+
+	rl.mu.Lock()
+	_, ok := rl.buckets["idle-caller"]
+	rl.mu.Unlock()
+	if ok {
+		t.Fatal("idle token bucket entry should be evicted")
+	}
+}
+
 func TestLeakyBucketPartialLeak(t *testing.T) {
 	rl := NewRateLimiter(2, 100*time.Millisecond, "leaky_bucket")
 	t.Cleanup(rl.Stop)

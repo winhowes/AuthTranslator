@@ -698,7 +698,7 @@ func TestProxyHandlerIdentifierSetsCallerID(t *testing.T) {
 		t.Fatalf("expected 200, got %d", rr.Code)
 	}
 	integ.inLimiter.mu.Lock()
-	count := integ.inLimiter.requests["known-caller"]
+	count := integ.inLimiter.requests[integrationRateLimitKey(integ.Name, "known-caller")]
 	integ.inLimiter.mu.Unlock()
 	if count != 1 {
 		t.Fatalf("expected rate limit key for caller, got %d", count)

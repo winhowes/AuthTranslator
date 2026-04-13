@@ -8,6 +8,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"errors"
 	"math/big"
 	"net"
 	"os"
@@ -145,7 +146,7 @@ func TestRateLimiterRedisAuthUsername(t *testing.T) {
 	<-done
 }
 
-func TestRateLimiterRedisTLSAuth(t *testing.T) {
+func TestRateLimiterRedisTLSAuthRequiresVerification(t *testing.T) {
 	key, _ := rsa.GenerateKey(rand.Reader, 1024)
 	tmpl := &x509.Certificate{
 		SerialNumber: big.NewInt(1),
@@ -166,28 +167,15 @@ func TestRateLimiterRedisTLSAuth(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer ln.Close()
-	done := make(chan struct{})
+	hsErr := make(chan error, 1)
 	go func() {
-		defer close(done)
 		c, err := ln.Accept()
 		if err != nil {
+			hsErr <- err
 			return
 		}
 		defer c.Close()
-		br := bufio.NewReader(c)
-		if cmd, _ := readCommand(t, br); cmd != "AUTH" {
-			t.Errorf("cmd %s, want AUTH", cmd)
-			return
-		}
-		c.Write([]byte("+OK\r\n"))
-		if cmd, _ := readCommand(t, br); cmd != "INCR" {
-			t.Errorf("cmd %s, want INCR", cmd)
-		}
-		c.Write([]byte(":1\r\n"))
-		if cmd, _ := readCommand(t, br); cmd != "EXPIRE" {
-			t.Errorf("cmd %s, want EXPIRE", cmd)
-		}
-		c.Write([]byte(":1\r\n"))
+		hsErr <- c.(*tls.Conn).Handshake()
 	}()
 	oldAddr := *redisAddr
 	oldTimeout := *redisTimeout
@@ -199,10 +187,17 @@ func TestRateLimiterRedisTLSAuth(t *testing.T) {
 		*redisAddr = oldAddr
 		*redisTimeout = oldTimeout
 	}()
-	if !rl.Allow("k") {
-		t.Fatal("allow failed")
+	if _, err := rl.allowRedis("k"); err == nil {
+		t.Fatal("expected TLS verification error")
+	} else {
+		var unknownAuthorityErr x509.UnknownAuthorityError
+		if !errors.As(err, &unknownAuthorityErr) {
+			t.Fatalf("expected x509.UnknownAuthorityError, got %v", err)
+		}
 	}
-	<-done
+	if err := <-hsErr; err == nil {
+		t.Fatal("expected server handshake error")
+	}
 }
 
 func TestRateLimiterRedisTLSWithCA(t *testing.T) {
