@@ -30,6 +30,19 @@ func splitPath(p string) []string {
 	return strings.Split(clean, "/")
 }
 
+func normalizeRule(r *CallRule) {
+	r.Segments = splitPath(r.Path)
+	methods := make(map[string]RequestConstraint, len(r.Methods))
+	for mth, cons := range r.Methods {
+		method := strings.TrimSpace(mth)
+		if method == "" {
+			continue
+		}
+		methods[strings.ToUpper(method)] = cons
+	}
+	r.Methods = methods
+}
+
 // validateAllowlist ensures callers and rules are unique after capability
 // expansion. The ID "" is treated as "*".
 func validateAllowlist(name string, callers []CallerConfig) error {
@@ -73,17 +86,7 @@ func SetAllowlist(name string, callers []CallerConfig) error {
 	m := make(map[string]CallerConfig, len(callers))
 	for _, c := range callers {
 		for ri := range c.Rules {
-			r := &c.Rules[ri]
-			r.Segments = splitPath(r.Path)
-			methods := make(map[string]RequestConstraint, len(r.Methods))
-			for mth, cons := range r.Methods {
-				method := strings.TrimSpace(mth)
-				if method == "" {
-					continue
-				}
-				methods[strings.ToUpper(method)] = cons
-			}
-			r.Methods = methods
+			normalizeRule(&c.Rules[ri])
 		}
 		id := c.ID
 		if id == "" {
@@ -487,6 +490,9 @@ func findConstraint(i *Integration, callerID, pth, method string) (RequestConstr
 	if ok {
 		if len(c.Capabilities) > 0 {
 			c = integrationplugins.ExpandCapabilities(i.Name, []CallerConfig{c})[0]
+			for ri := range c.Rules {
+				normalizeRule(&c.Rules[ri])
+			}
 		}
 		for _, r := range c.Rules {
 			if matchSegments(r.Segments, segments) {
@@ -499,6 +505,9 @@ func findConstraint(i *Integration, callerID, pth, method string) (RequestConstr
 	if hasWildcard {
 		if len(wildcard.Capabilities) > 0 {
 			wildcard = integrationplugins.ExpandCapabilities(i.Name, []CallerConfig{wildcard})[0]
+			for ri := range wildcard.Rules {
+				normalizeRule(&wildcard.Rules[ri])
+			}
 		}
 		for _, r := range wildcard.Rules {
 			if matchSegments(r.Segments, segments) {

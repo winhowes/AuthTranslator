@@ -146,9 +146,8 @@ func TestFindConstraintExpandsCapabilitiesOnLookup(t *testing.T) {
 	integrationplugins.RegisterCapability("lookup", "cap", integrationplugins.CapabilitySpec{
 		Generate: func(map[string]interface{}) ([]integrationplugins.CallRule, error) {
 			return []integrationplugins.CallRule{{
-				Path:     "/capability",
-				Methods:  map[string]integrationplugins.RequestConstraint{http.MethodGet: {}},
-				Segments: splitPath("/capability"),
+				Path:    "/capability",
+				Methods: map[string]integrationplugins.RequestConstraint{" get ": {}},
 			}}, nil
 		},
 	})
