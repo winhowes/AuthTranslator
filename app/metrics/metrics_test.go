@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"strings"
 	"testing"
 	"time"
@@ -15,6 +16,25 @@ type promPlugin struct{}
 func (*promPlugin) OnRequest(string, *http.Request)                          {}
 func (*promPlugin) OnResponse(string, string, *http.Request, *http.Response) {}
 func (*promPlugin) WriteProm(w http.ResponseWriter)                          { fmt.Fprintln(w, "custom_metric 1") }
+
+type blockingResponseWriter struct {
+	header  http.Header
+	blockCh <-chan struct{}
+	started chan<- struct{}
+	once    sync.Once
+}
+
+func (w *blockingResponseWriter) Header() http.Header { return w.header }
+
+func (w *blockingResponseWriter) Write(b []byte) (int, error) {
+	w.once.Do(func() {
+		close(w.started)
+	})
+	<-w.blockCh
+	return len(b), nil
+}
+
+func (w *blockingResponseWriter) WriteHeader(_ int) {}
 
 func TestMetricsHandlerEmpty(t *testing.T) {
 	Reset()
@@ -197,5 +217,49 @@ func TestWritePromSkipsMalformedUpstreamKeys(t *testing.T) {
 	}
 	if !strings.Contains(body, `authtranslator_upstream_responses_total{integration="foo",code="200"} 1`) {
 		t.Fatalf("missing valid upstream status metric: %s", body)
+	}
+}
+
+func TestWritePromDoesNotBlockRecordDurationForOtherIntegrations(t *testing.T) {
+	Reset()
+	RecordDuration("one", 100*time.Millisecond)
+
+	blockCh := make(chan struct{})
+	started := make(chan struct{})
+	bw := &blockingResponseWriter{
+		header:  make(http.Header),
+		blockCh: blockCh,
+		started: started,
+	}
+
+	done := make(chan struct{})
+	go func() {
+		WriteProm(bw)
+		close(done)
+	}()
+
+	select {
+	case <-started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("WriteProm did not start writing")
+	}
+
+	recordDone := make(chan struct{})
+	go func() {
+		RecordDuration("two", 50*time.Millisecond)
+		close(recordDone)
+	}()
+
+	select {
+	case <-recordDone:
+	case <-time.After(300 * time.Millisecond):
+		t.Fatal("RecordDuration blocked while metrics response writer was blocked")
+	}
+
+	close(blockCh)
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("WriteProm did not finish after unblocking writer")
 	}
 }
