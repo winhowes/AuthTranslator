@@ -741,98 +741,126 @@ func (rl *RateLimiter) allowRedis(key string) (bool, error) {
 }
 
 func (rl *RateLimiter) allowRedisTokenBucket(conn net.Conn, key string) (bool, error) {
-	now := time.Now()
-	val, err := redisCmdString(conn, "GET", key)
+	ttlMS := rl.window.Milliseconds()
+	if rl.window <= 0 {
+		ttlMS = 0
+	} else if ttlMS == 0 {
+		ttlMS = 1
+	}
+	const script = `local key = KEYS[1]
+local limit = tonumber(ARGV[1])
+local windowSeconds = tonumber(ARGV[2])
+local now = tonumber(ARGV[3])
+local ttl = tonumber(ARGV[4])
+local val = redis.call("GET", key)
+local tokens = limit
+local last = now
+local updatedLast = now
+if val then
+  local currentTokens, currentLast = string.match(val, "([^ ]+) ([^ ]+)")
+  if currentTokens and currentLast then
+    tokens = tonumber(currentTokens) or limit
+    last = tonumber(currentLast) or now
+    updatedLast = last
+  end
+end
+if windowSeconds > 0 then
+  local refill = ((now - last) / 1000000000.0) * limit / windowSeconds
+  if refill > 0 then
+    tokens = tokens + refill
+    if tokens > limit then
+      tokens = limit
+    end
+    last = now
+    updatedLast = now
+  end
+end
+local allowed = 0
+if tokens >= 1 then
+  tokens = tokens - 1
+  allowed = 1
+  updatedLast = now
+end
+redis.call("SET", key, tostring(tokens) .. " " .. tostring(updatedLast))
+if ttl <= 0 then
+  redis.call("EXPIRE", key, 0)
+else
+  redis.call("PEXPIRE", key, ttl)
+end
+return allowed`
+	n, err := redisCmdInt(
+		conn,
+		"EVAL",
+		script,
+		"1",
+		key,
+		strconv.Itoa(rl.limit),
+		strconv.FormatFloat(rl.window.Seconds(), 'f', -1, 64),
+		strconv.FormatInt(time.Now().UnixNano(), 10),
+		strconv.FormatInt(ttlMS, 10),
+	)
 	if err != nil {
 		return false, err
 	}
-	var tokens float64
-	var last int64
-	if val != "" {
-		parts := strings.Fields(val)
-		if len(parts) == 2 {
-			tokens, _ = strconv.ParseFloat(parts[0], 64)
-			last, _ = strconv.ParseInt(parts[1], 10, 64)
-		}
-	} else {
-		tokens = float64(rl.limit)
-		last = now.UnixNano()
-	}
-	lastTime := time.Unix(0, last)
-	refill := now.Sub(lastTime).Seconds() * float64(rl.limit) / rl.window.Seconds()
-	if refill > 0 {
-		tokens += refill
-		if tokens > float64(rl.limit) {
-			tokens = float64(rl.limit)
-		}
-		lastTime = now
-	}
-	if tokens < 1 {
-		val = fmt.Sprintf("%f %d", tokens, lastTime.UnixNano())
-		if err := redisCmd(conn, "SET", key, val); err != nil {
-			return false, err
-		}
-		cmd, ttl := redisTTLArgs(rl.window)
-		_, err := redisCmdInt(conn, cmd, key, ttl)
-		return false, err
-	}
-	tokens--
-	val = fmt.Sprintf("%f %d", tokens, now.UnixNano())
-	if err := redisCmd(conn, "SET", key, val); err != nil {
-		return false, err
-	}
-	cmd, ttl := redisTTLArgs(rl.window)
-	_, err = redisCmdInt(conn, cmd, key, ttl)
-	if err != nil {
-		return false, err
-	}
-	return true, nil
+	return n == 1, nil
 }
 
 func (rl *RateLimiter) allowRedisLeakyBucket(conn net.Conn, key string) (bool, error) {
-	now := time.Now()
-	val, err := redisCmdString(conn, "GET", key)
+	ttlMS := rl.window.Milliseconds()
+	if rl.window <= 0 {
+		ttlMS = 0
+	} else if ttlMS == 0 {
+		ttlMS = 1
+	}
+	const script = `local key = KEYS[1]
+local limit = tonumber(ARGV[1])
+local windowSeconds = tonumber(ARGV[2])
+local now = tonumber(ARGV[3])
+local ttl = tonumber(ARGV[4])
+local val = redis.call("GET", key)
+local level = 0
+local last = now
+if val then
+  local currentLevel, currentLast = string.match(val, "([^ ]+) ([^ ]+)")
+  if currentLevel and currentLast then
+    level = tonumber(currentLevel) or 0
+    last = tonumber(currentLast) or now
+  end
+end
+if windowSeconds > 0 then
+  local leaked = ((now - last) / 1000000000.0) * limit / windowSeconds
+  level = level - leaked
+  if level < 0 then
+    level = 0
+  end
+end
+local allowed = 0
+if level + 1 <= limit then
+  level = level + 1
+  allowed = 1
+end
+redis.call("SET", key, tostring(level) .. " " .. tostring(now))
+if ttl <= 0 then
+  redis.call("EXPIRE", key, 0)
+else
+  redis.call("PEXPIRE", key, ttl)
+end
+return allowed`
+	n, err := redisCmdInt(
+		conn,
+		"EVAL",
+		script,
+		"1",
+		key,
+		strconv.Itoa(rl.limit),
+		strconv.FormatFloat(rl.window.Seconds(), 'f', -1, 64),
+		strconv.FormatInt(time.Now().UnixNano(), 10),
+		strconv.FormatInt(ttlMS, 10),
+	)
 	if err != nil {
 		return false, err
 	}
-	var level float64
-	var last int64
-	if val != "" {
-		parts := strings.Fields(val)
-		if len(parts) == 2 {
-			level, _ = strconv.ParseFloat(parts[0], 64)
-			last, _ = strconv.ParseInt(parts[1], 10, 64)
-		}
-	} else {
-		level = 0
-		last = now.UnixNano()
-	}
-	lastTime := time.Unix(0, last)
-	leaked := now.Sub(lastTime).Seconds() * float64(rl.limit) / rl.window.Seconds()
-	level -= leaked
-	if level < 0 {
-		level = 0
-	}
-	if level+1 > float64(rl.limit) {
-		val = fmt.Sprintf("%f %d", level, now.UnixNano())
-		if err := redisCmd(conn, "SET", key, val); err != nil {
-			return false, err
-		}
-		cmd, ttl := redisTTLArgs(rl.window)
-		_, err := redisCmdInt(conn, cmd, key, ttl)
-		return false, err
-	}
-	level++
-	val = fmt.Sprintf("%f %d", level, now.UnixNano())
-	if err := redisCmd(conn, "SET", key, val); err != nil {
-		return false, err
-	}
-	cmd, ttl := redisTTLArgs(rl.window)
-	_, err = redisCmdInt(conn, cmd, key, ttl)
-	if err != nil {
-		return false, err
-	}
-	return true, nil
+	return n == 1, nil
 }
 
 func (rl *RateLimiter) retryAfterRedis(key string) (time.Duration, error) {

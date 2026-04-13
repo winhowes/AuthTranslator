@@ -420,8 +420,20 @@ func readRedisRequest(br *bufio.Reader) error {
 	if err != nil {
 		return err
 	}
-	for i := 0; i < n*2; i++ {
-		if _, err := br.ReadString('\n'); err != nil {
+	for i := 0; i < n; i++ {
+		bulkLenLine, err := br.ReadString('\n')
+		if err != nil {
+			return err
+		}
+		if len(bulkLenLine) == 0 || bulkLenLine[0] != '$' {
+			return fmt.Errorf("bad bulk prefix %q", bulkLenLine)
+		}
+		sz, err := strconv.Atoi(strings.TrimSpace(bulkLenLine[1:]))
+		if err != nil {
+			return err
+		}
+		buf := make([]byte, sz+2)
+		if _, err := io.ReadFull(br, buf); err != nil {
 			return err
 		}
 	}
@@ -445,14 +457,22 @@ func parseRedisCommand(t *testing.T, br *bufio.Reader) (string, []string) {
 	}
 	args := make([]string, 0, count)
 	for i := 0; i < count; i++ {
-		if _, err := br.ReadString('\n'); err != nil {
-			t.Fatal(err)
-		}
-		line, err := br.ReadString('\n')
+		lenLine, err := br.ReadString('\n')
 		if err != nil {
 			t.Fatal(err)
 		}
-		args = append(args, strings.TrimSpace(line))
+		if len(lenLine) == 0 || lenLine[0] != '$' {
+			t.Fatalf("bad bulk prefix %q", lenLine)
+		}
+		sz, err := strconv.Atoi(strings.TrimSpace(lenLine[1:]))
+		if err != nil {
+			t.Fatal(err)
+		}
+		buf := make([]byte, sz+2)
+		if _, err := io.ReadFull(br, buf); err != nil {
+			t.Fatal(err)
+		}
+		args = append(args, string(buf[:sz]))
 	}
 	if len(args) == 0 {
 		t.Fatal("no command received")
@@ -618,18 +638,8 @@ func TestAllowRedisTokenBucket(t *testing.T) {
 	go func() {
 		defer func() { srv.Close(); close(done) }()
 		br := bufio.NewReader(srv)
-		if cmd, args := parseRedisCommand(t, br); cmd != "GET" || args[0] != "k" {
+		if cmd, args := parseRedisCommand(t, br); cmd != "EVAL" || args[1] != "1" || args[2] != "k" {
 			t.Errorf("unexpected command %s %v", cmd, args)
-			return
-		}
-		srv.Write([]byte("$-1\r\n"))
-		if cmd, args := parseRedisCommand(t, br); cmd != "SET" || args[0] != "k" {
-			t.Errorf("unexpected command %s %v", cmd, args)
-			return
-		}
-		srv.Write([]byte("+OK\r\n"))
-		if cmd, _ := parseRedisCommand(t, br); cmd != "EXPIRE" && cmd != "PEXPIRE" {
-			t.Errorf("unexpected command %s", cmd)
 			return
 		}
 		srv.Write([]byte(":1\r\n"))
@@ -652,19 +662,8 @@ func TestAllowRedisTokenBucketRefillClamp(t *testing.T) {
 	go func() {
 		defer func() { srv.Close(); close(done) }()
 		br := bufio.NewReader(srv)
-		if cmd, args := parseRedisCommand(t, br); cmd != "GET" || args[0] != "k" {
+		if cmd, args := parseRedisCommand(t, br); cmd != "EVAL" || args[1] != "1" || args[2] != "k" {
 			t.Errorf("unexpected command %s %v", cmd, args)
-			return
-		}
-		val := fmt.Sprintf("%f %d", float64(rl.limit)+5, time.Now().Add(-time.Minute).UnixNano())
-		fmt.Fprintf(srv, "$%d\r\n%s\r\n", len(val), val)
-		if cmd, args := parseRedisCommand(t, br); cmd != "SET" || args[0] != "k" {
-			t.Errorf("unexpected command %s %v", cmd, args)
-			return
-		}
-		srv.Write([]byte("+OK\r\n"))
-		if cmd, _ := parseRedisCommand(t, br); cmd != "EXPIRE" && cmd != "PEXPIRE" {
-			t.Errorf("unexpected command %s", cmd)
 			return
 		}
 		srv.Write([]byte(":1\r\n"))
@@ -689,22 +688,12 @@ func TestAllowRedisTokenBucketReject(t *testing.T) {
 	go func() {
 		defer func() { srv.Close(); close(done) }()
 		br := bufio.NewReader(srv)
-		if cmd, args := parseRedisCommand(t, br); cmd != "GET" || args[0] != "k" {
+		if cmd, args := parseRedisCommand(t, br); cmd != "EVAL" || args[1] != "1" || args[2] != "k" {
 			t.Errorf("unexpected command %s %v", cmd, args)
 			return
 		}
-		val := fmt.Sprintf("0 %d", ts)
-		srv.Write([]byte(fmt.Sprintf("$%d\r\n%s\r\n", len(val), val)))
-		if cmd, args := parseRedisCommand(t, br); cmd != "SET" || args[0] != "k" {
-			t.Errorf("unexpected command %s %v", cmd, args)
-			return
-		}
-		srv.Write([]byte("+OK\r\n"))
-		if cmd, _ := parseRedisCommand(t, br); cmd != "EXPIRE" && cmd != "PEXPIRE" {
-			t.Errorf("unexpected command %s", cmd)
-			return
-		}
-		srv.Write([]byte(":1\r\n"))
+		_ = ts
+		srv.Write([]byte(":0\r\n"))
 	}()
 	ok, err := rl.allowRedisTokenBucket(cli, "k")
 	if err != nil {
@@ -730,10 +719,12 @@ func TestAllowRedisLeakyBucketPoolFullClosesConnection(t *testing.T) {
 	rc := &recordingConn{Conn: cli}
 	rl.conns <- rc
 	phReady := make(chan struct{})
+	phInserted := make(chan struct{})
 	phSrv, phCli := net.Pipe()
 	go func() {
 		<-phReady
 		rl.conns <- phCli
+		close(phInserted)
 	}()
 	done := make(chan struct{})
 	go func() {
@@ -742,21 +733,12 @@ func TestAllowRedisLeakyBucketPoolFullClosesConnection(t *testing.T) {
 			close(done)
 		}()
 		br := bufio.NewReader(srv)
-		if cmd, args := parseRedisCommand(t, br); cmd != "GET" || args[0] != "k" {
+		if cmd, args := parseRedisCommand(t, br); cmd != "EVAL" || args[1] != "1" || args[2] != "k" {
 			t.Errorf("unexpected command %s %v", cmd, args)
 			return
 		}
 		phReady <- struct{}{}
-		srv.Write([]byte("$-1\r\n"))
-		if cmd, args := parseRedisCommand(t, br); cmd != "SET" || args[0] != "k" {
-			t.Errorf("unexpected command %s %v", cmd, args)
-			return
-		}
-		srv.Write([]byte("+OK\r\n"))
-		if cmd, _ := parseRedisCommand(t, br); cmd != "EXPIRE" && cmd != "PEXPIRE" {
-			t.Errorf("unexpected command %s", cmd)
-			return
-		}
+		<-phInserted
 		srv.Write([]byte(":1\r\n"))
 	}()
 
@@ -788,22 +770,12 @@ func TestAllowRedisLeakyBucketReject(t *testing.T) {
 	go func() {
 		defer func() { srv.Close(); close(done) }()
 		br := bufio.NewReader(srv)
-		if cmd, args := parseRedisCommand(t, br); cmd != "GET" || args[0] != "k" {
+		if cmd, args := parseRedisCommand(t, br); cmd != "EVAL" || args[1] != "1" || args[2] != "k" {
 			t.Errorf("unexpected command %s %v", cmd, args)
 			return
 		}
-		val := fmt.Sprintf("1 %d", ts)
-		srv.Write([]byte(fmt.Sprintf("$%d\r\n%s\r\n", len(val), val)))
-		if cmd, args := parseRedisCommand(t, br); cmd != "SET" || args[0] != "k" {
-			t.Errorf("unexpected command %s %v", cmd, args)
-			return
-		}
-		srv.Write([]byte("+OK\r\n"))
-		if cmd, _ := parseRedisCommand(t, br); cmd != "EXPIRE" && cmd != "PEXPIRE" {
-			t.Errorf("unexpected command %s", cmd)
-			return
-		}
-		srv.Write([]byte(":1\r\n"))
+		_ = ts
+		srv.Write([]byte(":0\r\n"))
 	}()
 	ok, err := rl.allowRedisLeakyBucket(cli, "k")
 	if err != nil {
@@ -823,18 +795,8 @@ func TestAllowRedisLeakyBucketAllow(t *testing.T) {
 	go func() {
 		defer func() { srv.Close(); close(done) }()
 		br := bufio.NewReader(srv)
-		if cmd, args := parseRedisCommand(t, br); cmd != "GET" || args[0] != "k" {
+		if cmd, args := parseRedisCommand(t, br); cmd != "EVAL" || args[1] != "1" || args[2] != "k" {
 			t.Errorf("unexpected command %s %v", cmd, args)
-			return
-		}
-		srv.Write([]byte("$-1\r\n"))
-		if cmd, args := parseRedisCommand(t, br); cmd != "SET" || args[0] != "k" {
-			t.Errorf("unexpected command %s %v", cmd, args)
-			return
-		}
-		srv.Write([]byte("+OK\r\n"))
-		if cmd, _ := parseRedisCommand(t, br); cmd != "EXPIRE" && cmd != "PEXPIRE" {
-			t.Errorf("unexpected command %s", cmd)
 			return
 		}
 		srv.Write([]byte(":1\r\n"))
