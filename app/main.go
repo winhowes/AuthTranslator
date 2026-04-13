@@ -1195,11 +1195,12 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 	logger.Info("incoming request", "method", r.Method, "integration", integ.Name, "path", r.URL.Path, "caller_id", callerID)
 
 	r = r.WithContext(metrics.WithCaller(r.Context(), callerID))
+	limiterKey := integrationRateLimitKey(integ.Name, rateKey)
 
-	if !integ.inLimiter.Allow(rateKey) {
+	if !integ.inLimiter.Allow(limiterKey) {
 		logger.Warn("caller exceeded rate limit", "caller", rateKey, "host", host)
 		metrics.IncRateLimit(integ.Name)
-		if d := integ.inLimiter.RetryAfter(rateKey); d > 0 {
+		if d := integ.inLimiter.RetryAfter(limiterKey); d > 0 {
 			secs := int(math.Ceil(d.Seconds()))
 			if secs < 1 {
 				secs = 1
@@ -1304,6 +1305,10 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 		rec.status = http.StatusOK
 	}
 	logger.Info("upstream response", "host", host, "status", rec.status)
+}
+
+func integrationRateLimitKey(integrationName, callerKey string) string {
+	return integrationName + ":" + callerKey
 }
 
 type server interface {
