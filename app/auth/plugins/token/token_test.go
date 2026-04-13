@@ -56,6 +56,19 @@ func TestTokenIncomingPrefix(t *testing.T) {
 	}
 }
 
+func TestTokenIncomingConfiguredPrefixMissingInHeader(t *testing.T) {
+	r := &http.Request{Header: http.Header{"Authorization": []string{"secret"}}}
+	p := TokenAuth{}
+	t.Setenv("TOK", "secret")
+	cfg, err := p.ParseParams(map[string]interface{}{"secrets": []string{"env:TOK"}, "header": "Authorization", "prefix": "Bearer "})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Authenticate(context.Background(), r, cfg) {
+		t.Fatal("expected authentication to fail when configured prefix is missing from header")
+	}
+}
+
 func TestTokenIncomingPrefixMismatch(t *testing.T) {
 	r := &http.Request{Header: http.Header{"Authorization": []string{"Bearer secret"}}}
 	p := TokenAuth{}
