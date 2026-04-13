@@ -5,7 +5,9 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"net"
 	"net/http"
+	"time"
 
 	"github.com/winhowes/AuthTranslator/app/auth"
 	"github.com/winhowes/AuthTranslator/app/secrets"
@@ -19,6 +21,25 @@ type outParams struct {
 }
 
 type MTLSAuthOut struct{}
+
+func defaultLikeTransport() *http.Transport {
+	if t, ok := http.DefaultTransport.(*http.Transport); ok {
+		return t.Clone()
+	}
+
+	return &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		ForceAttemptHTTP2:     true,
+		MaxIdleConns:          100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+	}
+}
 
 func (m *MTLSAuthOut) Name() string             { return "mtls" }
 func (m *MTLSAuthOut) RequiredParams() []string { return []string{"cert", "key"} }
@@ -44,11 +65,7 @@ func (m *MTLSAuthOut) ParseParams(mp map[string]interface{}) (interface{}, error
 	if err != nil {
 		return nil, fmt.Errorf("tls pair: %w", err)
 	}
-	t, ok := http.DefaultTransport.(*http.Transport)
-	if !ok {
-		return nil, fmt.Errorf("default transport type mismatch")
-	}
-	t = t.Clone()
+	t := defaultLikeTransport()
 	if t.TLSClientConfig == nil {
 		t.TLSClientConfig = &tls.Config{}
 	} else {
