@@ -299,6 +299,12 @@ func TestMTLSOutgoingTransportFallsBackWhenDefaultWrapped(t *testing.T) {
 	if tr.TLSHandshakeTimeout <= 0 {
 		t.Fatal("expected fallback TLS handshake timeout")
 	}
+	if tr.MaxIdleConns != 100 {
+		t.Fatalf("expected fallback MaxIdleConns=100, got %d", tr.MaxIdleConns)
+	}
+	if tr.MaxIdleConnsPerHost != http.DefaultMaxIdleConnsPerHost {
+		t.Fatalf("expected fallback MaxIdleConnsPerHost=%d, got %d", http.DefaultMaxIdleConnsPerHost, tr.MaxIdleConnsPerHost)
+	}
 }
 
 func TestMTLSAuthNoSubjects(t *testing.T) {
