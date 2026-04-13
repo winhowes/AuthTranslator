@@ -940,3 +940,38 @@ func TestReloadSetAllowlistError(t *testing.T) {
 		t.Cleanup(i.outLimiter.Stop)
 	}
 }
+
+func TestReloadRedactsConfigURLSecretsOnFailure(t *testing.T) {
+	oldCfgURL := *configURL
+	oldCfg := *configFile
+	t.Cleanup(func() {
+		flag.Set("config-url", oldCfgURL)
+		flag.Set("config", oldCfg)
+	})
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"integrations":[{"destination":"http://example.com"}]}`))
+	}))
+	defer srv.Close()
+
+	if err := flag.Set("config-url", srv.URL+"/cfg?token=signed"); err != nil {
+		t.Fatal(err)
+	}
+
+	err := reload()
+	if err == nil {
+		t.Fatal("expected reload to fail")
+	}
+
+	msg := err.Error()
+	if strings.Contains(msg, "token=signed") {
+		t.Fatalf("expected reload error to redact secrets, got %q", msg)
+	}
+	if !strings.Contains(msg, "/cfg?REDACTED") {
+		t.Fatalf("expected reload error to include redacted source context, got %q", msg)
+	}
+	if !strings.Contains(msg, "missing name") {
+		t.Fatalf("expected validation error details, got %q", msg)
+	}
+}
