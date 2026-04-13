@@ -478,7 +478,8 @@ func findConstraint(i *Integration, callerID, pth, method string) (RequestConstr
 
 	allowlists.RLock()
 	callers := allowlists.m[i.Name]
-	// NOTE: wildcard callers are only used for anonymous requests (callerID="*").
+	// NOTE: wildcard callers are used for anonymous requests and when callerID
+	// does not have an explicit allowlist entry.
 	wildcard, hasWildcard := callers["*"]
 	c, ok := callers[callerID]
 	allowlists.RUnlock()
@@ -494,8 +495,13 @@ func findConstraint(i *Integration, callerID, pth, method string) (RequestConstr
 				}
 			}
 		}
+		// Identified callers with explicit entries should not fall back to wildcard
+		// rules when their own rules do not match.
+		if callerID != "*" && callerID != "" {
+			return RequestConstraint{}, false
+		}
 	}
-	if hasWildcard && (callerID == "*" || callerID == "") {
+	if hasWildcard && (!ok || callerID == "*" || callerID == "") {
 		if len(wildcard.Capabilities) > 0 {
 			wildcard = integrationplugins.ExpandCapabilities(i.Name, []CallerConfig{wildcard})[0]
 		}

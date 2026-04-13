@@ -115,7 +115,7 @@ func TestFindConstraintExpandsCallerAndWildcardCapabilities(t *testing.T) {
 	if _, ok := findConstraint(integ, "direct", "/capability", http.MethodGet); !ok {
 		t.Fatal("expected capability expansion for specific caller")
 	}
-	if _, ok := findConstraint(integ, "*", "/capability", http.MethodGet); !ok {
+	if _, ok := findConstraint(integ, "other", "/capability", http.MethodGet); !ok {
 		t.Fatal("expected capability expansion for wildcard caller")
 	}
 }
@@ -169,7 +169,7 @@ func TestFindConstraintExpandsCapabilitiesOnLookup(t *testing.T) {
 	if _, ok := findConstraint(integ, "direct", "/capability", http.MethodGet); !ok {
 		t.Fatal("expected capability expansion for caller during lookup")
 	}
-	if _, ok := findConstraint(integ, "*", "/capability", http.MethodGet); !ok {
+	if _, ok := findConstraint(integ, "other", "/capability", http.MethodGet); !ok {
 		t.Fatal("expected capability expansion for wildcard during lookup")
 	}
 }
@@ -211,11 +211,11 @@ func TestFindConstraintWildcard(t *testing.T) {
 	if _, ok := findConstraint(integ, "abc", "/abc", http.MethodGet); !ok {
 		t.Fatal("expected specific constraint")
 	}
-	if _, ok := findConstraint(integ, "*", "/wild", http.MethodGet); !ok {
+	if _, ok := findConstraint(integ, "xyz", "/wild", http.MethodGet); !ok {
 		t.Fatal("expected wildcard constraint")
 	}
-	if _, ok := findConstraint(integ, "xyz", "/wild", http.MethodGet); ok {
-		t.Fatal("unexpected wildcard fallback for identified caller")
+	if _, ok := findConstraint(integ, "abc", "/wild", http.MethodGet); ok {
+		t.Fatal("unexpected wildcard fallback for configured caller")
 	}
 	if _, ok := findConstraint(integ, "xyz", "/none", http.MethodGet); ok {
 		t.Fatal("unexpected match for unknown path")
