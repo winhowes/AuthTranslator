@@ -118,7 +118,7 @@ var logLevel = flag.String("log-level", "INFO", "log level: DEBUG, INFO, WARN, E
 var logFormat = flag.String("log-format", "text", "log output format: text or json")
 var redisAddr = flag.String("redis-addr", "", "redis address for rate limits (host:port or redis:// URL)")
 var redisTimeout = flag.Duration("redis-timeout", 5*time.Second, "dial timeout for redis")
-var redisCA = flag.String("redis-ca", "", "path to CA certificate for Redis TLS; disables InsecureSkipVerify")
+var redisCA = flag.String("redis-ca", "", "path to CA certificate for Redis TLS")
 var maxBodySizeFlag = flag.Int64("max_body_size", authplugins.MaxBodySize, "maximum bytes buffered from request bodies (0 to disable)")
 var secretRefresh = flag.Duration("secret-refresh", 0, "refresh interval for cached secrets (0 disables)")
 var readTimeout = flag.Duration("read-timeout", 0, "HTTP server read timeout")
@@ -672,8 +672,6 @@ func (rl *RateLimiter) allowRedis(key string) (bool, error) {
 					return false, fmt.Errorf("failed to load CA file")
 				}
 				tlsConf.RootCAs = pool
-			} else {
-				tlsConf.InsecureSkipVerify = true
 			}
 			conn, err = tls.DialWithDialer(&d, "tcp", addr, tlsConf)
 		} else {
@@ -883,8 +881,6 @@ func (rl *RateLimiter) retryAfterRedis(key string) (time.Duration, error) {
 					return 0, fmt.Errorf("failed to load CA file")
 				}
 				tlsConf.RootCAs = pool
-			} else {
-				tlsConf.InsecureSkipVerify = true
 			}
 			conn, err = tls.DialWithDialer(&d, "tcp", addr, tlsConf)
 		} else {
