@@ -435,6 +435,27 @@ func NewRateLimiter(limit int, duration time.Duration, strategy string) *RateLim
 			}
 		}()
 	}
+	if limit > 0 && strategy == "token_bucket" && duration > 0 {
+		rl.resetTicker = time.NewTicker(duration)
+
+		go func() {
+			for {
+				select {
+				case <-rl.resetTicker.C:
+					cutoff := time.Now().Add(-duration)
+					rl.mu.Lock()
+					for k, b := range rl.buckets {
+						if b.last.Before(cutoff) {
+							delete(rl.buckets, k)
+						}
+					}
+					rl.mu.Unlock()
+				case <-rl.done:
+					return
+				}
+			}
+		}()
+	}
 
 	return rl
 }
