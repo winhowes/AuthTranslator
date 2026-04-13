@@ -736,11 +736,13 @@ local ttl = tonumber(ARGV[4])
 local val = redis.call("GET", key)
 local tokens = limit
 local last = now
+local updatedLast = now
 if val then
   local currentTokens, currentLast = string.match(val, "([^ ]+) ([^ ]+)")
   if currentTokens and currentLast then
     tokens = tonumber(currentTokens) or limit
     last = tonumber(currentLast) or now
+    updatedLast = last
   end
 end
 if windowSeconds > 0 then
@@ -751,14 +753,16 @@ if windowSeconds > 0 then
       tokens = limit
     end
     last = now
+    updatedLast = now
   end
 end
 local allowed = 0
 if tokens >= 1 then
   tokens = tokens - 1
   allowed = 1
+  updatedLast = now
 end
-redis.call("SET", key, tostring(tokens) .. " " .. tostring(now))
+redis.call("SET", key, tostring(tokens) .. " " .. tostring(updatedLast))
 if ttl <= 0 then
   redis.call("EXPIRE", key, 0)
 else
