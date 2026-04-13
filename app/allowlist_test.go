@@ -213,8 +213,43 @@ func TestFindConstraintWildcard(t *testing.T) {
 	if _, ok := findConstraint(integ, "xyz", "/wild", http.MethodGet); !ok {
 		t.Fatal("expected wildcard constraint")
 	}
+	if _, ok := findConstraint(integ, "abc", "/wild", http.MethodGet); ok {
+		t.Fatal("unexpected wildcard fallback for configured caller")
+	}
 	if _, ok := findConstraint(integ, "xyz", "/none", http.MethodGet); ok {
 		t.Fatal("unexpected match for unknown path")
+	}
+}
+
+func TestFindConstraintWildcardFallbackSemantics(t *testing.T) {
+	allowlists.Lock()
+	allowlists.m = make(map[string]map[string]CallerConfig)
+	allowlists.Unlock()
+
+	if err := SetAllowlist("fc-fallback", []CallerConfig{
+		{ID: "alice", Rules: []CallRule{{Path: "/alice-only", Methods: map[string]RequestConstraint{"GET": {}}}}},
+		{ID: "*", Rules: []CallRule{{Path: "/wild-only", Methods: map[string]RequestConstraint{"GET": {}}}}},
+	}); err != nil {
+		t.Fatalf("failed to set allowlist: %v", err)
+	}
+
+	integ := &Integration{Name: "fc-fallback"}
+
+	// Explicit caller matches explicit rules.
+	if _, ok := findConstraint(integ, "alice", "/alice-only", http.MethodGet); !ok {
+		t.Fatal("expected explicit caller rule match")
+	}
+	// Explicit caller must not fall back to wildcard.
+	if _, ok := findConstraint(integ, "alice", "/wild-only", http.MethodGet); ok {
+		t.Fatal("unexpected wildcard fallback for explicit caller")
+	}
+	// Unknown caller should use wildcard fallback.
+	if _, ok := findConstraint(integ, "bob", "/wild-only", http.MethodGet); !ok {
+		t.Fatal("expected wildcard fallback for unknown caller")
+	}
+	// Anonymous caller should use wildcard fallback.
+	if _, ok := findConstraint(integ, "*", "/wild-only", http.MethodGet); !ok {
+		t.Fatal("expected wildcard fallback for anonymous caller")
 	}
 }
 
