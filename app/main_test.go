@@ -361,6 +361,44 @@ func TestOpenSourceLocalPath(t *testing.T) {
 	}
 }
 
+func TestRedactConfigSource(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			name:  "non-url path is unchanged",
+			input: "/etc/authtranslator/config.yaml",
+			want:  "/etc/authtranslator/config.yaml",
+		},
+		{
+			name:  "url userinfo query and fragment are redacted",
+			input: "https://user:pass@example.com/config.yaml?token=signed#frag",
+			want:  "https://REDACTED:REDACTED@example.com/config.yaml?REDACTED#REDACTED",
+		},
+		{
+			name:  "url without secrets is unchanged",
+			input: "https://example.com/config.yaml",
+			want:  "https://example.com/config.yaml",
+		},
+		{
+			name:  "file url with query is redacted",
+			input: "file:///tmp/config.yaml?sig=abc",
+			want:  "file:///tmp/config.yaml?REDACTED",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := redactConfigSource(tc.input)
+			if got != tc.want {
+				t.Fatalf("redactConfigSource(%q) = %q, want %q", tc.input, got, tc.want)
+			}
+		})
+	}
+}
+
 func TestIsRemoteWindowsPath(t *testing.T) {
 	if isRemote("C:\\path\\to\\file.yaml") {
 		t.Fatal("windows path detected as remote")
