@@ -662,8 +662,7 @@ func TestIntegrationRateLimitWindow(t *testing.T) {
 		t.Fatalf("add: %v", err)
 	}
 	t.Cleanup(func() {
-		i.inLimiter.Stop()
-		i.outLimiter.Stop()
+		DeleteIntegration(i.Name)
 	})
 
 	if !i.inLimiter.Allow("a") {
@@ -706,8 +705,7 @@ func TestIntegrationTransportSettings(t *testing.T) {
 		t.Fatalf("add: %v", err)
 	}
 	t.Cleanup(func() {
-		i.inLimiter.Stop()
-		i.outLimiter.Stop()
+		DeleteIntegration(i.Name)
 	})
 
 	tr, ok := i.proxy.Transport.(*http.Transport)
@@ -840,8 +838,7 @@ func TestIntegrationPluginTransport(t *testing.T) {
 		t.Fatalf("add: %v", err)
 	}
 	t.Cleanup(func() {
-		i.inLimiter.Stop()
-		i.outLimiter.Stop()
+		DeleteIntegration(i.Name)
 	})
 
 	tr, ok := i.proxy.Transport.(*http.Transport)
