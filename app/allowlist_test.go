@@ -3,7 +3,6 @@ package main
 import (
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"reflect"
 	"strings"
 	"testing"
@@ -318,8 +317,17 @@ func TestValidateRequestReasonFormMismatch(t *testing.T) {
 	body := strings.NewReader("other=x")
 	req := httptest.NewRequest(http.MethodPost, "http://example.com/", body)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	constraint := RequestConstraint{Body: map[string]interface{}{"field": "value"}}
-	if ok, reason := validateRequestReason(req, constraint); ok || reason == "" {
+	constraint := RequestConstraint{Body: map[string]interface{}{
+		"type": "object",
+		"properties": map[string]interface{}{
+			"field": map[string]interface{}{
+				"type":  "string",
+				"const": "value",
+			},
+		},
+		"required": []interface{}{"field"},
+	}}
+	if ok, reason := validateRequestReason(req, constraint); ok || !strings.Contains(reason, "body schema mismatch") {
 		t.Fatalf("expected form validation failure, got ok=%v reason=%q", ok, reason)
 	}
 }
@@ -422,7 +430,16 @@ func TestFindConstraintCapability(t *testing.T) {
 func TestValidateRequestReasonJSONContentTypeCaseInsensitive(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "http://case/json", strings.NewReader(`{"foo":"bar"}`))
 	req.Header.Set("Content-Type", "Application/JSON; charset=utf-8")
-	cons := RequestConstraint{Body: map[string]interface{}{"foo": "bar"}}
+	cons := RequestConstraint{Body: map[string]interface{}{
+		"type": "object",
+		"properties": map[string]interface{}{
+			"foo": map[string]interface{}{
+				"type":  "string",
+				"const": "bar",
+			},
+		},
+		"required": []interface{}{"foo"},
+	}}
 	if ok, reason := validateRequestReason(req, cons); !ok {
 		t.Fatalf("expected JSON constraint to pass regardless of content type case: %s", reason)
 	}
@@ -431,56 +448,17 @@ func TestValidateRequestReasonJSONContentTypeCaseInsensitive(t *testing.T) {
 func TestValidateRequestReasonFormContentTypeCaseInsensitive(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "http://case/form", strings.NewReader("foo=bar"))
 	req.Header.Set("Content-Type", "Application/X-Www-Form-Urlencoded")
-	cons := RequestConstraint{Body: map[string]interface{}{"foo": "bar"}}
+	cons := RequestConstraint{Body: map[string]interface{}{
+		"type": "object",
+		"properties": map[string]interface{}{
+			"foo": map[string]interface{}{
+				"type":  "string",
+				"const": "bar",
+			},
+		},
+		"required": []interface{}{"foo"},
+	}}
 	if ok, reason := validateRequestReason(req, cons); !ok {
 		t.Fatalf("expected form constraint to pass regardless of content type case: %s", reason)
-	}
-}
-
-func TestMatchValueNotOkBranches(t *testing.T) {
-	if matchValue("not-a-map", map[string]interface{}{"a": 1}) {
-		t.Fatal("expected map type mismatch to fail")
-	}
-	if matchValue(map[string]interface{}{"a": 1}, map[string]interface{}{"a": 1, "b": 2}) {
-		t.Fatal("expected missing map key to fail")
-	}
-	if matchValue("not-an-array", []interface{}{"a"}) {
-		t.Fatal("expected array type mismatch to fail")
-	}
-}
-
-func TestMatchValueReasonNotOkBranches(t *testing.T) {
-	if ok, reason := matchValueReason("not-a-map", map[string]interface{}{"a": 1}, ""); ok {
-		t.Fatalf("expected map type mismatch to fail, got reason: %s", reason)
-	}
-	if ok, reason := matchValueReason(map[string]interface{}{"a": 1}, map[string]interface{}{"a": 1, "b": 2}, ""); ok {
-		t.Fatalf("expected missing field to fail, got reason: %s", reason)
-	}
-	if ok, reason := matchValueReason("not-an-array", []interface{}{"a"}, "items"); ok {
-		t.Fatalf("expected array type mismatch to fail, got reason: %s", reason)
-	}
-	if ok, reason := matchValueReason([]interface{}{"x"}, []interface{}{"y"}, "items"); ok {
-		t.Fatalf("expected missing array element to fail, got reason: %s", reason)
-	}
-	if ok, reason := matchValueReason(map[string]interface{}{"a": "b"}, map[string]interface{}{"a": "c"}, ""); ok {
-		t.Fatalf("expected value mismatch to fail, got reason: %s", reason)
-	}
-}
-
-func TestMatchFormReasonAndValidateRequestFailures(t *testing.T) {
-	vals := url.Values{"foo": {"bar"}}
-	if ok, reason := matchFormReason(vals, map[string]interface{}{"foo": "baz"}); ok {
-		t.Fatalf("expected form value mismatch to fail, got reason: %s", reason)
-	}
-
-	req := httptest.NewRequest(http.MethodPost, "http://example.com", strings.NewReader("foo=bar"))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("X-Test", "wrong")
-	cons := RequestConstraint{
-		Headers: map[string][]string{"X-Test": {"expected"}},
-		Body:    map[string]interface{}{"foo": "baz"},
-	}
-	if ok, reason := validateRequestReason(req, cons); ok {
-		t.Fatalf("expected validateRequestReason to fail, got success with reason: %s", reason)
 	}
 }

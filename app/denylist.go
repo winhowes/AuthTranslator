@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -35,6 +34,11 @@ func validateDenylist(name, caller string, rules []CallRule) error {
 				return fmt.Errorf("caller %s rule %d invalid method %q", caller, ri, m)
 			}
 			method = strings.ToUpper(method)
+			if len(r.Methods[m].Body) > 0 {
+				if err := validateBodySchemaDefinition(r.Methods[m].Body); err != nil {
+					return fmt.Errorf("caller %s rule %d invalid body schema for method %s: %w", caller, ri, method, err)
+				}
+			}
 			if _, dup := seen[path][method]; dup {
 				return fmt.Errorf("duplicate rule for caller %s path %q method %s (rule %d)", caller, path, method, ri)
 			}
@@ -81,6 +85,9 @@ func SetDenylist(name string, callers []DenylistCaller) error {
 			methods := make(map[string]RequestConstraint, len(r.Methods))
 			for method, cons := range r.Methods {
 				cleaned := strings.ToUpper(strings.TrimSpace(method))
+				if err := compileBodySchemaInto(&cons); err != nil {
+					return fmt.Errorf("invalid body schema for %s %s: %w", r.Path, cleaned, err)
+				}
 				methods[cleaned] = cons
 			}
 			r.Methods = methods
@@ -210,17 +217,20 @@ func constraintMatchesRequest(r *http.Request, c RequestConstraint) bool {
 	ct := strings.ToLower(r.Header.Get("Content-Type"))
 	switch {
 	case strings.Contains(ct, "application/json"):
-		var data map[string]interface{}
-		if err := json.Unmarshal(bodyBytes, &data); err != nil {
+		data, err := decodeJSONBody(bodyBytes)
+		if err != nil {
 			return false
 		}
-		return matchBodyMap(data, c.Body)
+		ok, _ := validateBodySchemaCompiled(c.BodySchema, c.Body, data)
+		return ok
 	case strings.Contains(ct, "application/x-www-form-urlencoded"):
 		vals, err := url.ParseQuery(string(bodyBytes))
 		if err != nil {
 			return false
 		}
-		return matchForm(vals, c.Body)
+		data := formValuesToJSON(vals)
+		ok, _ := validateBodySchemaCompiled(c.BodySchema, c.Body, data)
+		return ok
 	default:
 		return false
 	}

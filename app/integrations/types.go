@@ -1,5 +1,7 @@
 package integrationplugins
 
+import "github.com/santhosh-tekuri/jsonschema/v6"
+
 // CallRule ties a path pattern to method-specific constraints.
 type CallRule struct {
 	Path     string                       `json:"path" yaml:"path"`
@@ -9,9 +11,10 @@ type CallRule struct {
 
 // RequestConstraint lists required headers and body parameters.
 type RequestConstraint struct {
-	Headers map[string][]string    `json:"headers" yaml:"headers,omitempty"`
-	Query   map[string][]string    `json:"query" yaml:"query,omitempty"`
-	Body    map[string]interface{} `json:"body" yaml:"body,omitempty"`
+	Headers    map[string][]string    `json:"headers" yaml:"headers,omitempty"`
+	Query      map[string][]string    `json:"query" yaml:"query,omitempty"`
+	Body       map[string]interface{} `json:"body" yaml:"body,omitempty"`
+	BodySchema *jsonschema.Schema     `json:"-" yaml:"-"`
 }
 
 type CallerConfig struct {

@@ -63,7 +63,22 @@ func TestValidateRequestHeaders(t *testing.T) {
 func TestValidateRequestJSONBody(t *testing.T) {
 	body := []byte(`{"a":"b","arr":[1,2]}`)
 	r := newRequest(http.MethodPost, "http://x", "application/json", body)
-	cons := RequestConstraint{Body: map[string]interface{}{"a": "b", "arr": []interface{}{float64(1)}}}
+	cons := RequestConstraint{Body: map[string]interface{}{
+		"type": "object",
+		"properties": map[string]interface{}{
+			"a": map[string]interface{}{
+				"type":  "string",
+				"const": "b",
+			},
+			"arr": map[string]interface{}{
+				"type": "array",
+				"items": map[string]interface{}{
+					"type": "integer",
+				},
+			},
+		},
+		"required": []interface{}{"a"},
+	}}
 	if !validateRequest(r, cons) {
 		t.Fatal("expected body match")
 	}
@@ -72,7 +87,23 @@ func TestValidateRequestJSONBody(t *testing.T) {
 func TestValidateRequestFormBody(t *testing.T) {
 	form := url.Values{"a": {"1", "3"}, "b": {"2"}}
 	r := newRequest(http.MethodPost, "http://x", "application/x-www-form-urlencoded", []byte(form.Encode()))
-	cons := RequestConstraint{Body: map[string]interface{}{"a": []interface{}{"1", "3"}, "b": "2"}}
+	cons := RequestConstraint{Body: map[string]interface{}{
+		"type": "object",
+		"properties": map[string]interface{}{
+			"a": map[string]interface{}{
+				"type": "array",
+				"items": map[string]interface{}{
+					"type": "string",
+				},
+				"minItems": 2,
+			},
+			"b": map[string]interface{}{
+				"type":  "string",
+				"const": "2",
+			},
+		},
+		"required": []interface{}{"a", "b"},
+	}}
 	if !validateRequest(r, cons) {
 		t.Fatal("expected form match")
 	}
@@ -93,7 +124,16 @@ func TestValidateRequestQuery(t *testing.T) {
 func TestValidateRequestBodyMismatch(t *testing.T) {
 	body := []byte(`{"a":"x"}`)
 	r := newRequest(http.MethodPost, "http://x", "application/json", body)
-	cons := RequestConstraint{Body: map[string]interface{}{"a": "b"}}
+	cons := RequestConstraint{Body: map[string]interface{}{
+		"type": "object",
+		"properties": map[string]interface{}{
+			"a": map[string]interface{}{
+				"type":  "string",
+				"const": "b",
+			},
+		},
+		"required": []interface{}{"a"},
+	}}
 	if validateRequest(r, cons) {
 		t.Fatal("expected body mismatch to fail")
 	}
@@ -101,7 +141,16 @@ func TestValidateRequestBodyMismatch(t *testing.T) {
 
 func TestValidateRequestUnknownContentType(t *testing.T) {
 	r := newRequest(http.MethodPost, "http://x", "text/plain", []byte("ignored"))
-	cons := RequestConstraint{Body: map[string]interface{}{"foo": "bar"}}
+	cons := RequestConstraint{Body: map[string]interface{}{
+		"type": "object",
+		"properties": map[string]interface{}{
+			"foo": map[string]interface{}{
+				"type":  "string",
+				"const": "bar",
+			},
+		},
+		"required": []interface{}{"foo"},
+	}}
 	if !validateRequest(r, cons) {
 		t.Fatal("expected body check skipped on unknown content type")
 	}
@@ -125,21 +174,48 @@ func TestValidateRequestBodyErrors(t *testing.T) {
 	r := httptest.NewRequest(http.MethodPost, "http://x", nil)
 	r.Body = errReadCloser{}
 	r.Header.Set("Content-Type", "application/json")
-	if validateRequest(r, RequestConstraint{Body: map[string]interface{}{"a": "b"}}) {
+	if validateRequest(r, RequestConstraint{Body: map[string]interface{}{
+		"type": "object",
+		"properties": map[string]interface{}{
+			"a": map[string]interface{}{
+				"type":  "string",
+				"const": "b",
+			},
+		},
+		"required": []interface{}{"a"},
+	}}) {
 		t.Fatal("expected false on body read error")
 	}
 
 	// bad JSON
 	r2 := httptest.NewRequest(http.MethodPost, "http://x", strings.NewReader("{"))
 	r2.Header.Set("Content-Type", "application/json")
-	if validateRequest(r2, RequestConstraint{Body: map[string]interface{}{"a": "b"}}) {
+	if validateRequest(r2, RequestConstraint{Body: map[string]interface{}{
+		"type": "object",
+		"properties": map[string]interface{}{
+			"a": map[string]interface{}{
+				"type":  "string",
+				"const": "b",
+			},
+		},
+		"required": []interface{}{"a"},
+	}}) {
 		t.Fatal("expected false on json parse error")
 	}
 
 	// bad form encoding
 	r3 := httptest.NewRequest(http.MethodPost, "http://x", strings.NewReader("%zz"))
 	r3.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	if validateRequest(r3, RequestConstraint{Body: map[string]interface{}{"a": "1"}}) {
+	if validateRequest(r3, RequestConstraint{Body: map[string]interface{}{
+		"type": "object",
+		"properties": map[string]interface{}{
+			"a": map[string]interface{}{
+				"type":  "string",
+				"const": "1",
+			},
+		},
+		"required": []interface{}{"a"},
+	}}) {
 		t.Fatal("expected false on form parse error")
 	}
 
@@ -168,88 +244,5 @@ func TestMatchSegmentsEdgeCases(t *testing.T) {
 		if got := matchSegments(tt.pattern, tt.path); got != tt.ok {
 			t.Errorf("case %d: got %v want %v", i, got, tt.ok)
 		}
-	}
-}
-
-func TestToFloatVariousTypes(t *testing.T) {
-	cases := []struct {
-		val  interface{}
-		want float64
-		ok   bool
-	}{
-		{int(1), 1, true},
-		{int8(2), 2, true},
-		{int16(3), 3, true},
-		{int32(4), 4, true},
-		{int64(5), 5, true},
-		{uint(6), 6, true},
-		{uint8(7), 7, true},
-		{uint16(8), 8, true},
-		{uint32(9), 9, true},
-		{uint64(10), 10, true},
-		{float32(11.5), 11.5, true},
-		{float64(12.5), 12.5, true},
-		{"nope", 0, false},
-	}
-	for i, tt := range cases {
-		got, ok := toFloat(tt.val)
-		if ok != tt.ok || (ok && got != tt.want) {
-			t.Errorf("case %d: toFloat(%T)=(%v,%v) want (%v,%v)", i, tt.val, got, ok, tt.want, tt.ok)
-		}
-	}
-}
-
-func TestMatchBodyMapReasonSuccess(t *testing.T) {
-	data := map[string]interface{}{
-		"a":   "b",
-		"arr": []interface{}{float64(1), float64(2)},
-	}
-	rule := map[string]interface{}{
-		"a":   "b",
-		"arr": []interface{}{float64(1)},
-	}
-	ok, reason := matchBodyMapReason(data, rule)
-	if !ok || reason != "" {
-		t.Fatalf("expected success, got ok=%v reason=%q", ok, reason)
-	}
-}
-
-func TestMatchBodyMapReasonMissingField(t *testing.T) {
-	data := map[string]interface{}{"a": "b"}
-	rule := map[string]interface{}{"a": "b", "c": "d"}
-	ok, reason := matchBodyMapReason(data, rule)
-	if ok || reason != "missing body field c" {
-		t.Fatalf("expected missing field failure, got ok=%v reason=%q", ok, reason)
-	}
-}
-
-func TestMatchBodyMapReasonNestedMismatch(t *testing.T) {
-	data := map[string]interface{}{"a": map[string]interface{}{"b": "c"}}
-	rule := map[string]interface{}{"a": map[string]interface{}{"b": "d"}}
-	ok, reason := matchBodyMapReason(data, rule)
-	if ok || reason != "body field a.b value mismatch" {
-		t.Fatalf("expected mismatch failure, got ok=%v reason=%q", ok, reason)
-	}
-}
-
-func TestMatchBodyMapSuccess(t *testing.T) {
-	data := map[string]interface{}{
-		"a":   "b",
-		"arr": []interface{}{float64(1), float64(2)},
-	}
-	rule := map[string]interface{}{
-		"a":   "b",
-		"arr": []interface{}{float64(1)},
-	}
-	if !matchBodyMap(data, rule) {
-		t.Fatal("expected matchBodyMap to succeed")
-	}
-}
-
-func TestMatchBodyMapFailure(t *testing.T) {
-	data := map[string]interface{}{"a": "b"}
-	rule := map[string]interface{}{"a": "b", "c": "d"}
-	if matchBodyMap(data, rule) {
-		t.Fatal("expected matchBodyMap to fail")
 	}
 }

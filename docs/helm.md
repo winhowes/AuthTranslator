@@ -79,7 +79,12 @@ denylist: |
             methods:
               POST:
                 body:
-                  channel: forbidden-room
+                  type: object
+                  properties:
+                    channel:
+                      type: string
+                      const: forbidden-room
+                  required: [channel]
 
 ```
 

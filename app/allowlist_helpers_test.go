@@ -69,21 +69,61 @@ func TestValidateRequestTable(t *testing.T) {
 			wantOK: false,
 		},
 		{
-			name:   "json body match",
-			r:      buildReq(http.MethodPost, "http://x", "application/json", bodyJSON),
-			cons:   RequestConstraint{Body: map[string]interface{}{"a": "b", "arr": []interface{}{float64(1)}}},
+			name: "json body match",
+			r:    buildReq(http.MethodPost, "http://x", "application/json", bodyJSON),
+			cons: RequestConstraint{Body: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"a": map[string]interface{}{
+						"type":  "string",
+						"const": "b",
+					},
+					"arr": map[string]interface{}{
+						"type": "array",
+						"items": map[string]interface{}{
+							"type": "integer",
+						},
+					},
+				},
+				"required": []interface{}{"a"},
+			}},
 			wantOK: true,
 		},
 		{
-			name:   "json body mismatch",
-			r:      buildReq(http.MethodPost, "http://x", "application/json", []byte(`{"a":"x"}`)),
-			cons:   RequestConstraint{Body: map[string]interface{}{"a": "b"}},
+			name: "json body mismatch",
+			r:    buildReq(http.MethodPost, "http://x", "application/json", []byte(`{"a":"x"}`)),
+			cons: RequestConstraint{Body: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"a": map[string]interface{}{
+						"type":  "string",
+						"const": "b",
+					},
+				},
+				"required": []interface{}{"a"},
+			}},
 			wantOK: false,
 		},
 		{
-			name:   "form match",
-			r:      buildReq(http.MethodPost, "http://x", "application/x-www-form-urlencoded", []byte(form.Encode())),
-			cons:   RequestConstraint{Body: map[string]interface{}{"a": []interface{}{"1", "3"}, "b": "2"}},
+			name: "form match",
+			r:    buildReq(http.MethodPost, "http://x", "application/x-www-form-urlencoded", []byte(form.Encode())),
+			cons: RequestConstraint{Body: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"a": map[string]interface{}{
+						"type": "array",
+						"items": map[string]interface{}{
+							"type": "string",
+						},
+						"minItems": 2,
+					},
+					"b": map[string]interface{}{
+						"type":  "string",
+						"const": "2",
+					},
+				},
+				"required": []interface{}{"a", "b"},
+			}},
 			wantOK: true,
 		},
 		{
@@ -130,8 +170,17 @@ func TestValidateRequestReasonFailures(t *testing.T) {
 		{
 			name: "body mismatch",
 			r:    buildReq(http.MethodPost, "http://x", "application/json", body),
-			cons: RequestConstraint{Body: map[string]interface{}{"a": "2"}},
-			want: "body field a value mismatch",
+			cons: RequestConstraint{Body: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"a": map[string]interface{}{
+						"type":  "string",
+						"const": "2",
+					},
+				},
+				"required": []interface{}{"a"},
+			}},
+			want: "body schema mismatch",
 		},
 	}
 	for _, tt := range tests {
@@ -143,7 +192,16 @@ func TestValidateRequestReasonFailures(t *testing.T) {
 }
 
 func TestValidateRequestUnsupportedContentType(t *testing.T) {
-	cons := RequestConstraint{Body: map[string]interface{}{"a": "b"}}
+	cons := RequestConstraint{Body: map[string]interface{}{
+		"type": "object",
+		"properties": map[string]interface{}{
+			"a": map[string]interface{}{
+				"type":  "string",
+				"const": "b",
+			},
+		},
+		"required": []interface{}{"a"},
+	}}
 	r := buildReq(http.MethodPost, "http://x", "text/plain", []byte("ignored"))
 	if !validateRequest(r, cons) {
 		t.Fatal("expected success for unsupported content type")

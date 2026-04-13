@@ -33,7 +33,12 @@ func TestSlackCapabilities(t *testing.T) {
 	if !ok {
 		t.Fatalf("missing POST method")
 	}
-	if rc.Body["username"] != "bot" {
+	props, ok := rc.Body["properties"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected body properties for post_as")
+	}
+	username, ok := props["username"].(map[string]interface{})
+	if !ok || username["const"] != "bot" {
 		t.Errorf("username not propagated")
 	}
 
@@ -62,9 +67,17 @@ func TestSlackCapabilities(t *testing.T) {
 	if !ok {
 		t.Fatalf("missing POST method")
 	}
-	chVal, ok := rc.Body["channel"].([]interface{})
+	props, ok = rc.Body["properties"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected body properties for post_channels_as")
+	}
+	channel, ok := props["channel"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected channel schema")
+	}
+	chVal, ok := channel["enum"].([]interface{})
 	if !ok || !reflect.DeepEqual(chVal, []interface{}{"c1", "c2"}) {
-		t.Errorf("channels not propagated: %v", rc.Body["channel"])
+		t.Errorf("channels not propagated: %v", channel["enum"])
 	}
 
 	// missing fields should error
@@ -91,9 +104,17 @@ func TestSlackCapabilities(t *testing.T) {
 	if !ok {
 		t.Fatalf("missing POST method")
 	}
-	chVal, ok = rc.Body["channel"].([]interface{})
+	props, ok = rc.Body["properties"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected body properties for post_channels")
+	}
+	channel, ok = props["channel"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected channel schema")
+	}
+	chVal, ok = channel["enum"].([]interface{})
 	if !ok || !reflect.DeepEqual(chVal, []interface{}{"c1"}) {
-		t.Errorf("channels not propagated: %v", rc.Body["channel"])
+		t.Errorf("channels not propagated: %v", channel["enum"])
 	}
 
 	// missing channels should error
