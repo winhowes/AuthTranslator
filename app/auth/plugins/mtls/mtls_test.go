@@ -20,6 +20,10 @@ import (
 	_ "github.com/winhowes/AuthTranslator/app/secrets/plugins"
 )
 
+type roundTripperFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripperFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
 func TestMTLSAuth(t *testing.T) {
 	cert := &x509.Certificate{Subject: pkix.Name{CommonName: "client"}}
 	r := &http.Request{TLS: &tls.ConnectionState{VerifiedChains: [][]*x509.Certificate{{cert}}, PeerCertificates: []*x509.Certificate{cert}}}
@@ -216,6 +220,90 @@ func TestMTLSOutgoingTransport(t *testing.T) {
 	}
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+}
+
+func TestMTLSOutgoingTransportUsesDefaultTimeouts(t *testing.T) {
+	key, _ := rsa.GenerateKey(rand.Reader, 1024)
+	tmpl := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "client"},
+		NotBefore:    time.Now().Add(-time.Hour),
+		NotAfter:     time.Now().Add(time.Hour),
+	}
+	der, _ := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
+	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})
+	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)})
+
+	t.Setenv("CERT", string(certPEM))
+	t.Setenv("KEY", string(keyPEM))
+
+	p := MTLSAuthOut{}
+	cfg, err := p.ParseParams(map[string]interface{}{"cert": "env:CERT", "key": "env:KEY"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tr := p.Transport(cfg)
+	if tr == nil {
+		t.Fatal("missing transport")
+	}
+	if tr.Proxy == nil {
+		t.Fatal("expected proxy function from default transport")
+	}
+	if tr.DialContext == nil {
+		t.Fatal("expected dialer from default transport")
+	}
+	if tr.TLSHandshakeTimeout <= 0 {
+		t.Fatal("expected TLS handshake timeout from default transport")
+	}
+}
+
+func TestMTLSOutgoingTransportFallsBackWhenDefaultWrapped(t *testing.T) {
+	orig := http.DefaultTransport
+	http.DefaultTransport = roundTripperFunc(func(*http.Request) (*http.Response, error) {
+		return nil, errors.New("unexpected call")
+	})
+	defer func() { http.DefaultTransport = orig }()
+
+	key, _ := rsa.GenerateKey(rand.Reader, 1024)
+	tmpl := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "client"},
+		NotBefore:    time.Now().Add(-time.Hour),
+		NotAfter:     time.Now().Add(time.Hour),
+	}
+	der, _ := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
+	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})
+	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)})
+
+	t.Setenv("CERT", string(certPEM))
+	t.Setenv("KEY", string(keyPEM))
+
+	p := MTLSAuthOut{}
+	cfg, err := p.ParseParams(map[string]interface{}{"cert": "env:CERT", "key": "env:KEY"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tr := p.Transport(cfg)
+	if tr == nil {
+		t.Fatal("missing transport")
+	}
+	if tr.Proxy == nil {
+		t.Fatal("expected fallback proxy function")
+	}
+	if tr.DialContext == nil {
+		t.Fatal("expected fallback dialer")
+	}
+	if tr.TLSHandshakeTimeout <= 0 {
+		t.Fatal("expected fallback TLS handshake timeout")
+	}
+	if tr.MaxIdleConns != 100 {
+		t.Fatalf("expected fallback MaxIdleConns=100, got %d", tr.MaxIdleConns)
+	}
+	if tr.MaxIdleConnsPerHost != http.DefaultMaxIdleConnsPerHost {
+		t.Fatalf("expected fallback MaxIdleConnsPerHost=%d, got %d", http.DefaultMaxIdleConnsPerHost, tr.MaxIdleConnsPerHost)
 	}
 }
 
