@@ -188,6 +188,25 @@ func configSource() string {
 	return *configFile
 }
 
+func redactConfigSource(source string) string {
+	u, err := url.Parse(source)
+	if err != nil || (u.Scheme == "" && u.Host == "") {
+		return source
+	}
+
+	if u.User != nil {
+		u.User = url.UserPassword("REDACTED", "REDACTED")
+	}
+	if u.RawQuery != "" {
+		u.RawQuery = "REDACTED"
+	}
+	if u.Fragment != "" {
+		u.Fragment = "REDACTED"
+	}
+
+	return u.String()
+}
+
 func loadConfig(filename string) (*Config, error) {
 	f, err := openSource(filename)
 	if err != nil {
@@ -237,7 +256,7 @@ func reload() error {
 	src := configSource()
 	cfg, err := loadConfig(src)
 	if err != nil {
-		return fmt.Errorf("reload failed for %s: %w", src, err)
+		return fmt.Errorf("reload failed: %w", err)
 	}
 
 	// Build new integration set without mutating the existing one so we can
@@ -1414,13 +1433,13 @@ func main() {
 		select {
 		case <-reloadSig:
 			if err := reload(); err != nil {
-				logger.Error("reload failed; keeping existing configuration", "source", configSource(), "error", err)
+				logger.Error("reload failed; keeping existing configuration", "source", redactConfigSource(configSource()), "error", err)
 			} else {
 				logger.Info("reloaded configuration")
 			}
 		case <-watchSig:
 			if err := reload(); err != nil {
-				logger.Error("reload failed; keeping existing configuration", "source", configSource(), "error", err)
+				logger.Error("reload failed; keeping existing configuration", "source", redactConfigSource(configSource()), "error", err)
 			} else {
 				logger.Info("reloaded configuration")
 			}
