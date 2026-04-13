@@ -8,6 +8,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"errors"
 	"math/big"
 	"net"
 	"os"
@@ -166,6 +167,16 @@ func TestRateLimiterRedisTLSAuthRequiresVerification(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer ln.Close()
+	hsErr := make(chan error, 1)
+	go func() {
+		c, err := ln.Accept()
+		if err != nil {
+			hsErr <- err
+			return
+		}
+		defer c.Close()
+		hsErr <- c.(*tls.Conn).Handshake()
+	}()
 	oldAddr := *redisAddr
 	oldTimeout := *redisTimeout
 	*redisAddr = "rediss://:pw@" + ln.Addr().String()
@@ -178,6 +189,14 @@ func TestRateLimiterRedisTLSAuthRequiresVerification(t *testing.T) {
 	}()
 	if _, err := rl.allowRedis("k"); err == nil {
 		t.Fatal("expected TLS verification error")
+	} else {
+		var unknownAuthorityErr x509.UnknownAuthorityError
+		if !errors.As(err, &unknownAuthorityErr) {
+			t.Fatalf("expected x509.UnknownAuthorityError, got %v", err)
+		}
+	}
+	if err := <-hsErr; err == nil {
+		t.Fatal("expected server handshake error")
 	}
 }
 
