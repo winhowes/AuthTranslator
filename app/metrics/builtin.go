@@ -90,15 +90,18 @@ func (h *histogram) String() string {
 
 func (h *histogram) writeProm(w http.ResponseWriter, integ string) {
 	h.mu.Lock()
-	defer h.mu.Unlock()
+	buckets := append([]float64(nil), h.buckets...)
+	counts := append([]uint64(nil), h.counts...)
+	sum := h.sum
+	h.mu.Unlock()
 	var cum uint64
-	for i, b := range h.buckets {
-		cum += h.counts[i]
+	for i, b := range buckets {
+		cum += counts[i]
 		fmt.Fprintf(w, "authtranslator_request_duration_seconds_bucket{integration=%q,le=%q} %d\n", integ, strconv.FormatFloat(b, 'f', -1, 64), cum)
 	}
-	cum += h.counts[len(h.buckets)]
+	cum += counts[len(buckets)]
 	fmt.Fprintf(w, "authtranslator_request_duration_seconds_bucket{integration=%q,le=\"+Inf\"} %d\n", integ, cum)
-	fmt.Fprintf(w, "authtranslator_request_duration_seconds_sum{integration=%q} %f\n", integ, h.sum)
+	fmt.Fprintf(w, "authtranslator_request_duration_seconds_sum{integration=%q} %f\n", integ, sum)
 	fmt.Fprintf(w, "authtranslator_request_duration_seconds_count{integration=%q} %d\n", integ, cum)
 }
 
@@ -137,10 +140,18 @@ func WriteProm(w http.ResponseWriter) {
 		fmt.Fprintf(w, "authtranslator_requests_total{integration=%q} %s\n", kv.Key, kv.Value.String())
 	})
 	durationHistsMu.Lock()
+	type histSnapshot struct {
+		name string
+		h    *histogram
+	}
+	hists := make([]histSnapshot, 0, len(durationHists))
 	for name, h := range durationHists {
-		h.writeProm(w, name)
+		hists = append(hists, histSnapshot{name: name, h: h})
 	}
 	durationHistsMu.Unlock()
+	for _, hs := range hists {
+		hs.h.writeProm(w, hs.name)
+	}
 	rateLimitCounts.Do(func(kv expvar.KeyValue) {
 		fmt.Fprintf(w, "authtranslator_rate_limit_events_total{integration=%q} %s\n", kv.Key, kv.Value.String())
 	})
