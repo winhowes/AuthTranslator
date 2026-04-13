@@ -965,8 +965,11 @@ func TestReloadRedactsConfigURLSecretsOnFailure(t *testing.T) {
 	}
 
 	msg := err.Error()
-	if strings.Contains(msg, "token=signed") || strings.Contains(msg, "/cfg") {
+	if strings.Contains(msg, "token=signed") {
 		t.Fatalf("expected reload error to redact secrets, got %q", msg)
+	}
+	if !strings.Contains(msg, "/cfg?REDACTED") {
+		t.Fatalf("expected reload error to include redacted source context, got %q", msg)
 	}
 	if !strings.Contains(msg, "missing name") {
 		t.Fatalf("expected validation error details, got %q", msg)

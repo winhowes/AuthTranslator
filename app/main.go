@@ -256,7 +256,7 @@ func reload() error {
 	src := configSource()
 	cfg, err := loadConfig(src)
 	if err != nil {
-		return fmt.Errorf("reload failed: %w", err)
+		return fmt.Errorf("reload failed for %s: %w", redactConfigSource(src), err)
 	}
 
 	// Build new integration set without mutating the existing one so we can
