@@ -219,6 +219,42 @@ func TestMTLSOutgoingTransport(t *testing.T) {
 	}
 }
 
+func TestMTLSOutgoingTransportUsesDefaultTimeouts(t *testing.T) {
+	key, _ := rsa.GenerateKey(rand.Reader, 1024)
+	tmpl := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "client"},
+		NotBefore:    time.Now().Add(-time.Hour),
+		NotAfter:     time.Now().Add(time.Hour),
+	}
+	der, _ := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
+	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})
+	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)})
+
+	t.Setenv("CERT", string(certPEM))
+	t.Setenv("KEY", string(keyPEM))
+
+	p := MTLSAuthOut{}
+	cfg, err := p.ParseParams(map[string]interface{}{"cert": "env:CERT", "key": "env:KEY"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tr := p.Transport(cfg)
+	if tr == nil {
+		t.Fatal("missing transport")
+	}
+	if tr.Proxy == nil {
+		t.Fatal("expected proxy function from default transport")
+	}
+	if tr.DialContext == nil {
+		t.Fatal("expected dialer from default transport")
+	}
+	if tr.TLSHandshakeTimeout <= 0 {
+		t.Fatal("expected TLS handshake timeout from default transport")
+	}
+}
+
 func TestMTLSAuthNoSubjects(t *testing.T) {
 	cert := &x509.Certificate{Subject: pkix.Name{CommonName: "any"}}
 	r := &http.Request{TLS: &tls.ConnectionState{VerifiedChains: [][]*x509.Certificate{{cert}}}}

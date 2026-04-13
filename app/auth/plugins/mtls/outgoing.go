@@ -44,7 +44,18 @@ func (m *MTLSAuthOut) ParseParams(mp map[string]interface{}) (interface{}, error
 	if err != nil {
 		return nil, fmt.Errorf("tls pair: %w", err)
 	}
-	p.transport = &http.Transport{TLSClientConfig: &tls.Config{Certificates: []tls.Certificate{tlsCert}}}
+	t, ok := http.DefaultTransport.(*http.Transport)
+	if !ok {
+		return nil, fmt.Errorf("default transport type mismatch")
+	}
+	t = t.Clone()
+	if t.TLSClientConfig == nil {
+		t.TLSClientConfig = &tls.Config{}
+	} else {
+		t.TLSClientConfig = t.TLSClientConfig.Clone()
+	}
+	t.TLSClientConfig.Certificates = []tls.Certificate{tlsCert}
+	p.transport = t
 	return p, nil
 }
 
