@@ -9,6 +9,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -17,6 +18,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"os/exec"
 	"strconv"
@@ -286,7 +288,7 @@ func TestOpenSourceHTTPStatus(t *testing.T) {
 		rc.Close()
 		t.Fatal("expected error")
 	}
-	want := fmt.Sprintf("remote fetch %s: 418 I'm a teapot", srv.URL)
+	want := fmt.Sprintf("remote fetch %s failed: 418 I'm a teapot", srv.URL)
 	if err.Error() != want {
 		t.Fatalf("unexpected error %v", err)
 	}
@@ -299,13 +301,42 @@ func TestOpenSourceHTTPDialError(t *testing.T) {
 	}
 }
 
+func TestOpenSourceHTTPDialErrorPreservesErrorChain(t *testing.T) {
+	addr := freeAddr(t)
+	_, err := openSource("http://" + addr + "/")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	var uerr *url.Error
+	if !errors.As(err, &uerr) {
+		t.Fatalf("expected wrapped *url.Error, got %T (%v)", err, err)
+	}
+}
+
 func TestOpenSourceHTTPRequestError(t *testing.T) {
 	_, err := openSource("http://[::1")
 	if err == nil {
 		t.Fatal("expected error for invalid URL")
 	}
-	if !strings.Contains(err.Error(), "fetch http://[::1") {
+	if !strings.Contains(err.Error(), "fetch http://[::1: invalid URL") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestOpenSourceHTTPDialErrorRedactsSecrets(t *testing.T) {
+	addr := freeAddr(t)
+	_, err := openSource("http://user:pass@" + addr + "/config.yaml?token=abc#frag")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if strings.Contains(err.Error(), "user:pass@") {
+		t.Fatalf("expected raw credentials to be redacted: %v", err)
+	}
+	if strings.Contains(err.Error(), "token=abc") || strings.Contains(err.Error(), "#frag") {
+		t.Fatalf("expected query/fragment to be redacted: %v", err)
+	}
+	if !strings.Contains(err.Error(), "http://REDACTED:REDACTED@") {
+		t.Fatalf("expected redacted URL in error: %v", err)
 	}
 }
 
@@ -387,6 +418,11 @@ func TestRedactConfigSource(t *testing.T) {
 			input: "file:///tmp/config.yaml?sig=abc",
 			want:  "file:///tmp/config.yaml?REDACTED",
 		},
+		{
+			name:  "invalid remote url is unchanged",
+			input: "http://[::1",
+			want:  "http://[::1",
+		},
 	}
 
 	for _, tc := range tests {
@@ -396,6 +432,45 @@ func TestRedactConfigSource(t *testing.T) {
 				t.Fatalf("redactConfigSource(%q) = %q, want %q", tc.input, got, tc.want)
 			}
 		})
+	}
+}
+
+func TestRedactSourceInErrorReplacesRawSource(t *testing.T) {
+	raw := "https://user:pass@example.com/config.yaml?token=abc#frag"
+	redacted := "https://REDACTED:REDACTED@example.com/config.yaml?REDACTED#REDACTED"
+	err := fmt.Errorf("Get %q: dial tcp: i/o timeout", raw)
+
+	got := redactSourceInError(err, raw, redacted)
+	if strings.Contains(got, raw) {
+		t.Fatalf("expected raw source to be replaced: %q", got)
+	}
+	if !strings.Contains(got, redacted) {
+		t.Fatalf("expected redacted source in result: %q", got)
+	}
+}
+
+func TestRedactSourceInErrorNoRawSource(t *testing.T) {
+	err := fmt.Errorf("plain error text")
+	got := redactSourceInError(err, "", "ignored")
+	if got != "plain error text" {
+		t.Fatalf("unexpected output: %q", got)
+	}
+}
+
+func TestRedactSourceInErrorReplacesNormalizedSource(t *testing.T) {
+	raw := "https://user:pass@example.com/config.yaml?token=abc#frag"
+	redacted := "https://REDACTED:REDACTED@example.com/config.yaml?REDACTED#REDACTED"
+	err := fmt.Errorf("Get %q: dial tcp: i/o timeout", "https://user:***@example.com/config.yaml?token=abc#frag")
+
+	got := redactSourceInError(err, raw, redacted)
+	if strings.Contains(got, "token=abc") || strings.Contains(got, "#frag") {
+		t.Fatalf("expected query/fragment redaction: %q", got)
+	}
+	if strings.Contains(got, "user:***@") {
+		t.Fatalf("expected masked userinfo to be replaced: %q", got)
+	}
+	if !strings.Contains(got, redacted) {
+		t.Fatalf("expected redacted source in result: %q", got)
 	}
 }
 

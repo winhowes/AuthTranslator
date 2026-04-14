@@ -160,17 +160,28 @@ func openSource(path string) (io.ReadCloser, error) {
 		return os.Open(strings.TrimPrefix(path, "file://"))
 	}
 	if isRemote(path) {
+		src := redactConfigSource(path)
 		req, err := http.NewRequestWithContext(context.Background(), "GET", path, nil)
 		if err != nil {
-			return nil, fmt.Errorf("fetch %s: %w", path, err)
+			return nil, newRedactedWrappedError(
+				fmt.Sprintf("fetch %s: invalid URL", src),
+				err,
+				path,
+				src,
+			)
 		}
 		resp, err := httpClient.Do(req)
 		if err != nil {
-			return nil, fmt.Errorf("fetch %s: %w", path, err)
+			return nil, newRedactedWrappedError(
+				fmt.Sprintf("fetch %s: request failed", src),
+				err,
+				path,
+				src,
+			)
 		}
 		if resp.StatusCode != http.StatusOK {
 			resp.Body.Close()
-			return nil, fmt.Errorf("remote fetch %s: %s", path, resp.Status)
+			return nil, fmt.Errorf("remote fetch %s failed: %s", src, resp.Status)
 		}
 		return resp.Body, nil
 	}
@@ -190,7 +201,10 @@ func configSource() string {
 
 func redactConfigSource(source string) string {
 	u, err := url.Parse(source)
-	if err != nil || (u.Scheme == "" && u.Host == "") {
+	if err != nil {
+		return source
+	}
+	if u.Scheme == "" && u.Host == "" {
 		return source
 	}
 
@@ -205,6 +219,60 @@ func redactConfigSource(source string) string {
 	}
 
 	return u.String()
+}
+
+func redactSourceInError(err error, rawSource, redactedSource string) string {
+	msg := err.Error()
+	if rawSource == "" {
+		return msg
+	}
+	if rawSource != redactedSource {
+		msg = strings.ReplaceAll(msg, rawSource, redactedSource)
+	}
+
+	u, parseErr := url.Parse(rawSource)
+	if parseErr != nil {
+		return msg
+	}
+
+	// http.Client errors may normalize URL rendering (for example masking
+	// passwords with ***). Replace common normalized forms as well.
+	msg = strings.ReplaceAll(msg, u.Redacted(), redactedSource)
+	if u.RawQuery != "" {
+		msg = strings.ReplaceAll(msg, u.RawQuery, "REDACTED")
+	}
+	if u.Fragment != "" {
+		msg = strings.ReplaceAll(msg, u.Fragment, "REDACTED")
+	}
+	if u.User != nil {
+		userMasked := u.User.Username() + ":***@"
+		msg = strings.ReplaceAll(msg, userMasked, "REDACTED:REDACTED@")
+	}
+	return msg
+}
+
+type redactedWrappedError struct {
+	msg            string
+	cause          error
+	rawSource      string
+	redactedSource string
+}
+
+func newRedactedWrappedError(msg string, cause error, rawSource, redactedSource string) error {
+	return &redactedWrappedError{
+		msg:            msg,
+		cause:          cause,
+		rawSource:      rawSource,
+		redactedSource: redactedSource,
+	}
+}
+
+func (e *redactedWrappedError) Error() string {
+	return fmt.Sprintf("%s: %s", e.msg, redactSourceInError(e.cause, e.rawSource, e.redactedSource))
+}
+
+func (e *redactedWrappedError) Unwrap() error {
+	return e.cause
 }
 
 func loadConfig(filename string) (*Config, error) {
