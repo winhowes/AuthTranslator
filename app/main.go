@@ -163,21 +163,21 @@ func openSource(path string) (io.ReadCloser, error) {
 		src := redactConfigSource(path)
 		req, err := http.NewRequestWithContext(context.Background(), "GET", path, nil)
 		if err != nil {
-			return nil, &redactedWrappedError{
-				msg:            fmt.Sprintf("fetch %s: invalid URL", src),
-				cause:          err,
-				rawSource:      path,
-				redactedSource: src,
-			}
+			return nil, newRedactedWrappedError(
+				fmt.Sprintf("fetch %s: invalid URL", src),
+				err,
+				path,
+				src,
+			)
 		}
 		resp, err := httpClient.Do(req)
 		if err != nil {
-			return nil, &redactedWrappedError{
-				msg:            fmt.Sprintf("fetch %s: request failed", src),
-				cause:          err,
-				rawSource:      path,
-				redactedSource: src,
-			}
+			return nil, newRedactedWrappedError(
+				fmt.Sprintf("fetch %s: request failed", src),
+				err,
+				path,
+				src,
+			)
 		}
 		if resp.StatusCode != http.StatusOK {
 			resp.Body.Close()
@@ -237,6 +237,15 @@ type redactedWrappedError struct {
 	cause          error
 	rawSource      string
 	redactedSource string
+}
+
+func newRedactedWrappedError(msg string, cause error, rawSource, redactedSource string) error {
+	return &redactedWrappedError{
+		msg:            msg,
+		cause:          cause,
+		rawSource:      rawSource,
+		redactedSource: redactedSource,
+	}
 }
 
 func (e *redactedWrappedError) Error() string {
