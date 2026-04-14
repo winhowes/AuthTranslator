@@ -160,17 +160,18 @@ func openSource(path string) (io.ReadCloser, error) {
 		return os.Open(strings.TrimPrefix(path, "file://"))
 	}
 	if isRemote(path) {
+		src := redactConfigSource(path)
 		req, err := http.NewRequestWithContext(context.Background(), "GET", path, nil)
 		if err != nil {
-			return nil, fmt.Errorf("fetch %s: %w", path, err)
+			return nil, fmt.Errorf("fetch %s: invalid URL: %s", src, redactSourceInError(err, path, src))
 		}
 		resp, err := httpClient.Do(req)
 		if err != nil {
-			return nil, fmt.Errorf("fetch %s: %w", path, err)
+			return nil, fmt.Errorf("fetch %s: request failed: %s", src, redactSourceInError(err, path, src))
 		}
 		if resp.StatusCode != http.StatusOK {
 			resp.Body.Close()
-			return nil, fmt.Errorf("remote fetch %s: %s", path, resp.Status)
+			return nil, fmt.Errorf("remote fetch %s failed: %s", src, resp.Status)
 		}
 		return resp.Body, nil
 	}
@@ -190,7 +191,10 @@ func configSource() string {
 
 func redactConfigSource(source string) string {
 	u, err := url.Parse(source)
-	if err != nil || (u.Scheme == "" && u.Host == "") {
+	if err != nil {
+		return source
+	}
+	if u.Scheme == "" && u.Host == "" {
 		return source
 	}
 
@@ -205,6 +209,17 @@ func redactConfigSource(source string) string {
 	}
 
 	return u.String()
+}
+
+func redactSourceInError(err error, rawSource, redactedSource string) string {
+	msg := err.Error()
+	if rawSource == "" {
+		return msg
+	}
+	if rawSource != redactedSource {
+		msg = strings.ReplaceAll(msg, rawSource, redactedSource)
+	}
+	return msg
 }
 
 func loadConfig(filename string) (*Config, error) {

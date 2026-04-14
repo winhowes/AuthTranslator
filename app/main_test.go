@@ -286,7 +286,7 @@ func TestOpenSourceHTTPStatus(t *testing.T) {
 		rc.Close()
 		t.Fatal("expected error")
 	}
-	want := fmt.Sprintf("remote fetch %s: 418 I'm a teapot", srv.URL)
+	want := fmt.Sprintf("remote fetch %s failed: 418 I'm a teapot", srv.URL)
 	if err.Error() != want {
 		t.Fatalf("unexpected error %v", err)
 	}
@@ -304,8 +304,22 @@ func TestOpenSourceHTTPRequestError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for invalid URL")
 	}
-	if !strings.Contains(err.Error(), "fetch http://[::1") {
+	if !strings.Contains(err.Error(), "fetch http://[::1: invalid URL") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestOpenSourceHTTPDialErrorRedactsSecrets(t *testing.T) {
+	addr := freeAddr(t)
+	_, err := openSource("http://user:pass@" + addr + "/config.yaml?token=abc#frag")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if strings.Contains(err.Error(), "user:pass@") {
+		t.Fatalf("expected raw credentials to be redacted: %v", err)
+	}
+	if !strings.Contains(err.Error(), "http://REDACTED:REDACTED@") {
+		t.Fatalf("expected redacted URL in error: %v", err)
 	}
 }
 
@@ -386,6 +400,11 @@ func TestRedactConfigSource(t *testing.T) {
 			name:  "file url with query is redacted",
 			input: "file:///tmp/config.yaml?sig=abc",
 			want:  "file:///tmp/config.yaml?REDACTED",
+		},
+		{
+			name:  "invalid remote url is unchanged",
+			input: "http://[::1",
+			want:  "http://[::1",
 		},
 	}
 
