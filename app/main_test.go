@@ -9,6 +9,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -17,6 +18,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"os/exec"
 	"strconv"
@@ -296,6 +298,18 @@ func TestOpenSourceHTTPDialError(t *testing.T) {
 	addr := freeAddr(t)
 	if _, err := openSource("http://" + addr + "/"); err == nil {
 		t.Fatal("expected error")
+	}
+}
+
+func TestOpenSourceHTTPDialErrorPreservesErrorChain(t *testing.T) {
+	addr := freeAddr(t)
+	_, err := openSource("http://" + addr + "/")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	var uerr *url.Error
+	if !errors.As(err, &uerr) {
+		t.Fatalf("expected wrapped *url.Error, got %T (%v)", err, err)
 	}
 }
 
