@@ -229,6 +229,25 @@ func redactSourceInError(err error, rawSource, redactedSource string) string {
 	if rawSource != redactedSource {
 		msg = strings.ReplaceAll(msg, rawSource, redactedSource)
 	}
+
+	u, parseErr := url.Parse(rawSource)
+	if parseErr != nil {
+		return msg
+	}
+
+	// http.Client errors may normalize URL rendering (for example masking
+	// passwords with ***). Replace common normalized forms as well.
+	msg = strings.ReplaceAll(msg, u.Redacted(), redactedSource)
+	if u.RawQuery != "" {
+		msg = strings.ReplaceAll(msg, u.RawQuery, "REDACTED")
+	}
+	if u.Fragment != "" {
+		msg = strings.ReplaceAll(msg, u.Fragment, "REDACTED")
+	}
+	if u.User != nil {
+		userMasked := u.User.Username() + ":***@"
+		msg = strings.ReplaceAll(msg, userMasked, "REDACTED:REDACTED@")
+	}
 	return msg
 }
 

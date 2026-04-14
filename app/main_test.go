@@ -332,6 +332,9 @@ func TestOpenSourceHTTPDialErrorRedactsSecrets(t *testing.T) {
 	if strings.Contains(err.Error(), "user:pass@") {
 		t.Fatalf("expected raw credentials to be redacted: %v", err)
 	}
+	if strings.Contains(err.Error(), "token=abc") || strings.Contains(err.Error(), "#frag") {
+		t.Fatalf("expected query/fragment to be redacted: %v", err)
+	}
 	if !strings.Contains(err.Error(), "http://REDACTED:REDACTED@") {
 		t.Fatalf("expected redacted URL in error: %v", err)
 	}
@@ -451,6 +454,23 @@ func TestRedactSourceInErrorNoRawSource(t *testing.T) {
 	got := redactSourceInError(err, "", "ignored")
 	if got != "plain error text" {
 		t.Fatalf("unexpected output: %q", got)
+	}
+}
+
+func TestRedactSourceInErrorReplacesNormalizedSource(t *testing.T) {
+	raw := "https://user:pass@example.com/config.yaml?token=abc#frag"
+	redacted := "https://REDACTED:REDACTED@example.com/config.yaml?REDACTED#REDACTED"
+	err := fmt.Errorf("Get %q: dial tcp: i/o timeout", "https://user:***@example.com/config.yaml?token=abc#frag")
+
+	got := redactSourceInError(err, raw, redacted)
+	if strings.Contains(got, "token=abc") || strings.Contains(got, "#frag") {
+		t.Fatalf("expected query/fragment redaction: %q", got)
+	}
+	if strings.Contains(got, "user:***@") {
+		t.Fatalf("expected masked userinfo to be replaced: %q", got)
+	}
+	if !strings.Contains(got, redacted) {
+		t.Fatalf("expected redacted source in result: %q", got)
 	}
 }
 
