@@ -13,22 +13,23 @@ import (
 	"time"
 )
 
-// statusKeySeparator joins the integration name and HTTP status code when
-// storing upstream counters in expvar. We intentionally pick a character that
-// integrations cannot contain so parsing during Prometheus export stays
-// unambiguous even after allowing dots and underscores in names.
-const statusKeySeparator = "|"
+// metricKeySeparator joins expvar map key parts for metrics that need to
+// serialize multiple labels into a single string key. We intentionally pick a
+// character that integrations and the fixed internal reason labels cannot
+// contain so parsing during Prometheus export stays unambiguous.
+const metricKeySeparator = "|"
 
 var (
-	requestCounts        = expvar.NewMap("authtranslator_requests_total")
-	rateLimitCounts      = expvar.NewMap("authtranslator_rate_limit_events_total")
-	authFailureCounts    = expvar.NewMap("authtranslator_auth_failures_total")
-	upstreamStatusCounts = expvar.NewMap("authtranslator_upstream_responses_total")
-	requestDurations     = expvar.NewMap("authtranslator_request_duration_seconds")
-	LastReloadTime       = expvar.NewString("authtranslator_last_reload")
-	durationHistsMu      sync.Mutex
-	durationHists        = make(map[string]*histogram)
-	durationBuckets      = []float64{0.1, 0.25, 0.5, 1, 2.5, 5, 10}
+	requestCounts          = expvar.NewMap("authtranslator_requests_total")
+	rateLimitCounts        = expvar.NewMap("authtranslator_rate_limit_events_total")
+	authFailureCounts      = expvar.NewMap("authtranslator_auth_failures_total")
+	internalResponseCounts = expvar.NewMap("authtranslator_internal_responses_total")
+	upstreamStatusCounts   = expvar.NewMap("authtranslator_upstream_responses_total")
+	requestDurations       = expvar.NewMap("authtranslator_request_duration_seconds")
+	LastReloadTime         = expvar.NewString("authtranslator_last_reload")
+	durationHistsMu        sync.Mutex
+	durationHists          = make(map[string]*histogram)
+	durationBuckets        = []float64{0.1, 0.25, 0.5, 1, 2.5, 5, 10}
 )
 
 type histogram struct {
@@ -114,9 +115,16 @@ func IncRateLimit(integration string) { rateLimitCounts.Add(integration, 1) }
 // IncAuthFailure increments the auth failure counter for the integration.
 func IncAuthFailure(integration string) { authFailureCounts.Add(integration, 1) }
 
+// IncInternalResponse increments the counter for proxy-generated responses with
+// a coarse reason label to keep cardinality bounded.
+func IncInternalResponse(integration string, status int, reason string) {
+	key := fmt.Sprintf("%s%s%d%s%s", integration, metricKeySeparator, status, metricKeySeparator, reason)
+	internalResponseCounts.Add(key, 1)
+}
+
 // RecordStatus records the upstream status code for the integration.
 func RecordStatus(integration string, status int) {
-	key := fmt.Sprintf("%s%s%d", integration, statusKeySeparator, status)
+	key := fmt.Sprintf("%s%s%d", integration, metricKeySeparator, status)
 	upstreamStatusCounts.Add(key, 1)
 }
 
@@ -158,8 +166,16 @@ func WriteProm(w http.ResponseWriter) {
 	authFailureCounts.Do(func(kv expvar.KeyValue) {
 		fmt.Fprintf(w, "authtranslator_auth_failures_total{integration=%q} %s\n", kv.Key, kv.Value.String())
 	})
+	internalResponseCounts.Do(func(kv expvar.KeyValue) {
+		parts := strings.SplitN(kv.Key, metricKeySeparator, 3)
+		if len(parts) != 3 {
+			return
+		}
+		integ, code, reason := parts[0], parts[1], parts[2]
+		fmt.Fprintf(w, "authtranslator_internal_responses_total{integration=%q,code=%q,reason=%q} %s\n", integ, code, reason, kv.Value.String())
+	})
 	upstreamStatusCounts.Do(func(kv expvar.KeyValue) {
-		parts := strings.SplitN(kv.Key, statusKeySeparator, 2)
+		parts := strings.SplitN(kv.Key, metricKeySeparator, 2)
 		if len(parts) != 2 {
 			return
 		}

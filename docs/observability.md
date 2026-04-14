@@ -35,9 +35,12 @@ sets `X-AT-Error-Reason` with a short explanation such as "integration not found
 | `authtranslator_upstream_responses_total` | counter   | `integration`, `code` | HTTP status codes returned by upstreams.         |
 | `authtranslator_request_duration_seconds` | histogram | `integration`         | Histogram of upstream request latency.           |
 | `authtranslator_rate_limit_events_total`  | counter   | `integration`         | Incremented when a request is rejected with 429. |
-| `authtranslator_auth_failures_total`      | counter   | `integration`         | Authentication plugin failures.                  |
+| `authtranslator_auth_failures_total`      | counter   | `integration`         | Incoming and outgoing auth plugin failures.      |
+| `authtranslator_internal_responses_total` | counter   | `integration`, `code`, `reason` | Proxy-generated non-upstream responses grouped by coarse reason. |
 | `authtranslator_last_reload`             | gauge     | –
 | Timestamp of the most recent configuration reload. |
+
+The `reason` label on `authtranslator_internal_responses_total` uses bounded categories such as `integration_not_found`, `incoming_auth_failure`, `caller_rate_limited`, `integration_rate_limited`, `invalid_destination`, and `no_proxy_configured`.
 
 Missing a metric? Write a small **metrics plugin** to hook into requests and responses or open a PR—new counters are easy to wire in. `WriteProm` calls every registered plugin's own `WriteProm` method so any custom counters you output will appear alongside the built‑in ones. Plugins must manage their own state (typically in memory). See [Metrics Plugins](metrics-plugins.md) for a primer.
 
@@ -69,6 +72,7 @@ assume you scrape the metrics under the default job label
 | Error ratio                | `sum(rate(authtranslator_upstream_responses_total{job="authtranslator",code=~"5.."}[5m]))`<br>`/`<br>`sum(rate(authtranslator_upstream_responses_total{job="authtranslator"}[5m]))` | Surfaces spikes in upstream failures. |
 | 95th percentile latency    | `histogram_quantile(0.95, sum(rate(authtranslator_request_duration_seconds_bucket{job="authtranslator"}[5m])) by (le, integration))` | Watches for slowdowns before they hit the SLA. |
 | Rate-limit rejections      | `sum(rate(authtranslator_rate_limit_events_total{job="authtranslator"}[5m])) by (integration)` | Shows when callers are constrained and need more quota. |
+| Internal failures by reason | `sum(rate(authtranslator_internal_responses_total{job="authtranslator"}[5m])) by (integration, reason)` | Separates local proxy rejections from upstream failures. |
 
 You can convert the table above into Grafana time-series panels by pasting the
 queries into new panels and turning on **Legend → `{{integration}}`**. For a

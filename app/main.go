@@ -1228,6 +1228,19 @@ func metricsHandler(w http.ResponseWriter, r *http.Request) {
 	metrics.Handler(w, r, *metricsUser, *metricsPass)
 }
 
+const (
+	internalReasonIntegrationNotFound    = "integration_not_found"
+	internalReasonIncomingAuthFailure    = "incoming_auth_failure"
+	internalReasonCallerRateLimited      = "caller_rate_limited"
+	internalReasonIntegrationRateLimited = "integration_rate_limited"
+	internalReasonDenylistMatch          = "denylist_match"
+	internalReasonNoAllowlistMatch       = "no_allowlist_match"
+	internalReasonConstraintFailure      = "constraint_failure"
+	internalReasonInvalidDestination     = "invalid_destination"
+	internalReasonOutgoingAuthFailure    = "outgoing_auth_failure"
+	internalReasonNoProxyConfigured      = "no_proxy_configured"
+)
+
 // proxyHandler handles incoming requests and proxies them according to the integration.
 func proxyHandler(w http.ResponseWriter, r *http.Request) {
 	host := r.Host
@@ -1242,6 +1255,7 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		logger.Warn("no integration configured", "host", host)
 		metrics.IncRequest("unknown")
+		metrics.IncInternalResponse("unknown", http.StatusNotFound, internalReasonIntegrationNotFound)
 		w.Header().Set("X-AT-Upstream-Error", "false")
 		w.Header().Set("X-AT-Error-Reason", "integration not found")
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
@@ -1261,6 +1275,7 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 			if !p.Authenticate(r.Context(), r, cfg.parsed) {
 				logger.Warn("authentication failed", "host", host, "remote", r.RemoteAddr)
 				metrics.IncAuthFailure(integ.Name)
+				metrics.IncInternalResponse(integ.Name, http.StatusUnauthorized, internalReasonIncomingAuthFailure)
 				w.Header().Set("X-AT-Upstream-Error", "false")
 				w.Header().Set("X-AT-Error-Reason", "authentication failed")
 				w.Header().Set("Content-Type", "text/plain; charset=utf-8")
@@ -1287,6 +1302,7 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 	if !integ.inLimiter.Allow(limiterKey) {
 		logger.Warn("caller exceeded rate limit", "caller", rateKey, "host", host)
 		metrics.IncRateLimit(integ.Name)
+		metrics.IncInternalResponse(integ.Name, http.StatusTooManyRequests, internalReasonCallerRateLimited)
 		if d := integ.inLimiter.RetryAfter(limiterKey); d > 0 {
 			secs := int(math.Ceil(d.Seconds()))
 			if secs < 1 {
@@ -1303,6 +1319,7 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 	if !integ.outLimiter.Allow(host) {
 		logger.Warn("host exceeded rate limit", "host", host)
 		metrics.IncRateLimit(integ.Name)
+		metrics.IncInternalResponse(integ.Name, http.StatusTooManyRequests, internalReasonIntegrationRateLimited)
 		if d := integ.outLimiter.RetryAfter(host); d > 0 {
 			secs := int(math.Ceil(d.Seconds()))
 			if secs < 1 {
@@ -1319,6 +1336,7 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 
 	if blocked, reason := matchDenylist(integ, callerID, r); blocked {
 		logger.Warn("request denied by denylist", "integration", integ.Name, "caller_id", callerID, "reason", reason)
+		metrics.IncInternalResponse(integ.Name, http.StatusForbidden, internalReasonDenylistMatch)
 		w.Header().Set("X-AT-Error-Reason", reason)
 		w.Header().Set("X-AT-Upstream-Error", "false")
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
@@ -1332,6 +1350,7 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 		if !ok {
 			reason := "no allowlist match"
 			logger.Warn("request blocked", "integration", integ.Name, "caller_id", callerID, "reason", reason)
+			metrics.IncInternalResponse(integ.Name, http.StatusForbidden, internalReasonNoAllowlistMatch)
 			w.Header().Set("X-AT-Error-Reason", reason)
 			w.Header().Set("X-AT-Upstream-Error", "false")
 			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
@@ -1340,6 +1359,7 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		if ok2, reason := validateRequestReason(r, cons); !ok2 {
 			logger.Warn("request failed constraints", "integration", integ.Name, "caller_id", callerID, "reason", reason)
+			metrics.IncInternalResponse(integ.Name, http.StatusForbidden, internalReasonConstraintFailure)
 			w.Header().Set("X-AT-Error-Reason", reason)
 			w.Header().Set("X-AT-Upstream-Error", "false")
 			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
@@ -1351,6 +1371,7 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 	resolvedDest, err := integ.resolveRequestDestination(r)
 	if err != nil {
 		logger.Warn("invalid destination header", "integration", integ.Name, "error", err)
+		metrics.IncInternalResponse(integ.Name, http.StatusBadRequest, internalReasonInvalidDestination)
 		w.Header().Set("X-AT-Upstream-Error", "false")
 		w.Header().Set("X-AT-Error-Reason", "invalid destination")
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
@@ -1368,6 +1389,8 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 		if p != nil {
 			if err := p.AddAuth(r.Context(), r, cfg.parsed); err != nil {
 				logger.Warn("outgoing auth failed", "integration", integ.Name, "plugin", cfg.Type, "error", err)
+				metrics.IncAuthFailure(integ.Name)
+				metrics.IncInternalResponse(integ.Name, http.StatusUnauthorized, internalReasonOutgoingAuthFailure)
 				w.Header().Set("X-AT-Upstream-Error", "false")
 				w.Header().Set("X-AT-Error-Reason", "authentication failed")
 				w.Header().Set("Content-Type", "text/plain; charset=utf-8")
@@ -1378,6 +1401,7 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if integ.proxy == nil {
+		metrics.IncInternalResponse(integ.Name, http.StatusBadGateway, internalReasonNoProxyConfigured)
 		w.Header().Set("X-AT-Upstream-Error", "false")
 		w.Header().Set("X-AT-Error-Reason", "no proxy configured")
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
