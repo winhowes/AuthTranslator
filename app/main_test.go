@@ -418,6 +418,28 @@ func TestRedactConfigSource(t *testing.T) {
 	}
 }
 
+func TestRedactSourceInErrorReplacesRawSource(t *testing.T) {
+	raw := "https://user:pass@example.com/config.yaml?token=abc#frag"
+	redacted := "https://REDACTED:REDACTED@example.com/config.yaml?REDACTED#REDACTED"
+	err := fmt.Errorf("Get %q: dial tcp: i/o timeout", raw)
+
+	got := redactSourceInError(err, raw, redacted)
+	if strings.Contains(got, raw) {
+		t.Fatalf("expected raw source to be replaced: %q", got)
+	}
+	if !strings.Contains(got, redacted) {
+		t.Fatalf("expected redacted source in result: %q", got)
+	}
+}
+
+func TestRedactSourceInErrorNoRawSource(t *testing.T) {
+	err := fmt.Errorf("plain error text")
+	got := redactSourceInError(err, "", "ignored")
+	if got != "plain error text" {
+		t.Fatalf("unexpected output: %q", got)
+	}
+}
+
 func TestIsRemoteWindowsPath(t *testing.T) {
 	if isRemote("C:\\path\\to\\file.yaml") {
 		t.Fatal("windows path detected as remote")
