@@ -56,6 +56,7 @@ func TestMetricsHandlerOutput(t *testing.T) {
 	IncRequest("foo")
 	IncRateLimit("foo")
 	IncAuthFailure("foo")
+	IncInternalResponse("foo", http.StatusUnauthorized, "incoming_auth_failure")
 	RecordStatus("foo", http.StatusOK)
 	RecordStatus("bar", http.StatusTeapot)
 	IncRequest("bar")
@@ -73,8 +74,8 @@ func TestMetricsHandlerOutput(t *testing.T) {
 
 	body := rr.Body.String()
 	lines := strings.Split(strings.TrimSpace(body), "\n")
-	if len(lines) < 26 {
-		t.Fatalf("expected at least 26 metrics lines, got %d", len(lines))
+	if len(lines) < 27 {
+		t.Fatalf("expected at least 27 metrics lines, got %d", len(lines))
 	}
 	if !strings.Contains(body, `authtranslator_requests_total{integration="foo"} 2`) {
 		t.Fatal("missing foo request metric")
@@ -87,6 +88,9 @@ func TestMetricsHandlerOutput(t *testing.T) {
 	}
 	if !strings.Contains(body, `authtranslator_auth_failures_total{integration="foo"} 1`) {
 		t.Fatal("missing foo auth failure metric")
+	}
+	if !strings.Contains(body, `authtranslator_internal_responses_total{integration="foo",code="401",reason="incoming_auth_failure"} 1`) {
+		t.Fatal("missing foo internal response metric")
 	}
 	if !strings.Contains(body, `authtranslator_upstream_responses_total{integration="foo",code="200"} 1`) {
 		t.Fatal("missing foo status metric")
@@ -111,6 +115,7 @@ func TestMetricsHandlerOutputWithPunctuation(t *testing.T) {
 	IncRequest(dotName)
 	RecordDuration(dotName, 150*time.Millisecond)
 	RecordStatus(dotName, http.StatusAccepted)
+	IncInternalResponse(dotName, http.StatusBadRequest, "invalid_destination")
 
 	RecordStatus(underscoreName, http.StatusBadGateway)
 
@@ -127,6 +132,9 @@ func TestMetricsHandlerOutputWithPunctuation(t *testing.T) {
 	}
 	if !strings.Contains(body, fmt.Sprintf(`authtranslator_upstream_responses_total{integration=%q,code=%q} 1`, dotName, "202")) {
 		t.Fatalf("missing status metric for %s: %s", dotName, body)
+	}
+	if !strings.Contains(body, fmt.Sprintf(`authtranslator_internal_responses_total{integration=%q,code=%q,reason=%q} 1`, dotName, "400", "invalid_destination")) {
+		t.Fatalf("missing internal response metric for %s: %s", dotName, body)
 	}
 	if !strings.Contains(body, fmt.Sprintf(`authtranslator_upstream_responses_total{integration=%q,code=%q} 1`, underscoreName, "502")) {
 		t.Fatalf("missing status metric for %s: %s", underscoreName, body)
@@ -206,7 +214,9 @@ func TestWritePromSkipsMalformedUpstreamKeys(t *testing.T) {
 	Reset()
 
 	upstreamStatusCounts.Add("badkey", 3)
+	internalResponseCounts.Add("stillbad", 2)
 	RecordStatus("foo", http.StatusOK)
+	IncInternalResponse("foo", http.StatusBadRequest, "invalid_destination")
 
 	rr := httptest.NewRecorder()
 	WriteProm(rr)
@@ -215,8 +225,14 @@ func TestWritePromSkipsMalformedUpstreamKeys(t *testing.T) {
 	if strings.Contains(body, "badkey") {
 		t.Fatalf("expected malformed upstream key to be ignored, got %q", body)
 	}
+	if strings.Contains(body, "stillbad") {
+		t.Fatalf("expected malformed internal response key to be ignored, got %q", body)
+	}
 	if !strings.Contains(body, `authtranslator_upstream_responses_total{integration="foo",code="200"} 1`) {
 		t.Fatalf("missing valid upstream status metric: %s", body)
+	}
+	if !strings.Contains(body, `authtranslator_internal_responses_total{integration="foo",code="400",reason="invalid_destination"} 1`) {
+		t.Fatalf("missing valid internal response metric: %s", body)
 	}
 }
 

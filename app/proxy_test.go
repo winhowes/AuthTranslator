@@ -7,11 +7,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strconv"
 	"strings"
 	"testing"
 
 	authplugins "github.com/winhowes/AuthTranslator/app/auth"
 	_ "github.com/winhowes/AuthTranslator/app/auth/plugins/token"
+	"github.com/winhowes/AuthTranslator/app/metrics"
 	_ "github.com/winhowes/AuthTranslator/app/secrets/plugins"
 )
 
@@ -101,6 +103,30 @@ func init() {
 type roundTripFunc func(*http.Request) (*http.Response, error)
 
 func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+func promCounterValue(t *testing.T, prefix string) float64 {
+	t.Helper()
+
+	req := httptest.NewRequest(http.MethodGet, "/_at_internal/metrics", nil)
+	rr := httptest.NewRecorder()
+	metrics.Handler(rr, req, "", "")
+
+	body := strings.TrimSpace(rr.Body.String())
+	if body == "" {
+		return 0
+	}
+	for _, line := range strings.Split(body, "\n") {
+		if !strings.HasPrefix(line, prefix+" ") {
+			continue
+		}
+		val, err := strconv.ParseFloat(strings.TrimSpace(strings.TrimPrefix(line, prefix+" ")), 64)
+		if err != nil {
+			t.Fatalf("parse metric %q: %v", line, err)
+		}
+		return val
+	}
+	return 0
+}
 
 func TestProxyHandlerPrefersHeader(t *testing.T) {
 	denylists.Lock()
@@ -451,6 +477,7 @@ func TestProxyHandlerRateLimiterUsesIP(t *testing.T) {
 	req2.Host = "rl-ip"
 	req2.RemoteAddr = "1.2.3.4:5678"
 	rr2 := httptest.NewRecorder()
+	beforeInternal := promCounterValue(t, `authtranslator_internal_responses_total{integration="rl-ip",code="429",reason="caller_rate_limited"}`)
 	proxyHandler(rr2, req2)
 	if rr2.Code != http.StatusTooManyRequests {
 		t.Fatalf("expected rate limit rejection, got %d", rr2.Code)
@@ -463,6 +490,9 @@ func TestProxyHandlerRateLimiterUsesIP(t *testing.T) {
 	}
 	if rr2.Header().Get("X-AT-Error-Reason") != "caller rate limited" {
 		t.Fatalf("unexpected error reason: %s", rr2.Header().Get("X-AT-Error-Reason"))
+	}
+	if afterInternal := promCounterValue(t, `authtranslator_internal_responses_total{integration="rl-ip",code="429",reason="caller_rate_limited"}`); afterInternal != beforeInternal+1 {
+		t.Fatalf("expected caller rate limit metric to increment by 1, got before=%v after=%v", beforeInternal, afterInternal)
 	}
 }
 
@@ -520,6 +550,7 @@ func TestProxyHandlerRetryAfterOutLimit(t *testing.T) {
 	req2 := httptest.NewRequest(http.MethodGet, "http://rl-out/", nil)
 	req2.Host = "rl-out"
 	rr2 := httptest.NewRecorder()
+	beforeInternal := promCounterValue(t, `authtranslator_internal_responses_total{integration="rl-out",code="429",reason="integration_rate_limited"}`)
 	proxyHandler(rr2, req2)
 	if rr2.Code != http.StatusTooManyRequests {
 		t.Fatalf("expected rate limit rejection, got %d", rr2.Code)
@@ -532,6 +563,9 @@ func TestProxyHandlerRetryAfterOutLimit(t *testing.T) {
 	}
 	if rr2.Header().Get("X-AT-Error-Reason") != "integration rate limited" {
 		t.Fatalf("unexpected error reason: %s", rr2.Header().Get("X-AT-Error-Reason"))
+	}
+	if afterInternal := promCounterValue(t, `authtranslator_internal_responses_total{integration="rl-out",code="429",reason="integration_rate_limited"}`); afterInternal != beforeInternal+1 {
+		t.Fatalf("expected integration rate limit metric to increment by 1, got before=%v after=%v", beforeInternal, afterInternal)
 	}
 }
 
@@ -611,6 +645,7 @@ func TestProxyHandlerNotFound(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "http://missing/", nil)
 	req.Host = "missing"
 	rr := httptest.NewRecorder()
+	beforeInternal := promCounterValue(t, `authtranslator_internal_responses_total{integration="unknown",code="404",reason="integration_not_found"}`)
 	proxyHandler(rr, req)
 	if rr.Code != http.StatusNotFound {
 		t.Fatalf("expected 404, got %d", rr.Code)
@@ -623,6 +658,9 @@ func TestProxyHandlerNotFound(t *testing.T) {
 	}
 	if ct := rr.Header().Get("Content-Type"); ct != "text/plain; charset=utf-8" {
 		t.Fatalf("unexpected content type %s", ct)
+	}
+	if afterInternal := promCounterValue(t, `authtranslator_internal_responses_total{integration="unknown",code="404",reason="integration_not_found"}`); afterInternal != beforeInternal+1 {
+		t.Fatalf("expected integration not found metric to increment by 1, got before=%v after=%v", beforeInternal, afterInternal)
 	}
 }
 
@@ -649,6 +687,8 @@ func TestProxyHandlerAuthFailure(t *testing.T) {
 	req.Host = "authfail"
 	req.Header.Set("X-Auth", "wrong")
 	rr := httptest.NewRecorder()
+	beforeAuthFailures := promCounterValue(t, `authtranslator_auth_failures_total{integration="authfail"}`)
+	beforeInternal := promCounterValue(t, `authtranslator_internal_responses_total{integration="authfail",code="401",reason="incoming_auth_failure"}`)
 	proxyHandler(rr, req)
 	if rr.Code != http.StatusUnauthorized {
 		t.Fatalf("expected 401, got %d", rr.Code)
@@ -661,6 +701,12 @@ func TestProxyHandlerAuthFailure(t *testing.T) {
 	}
 	if ct := rr.Header().Get("Content-Type"); ct != "text/plain; charset=utf-8" {
 		t.Fatalf("unexpected content type %s", ct)
+	}
+	if afterAuthFailures := promCounterValue(t, `authtranslator_auth_failures_total{integration="authfail"}`); afterAuthFailures != beforeAuthFailures+1 {
+		t.Fatalf("expected auth failure metric to increment by 1, got before=%v after=%v", beforeAuthFailures, afterAuthFailures)
+	}
+	if afterInternal := promCounterValue(t, `authtranslator_internal_responses_total{integration="authfail",code="401",reason="incoming_auth_failure"}`); afterInternal != beforeInternal+1 {
+		t.Fatalf("expected incoming auth failure metric to increment by 1, got before=%v after=%v", beforeInternal, afterInternal)
 	}
 }
 
@@ -723,6 +769,7 @@ func TestProxyHandlerBadGateway(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "http://badgw/", nil)
 	req.Host = "badgw"
 	rr := httptest.NewRecorder()
+	beforeInternal := promCounterValue(t, `authtranslator_internal_responses_total{integration="badgw",code="502",reason="no_proxy_configured"}`)
 	proxyHandler(rr, req)
 	if rr.Code != http.StatusBadGateway {
 		t.Fatalf("expected 502, got %d", rr.Code)
@@ -735,6 +782,9 @@ func TestProxyHandlerBadGateway(t *testing.T) {
 	}
 	if ct := rr.Header().Get("Content-Type"); ct != "text/plain; charset=utf-8" {
 		t.Fatalf("unexpected content type %s", ct)
+	}
+	if afterInternal := promCounterValue(t, `authtranslator_internal_responses_total{integration="badgw",code="502",reason="no_proxy_configured"}`); afterInternal != beforeInternal+1 {
+		t.Fatalf("expected no proxy metric to increment by 1, got before=%v after=%v", beforeInternal, afterInternal)
 	}
 }
 
@@ -783,6 +833,7 @@ func TestProxyHandlerWildcardMissingDestination(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "http://wild-missing/path", nil)
 	req.Host = "wild-missing"
 	rr := httptest.NewRecorder()
+	beforeInternal := promCounterValue(t, `authtranslator_internal_responses_total{integration="wild-missing",code="400",reason="invalid_destination"}`)
 
 	proxyHandler(rr, req)
 
@@ -791,6 +842,9 @@ func TestProxyHandlerWildcardMissingDestination(t *testing.T) {
 	}
 	if rr.Header().Get("X-AT-Error-Reason") != "invalid destination" {
 		t.Fatalf("unexpected error reason: %s", rr.Header().Get("X-AT-Error-Reason"))
+	}
+	if afterInternal := promCounterValue(t, `authtranslator_internal_responses_total{integration="wild-missing",code="400",reason="invalid_destination"}`); afterInternal != beforeInternal+1 {
+		t.Fatalf("expected invalid destination metric to increment by 1, got before=%v after=%v", beforeInternal, afterInternal)
 	}
 }
 
@@ -960,6 +1014,8 @@ func TestProxyHandlerOutgoingAuthError(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "http://fail-auth/", nil)
 	req.Host = "fail-auth"
 	rr := httptest.NewRecorder()
+	beforeAuthFailures := promCounterValue(t, `authtranslator_auth_failures_total{integration="fail-auth"}`)
+	beforeInternal := promCounterValue(t, `authtranslator_internal_responses_total{integration="fail-auth",code="401",reason="outgoing_auth_failure"}`)
 
 	proxyHandler(rr, req)
 
@@ -968,6 +1024,12 @@ func TestProxyHandlerOutgoingAuthError(t *testing.T) {
 	}
 	if rr.Header().Get("X-AT-Error-Reason") != "authentication failed" {
 		t.Fatalf("unexpected error reason %q", rr.Header().Get("X-AT-Error-Reason"))
+	}
+	if afterAuthFailures := promCounterValue(t, `authtranslator_auth_failures_total{integration="fail-auth"}`); afterAuthFailures != beforeAuthFailures+1 {
+		t.Fatalf("expected auth failure metric to increment by 1, got before=%v after=%v", beforeAuthFailures, afterAuthFailures)
+	}
+	if afterInternal := promCounterValue(t, `authtranslator_internal_responses_total{integration="fail-auth",code="401",reason="outgoing_auth_failure"}`); afterInternal != beforeInternal+1 {
+		t.Fatalf("expected outgoing auth failure metric to increment by 1, got before=%v after=%v", beforeInternal, afterInternal)
 	}
 }
 

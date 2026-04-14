@@ -38,6 +38,7 @@ func Reset() {
 	requestCounts.Init()
 	rateLimitCounts.Init()
 	authFailureCounts.Init()
+	internalResponseCounts.Init()
 	upstreamStatusCounts.Init()
 	durationHistsMu.Lock()
 	durationHists = make(map[string]*histogram)
