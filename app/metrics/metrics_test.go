@@ -45,8 +45,22 @@ func TestMetricsHandlerEmpty(t *testing.T) {
 	if ct := rr.Header().Get("Content-Type"); ct != "text/plain; version=0.0.4" {
 		t.Fatalf("expected content type text/plain; version=0.0.4, got %s", ct)
 	}
-	if body := rr.Body.String(); body != "" {
-		t.Fatalf("expected empty body, got %q", body)
+
+	body := rr.Body.String()
+	for _, line := range []string{
+		"# TYPE authtranslator_requests_total counter",
+		"# TYPE authtranslator_request_duration_seconds histogram",
+		"# TYPE authtranslator_rate_limit_events_total counter",
+		"# TYPE authtranslator_auth_failures_total counter",
+		"# TYPE authtranslator_internal_responses_total counter",
+		"# TYPE authtranslator_upstream_responses_total counter",
+	} {
+		if !strings.Contains(body, line) {
+			t.Fatalf("missing metric type line %q in %q", line, body)
+		}
+	}
+	if strings.Contains(body, `{integration="`) {
+		t.Fatalf("expected no metric samples, got %q", body)
 	}
 }
 
@@ -73,9 +87,17 @@ func TestMetricsHandlerOutput(t *testing.T) {
 	}
 
 	body := rr.Body.String()
-	lines := strings.Split(strings.TrimSpace(body), "\n")
-	if len(lines) < 27 {
-		t.Fatalf("expected at least 27 metrics lines, got %d", len(lines))
+	for _, line := range []string{
+		"# TYPE authtranslator_requests_total counter",
+		"# TYPE authtranslator_request_duration_seconds histogram",
+		"# TYPE authtranslator_rate_limit_events_total counter",
+		"# TYPE authtranslator_auth_failures_total counter",
+		"# TYPE authtranslator_internal_responses_total counter",
+		"# TYPE authtranslator_upstream_responses_total counter",
+	} {
+		if !strings.Contains(body, line) {
+			t.Fatalf("missing metric type line %q in %q", line, body)
+		}
 	}
 	if !strings.Contains(body, `authtranslator_requests_total{integration="foo"} 2`) {
 		t.Fatal("missing foo request metric")
