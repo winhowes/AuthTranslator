@@ -32,6 +32,9 @@ func TestTokenCounter(t *testing.T) {
 
 	rr := httptest.NewRecorder()
 	metrics.Handler(rr, httptest.NewRequest(http.MethodGet, "/metrics", nil), "", "")
+	if !strings.Contains(rr.Body.String(), "# TYPE authtranslator_tokens_total counter") {
+		t.Fatalf("token metric type missing: %s", rr.Body.String())
+	}
 	if !strings.Contains(rr.Body.String(), `authtranslator_tokens_total{caller="caller"} 42`) {
 		t.Fatalf("token metric missing: %s", rr.Body.String())
 	}

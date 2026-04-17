@@ -3,10 +3,8 @@
 package example
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"sync"
 
@@ -47,6 +45,10 @@ func (t *tokenCounter) OnResponse(integ, caller string, r *http.Request, resp *h
 func (t *tokenCounter) WriteProm(w http.ResponseWriter) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
+	if len(t.totals) == 0 {
+		return
+	}
+	fmt.Fprintln(w, "# TYPE authtranslator_tokens_total counter")
 	for caller, total := range t.totals {
 		fmt.Fprintf(w, "authtranslator_tokens_total{caller=%q} %d\n", caller, total)
 	}

@@ -22,7 +22,9 @@ type Plugin interface {
 
 `OnRequest` fires just before the proxy forwards a request upstream and
 `OnResponse` runs once the upstream reply is received. `WriteProm` lets a plugin
-append custom Prometheus metrics. The integration name is passed so you can
+append custom Prometheus metrics. For custom families, emit the matching
+Prometheus metadata lines such as `# TYPE ... counter` so functions like
+`rate()` are recognized correctly. The integration name is passed so you can
 apply per-service logic.
 
 ---
@@ -97,6 +99,10 @@ func (t *tokenCounter) OnResponse(integ, caller string, r *http.Request, resp *h
 func (t *tokenCounter) WriteProm(w http.ResponseWriter) {
     t.mu.Lock()
     defer t.mu.Unlock()
+    if len(t.totals) == 0 {
+        return
+    }
+    fmt.Fprintln(w, "# TYPE authtranslator_tokens_total counter")
     for caller, total := range t.totals {
         fmt.Fprintf(w, "authtranslator_tokens_total{caller=%q} %d\n", caller, total)
     }

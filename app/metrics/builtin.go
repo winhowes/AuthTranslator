@@ -141,12 +141,18 @@ func RecordDuration(integration string, d time.Duration) {
 	h.Observe(d.Seconds())
 }
 
+func writePromType(w http.ResponseWriter, name, metricType string) {
+	fmt.Fprintf(w, "# TYPE %s %s\n", name, metricType)
+}
+
 // WriteProm emits all Prometheus metrics to w in text format.
 func WriteProm(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "text/plain; version=0.0.4")
+	writePromType(w, "authtranslator_requests_total", "counter")
 	requestCounts.Do(func(kv expvar.KeyValue) {
 		fmt.Fprintf(w, "authtranslator_requests_total{integration=%q} %s\n", kv.Key, kv.Value.String())
 	})
+	writePromType(w, "authtranslator_request_duration_seconds", "histogram")
 	durationHistsMu.Lock()
 	type histSnapshot struct {
 		name string
@@ -160,12 +166,15 @@ func WriteProm(w http.ResponseWriter) {
 	for _, hs := range hists {
 		hs.h.writeProm(w, hs.name)
 	}
+	writePromType(w, "authtranslator_rate_limit_events_total", "counter")
 	rateLimitCounts.Do(func(kv expvar.KeyValue) {
 		fmt.Fprintf(w, "authtranslator_rate_limit_events_total{integration=%q} %s\n", kv.Key, kv.Value.String())
 	})
+	writePromType(w, "authtranslator_auth_failures_total", "counter")
 	authFailureCounts.Do(func(kv expvar.KeyValue) {
 		fmt.Fprintf(w, "authtranslator_auth_failures_total{integration=%q} %s\n", kv.Key, kv.Value.String())
 	})
+	writePromType(w, "authtranslator_internal_responses_total", "counter")
 	internalResponseCounts.Do(func(kv expvar.KeyValue) {
 		parts := strings.SplitN(kv.Key, metricKeySeparator, 3)
 		if len(parts) != 3 {
@@ -174,6 +183,7 @@ func WriteProm(w http.ResponseWriter) {
 		integ, code, reason := parts[0], parts[1], parts[2]
 		fmt.Fprintf(w, "authtranslator_internal_responses_total{integration=%q,code=%q,reason=%q} %s\n", integ, code, reason, kv.Value.String())
 	})
+	writePromType(w, "authtranslator_upstream_responses_total", "counter")
 	upstreamStatusCounts.Do(func(kv expvar.KeyValue) {
 		parts := strings.SplitN(kv.Key, metricKeySeparator, 2)
 		if len(parts) != 2 {
