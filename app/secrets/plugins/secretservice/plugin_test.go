@@ -22,13 +22,31 @@ func TestSecretServicePluginLoad(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if got != "secret" {
-		t.Fatalf("expected secret, got %q", got)
+	if got != "secret\n" {
+		t.Fatalf("expected exact secret bytes, got %q", got)
 	}
 
 	wantArgs := []string{"lookup", "service", "slack", "user", "bot"}
 	if !reflect.DeepEqual(gotArgs, wantArgs) {
 		t.Fatalf("args = %v, want %v", gotArgs, wantArgs)
+	}
+}
+
+func TestSecretServicePluginLoadPreservesWhitespace(t *testing.T) {
+	old := execSecretTool
+	t.Cleanup(func() { execSecretTool = old })
+
+	execSecretTool = func(ctx context.Context, args ...string) ([]byte, error) {
+		return []byte("  secret with spaces  \n"), nil
+	}
+
+	p := secretServicePlugin{}
+	got, err := p.Load(context.Background(), "service=slack")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "  secret with spaces  \n" {
+		t.Fatalf("expected exact secret bytes, got %q", got)
 	}
 }
 

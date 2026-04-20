@@ -7,24 +7,56 @@ import (
 	"unicode/utf8"
 )
 
-// decodeCredentialBlob converts Windows credential blobs into a string.
+// decodeCredentialBlob converts a CredentialBlob to text conservatively.
 //
-// CredMan generic credentials are often stored as UTF-16LE text, but callers
-// can write arbitrary bytes. We therefore:
-//   - prefer UTF-8 when bytes are valid UTF-8 text without embedded NULs,
-//   - otherwise decode valid UTF-16LE,
-//   - and finally fall back to raw bytes with trailing NULs removed.
+// For CRED_TYPE_GENERIC, CredentialBlob is application-defined bytes. To avoid
+// corrupting non-UTF16 blobs, we only decode as UTF-16LE when the payload looks
+// like UTF-16LE (BOM or enough NUL-byte structure). Otherwise we keep bytes as-is.
 func decodeCredentialBlob(blob []byte) string {
-	trimmed := bytes.TrimRight(blob, "\x00")
-	if utf8.Valid(trimmed) && !bytes.Contains(trimmed, []byte{0x00}) {
-		return string(trimmed)
+	trimmedNUL := bytes.TrimRight(blob, "\x00")
+	if utf8.Valid(trimmedNUL) && !bytes.Contains(trimmedNUL, []byte{0x00}) {
+		return string(trimmedNUL)
 	}
 
-	if s, ok := decodeUTF16LEBlob(blob); ok {
-		return s
+	if looksLikeUTF16LE(blob) {
+		if s, ok := decodeUTF16LEBlob(blob); ok {
+			return s
+		}
 	}
 
-	return string(trimmed)
+	return string(blob)
+}
+
+func looksLikeUTF16LE(blob []byte) bool {
+	if len(blob) < 2 || len(blob)%2 != 0 {
+		return false
+	}
+
+	// UTF-16LE BOM.
+	if len(blob) >= 2 && blob[0] == 0xFF && blob[1] == 0xFE {
+		return true
+	}
+
+	// Heuristic: UTF-16 text often contains many zero bytes in one parity (ASCII
+	// in UTF-16LE has zeros at odd indices) or explicit NUL terminators.
+	oddZeros, evenZeros := 0, 0
+	for i, b := range blob {
+		if b != 0 {
+			continue
+		}
+		if i%2 == 0 {
+			evenZeros++
+		} else {
+			oddZeros++
+		}
+	}
+
+	threshold := len(blob) / 4
+	if threshold == 0 {
+		threshold = 1
+	}
+
+	return oddZeros >= threshold || evenZeros >= threshold
 }
 
 func decodeUTF16LEBlob(blob []byte) (string, bool) {

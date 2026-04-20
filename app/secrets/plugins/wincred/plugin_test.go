@@ -32,7 +32,7 @@ func TestDecodeCredentialBlobUTF16Unicode(t *testing.T) {
 
 func TestDecodeCredentialBlobInvalidUTF16FallsBackToBytes(t *testing.T) {
 	blob := []byte{0x00, 0xD8, 0x41, 0x00} // lone high surrogate + 'A'
-	if got := decodeCredentialBlob(blob); got != string(blob[:3]) {
+	if got := decodeCredentialBlob(blob); got != string(blob) {
 		t.Fatalf("decodeCredentialBlob() = %q, want byte fallback", got)
 	}
 }
@@ -41,6 +41,35 @@ func TestDecodeCredentialBlobOddLengthFallsBackToBytes(t *testing.T) {
 	blob := []byte{0x61, 0x62, 0x63}
 	if got := decodeCredentialBlob(blob); got != "abc" {
 		t.Fatalf("decodeCredentialBlob() = %q, want %q", got, "abc")
+	}
+}
+
+func TestDecodeCredentialBlobEvenLengthNonUTF16Binary(t *testing.T) {
+	blob := []byte{0x80, 0x81, 0x82, 0x83}
+	if got := decodeCredentialBlob(blob); got != string(blob) {
+		t.Fatalf("decodeCredentialBlob() = %q, want raw bytes", got)
+	}
+}
+
+func TestLooksLikeUTF16LE(t *testing.T) {
+	tests := []struct {
+		name string
+		blob []byte
+		want bool
+	}{
+		{name: "odd length", blob: []byte{0x41}, want: false},
+		{name: "len2 threshold path", blob: []byte{0x00, 0x00}, want: true},
+		{name: "bom", blob: []byte{0xFF, 0xFE, 0x41, 0x00}, want: true},
+		{name: "ascii utf16 style", blob: []byte{0x41, 0x00, 0x42, 0x00}, want: true},
+		{name: "binary without nul pattern", blob: []byte{0x80, 0x81, 0x82, 0x83}, want: false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := looksLikeUTF16LE(tc.blob); got != tc.want {
+				t.Fatalf("looksLikeUTF16LE(%v) = %v, want %v", tc.blob, got, tc.want)
+			}
+		})
 	}
 }
 

@@ -23,13 +23,31 @@ func TestKeychainPluginLoad(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if got != "super-secret" {
-		t.Fatalf("expected trimmed secret, got %q", got)
+	if got != "super-secret\n" {
+		t.Fatalf("expected exact secret bytes, got %q", got)
 	}
 
 	wantArgs := []string{"find-generic-password", "-w", "-s", "slack", "-a", "bot"}
 	if !reflect.DeepEqual(gotArgs, wantArgs) {
 		t.Fatalf("args = %v, want %v", gotArgs, wantArgs)
+	}
+}
+
+func TestKeychainPluginLoadPreservesWhitespace(t *testing.T) {
+	old := execSecurityCommand
+	t.Cleanup(func() { execSecurityCommand = old })
+
+	execSecurityCommand = func(ctx context.Context, args ...string) ([]byte, error) {
+		return []byte("  secret with spaces  \n"), nil
+	}
+
+	p := keychainPlugin{}
+	got, err := p.Load(context.Background(), "svc")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "  secret with spaces  \n" {
+		t.Fatalf("expected exact secret bytes, got %q", got)
 	}
 }
 

@@ -35,7 +35,7 @@ func (secretServicePlugin) Load(ctx context.Context, id string) (string, error) 
 	if err != nil {
 		return "", fmt.Errorf("secretservice lookup failed: %w", err)
 	}
-	return strings.TrimSpace(string(out)), nil
+	return string(out), nil
 }
 
 func parseSecretServiceAttrs(id string) ([][2]string, error) {

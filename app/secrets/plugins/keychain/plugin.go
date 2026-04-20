@@ -47,7 +47,7 @@ func (keychainPlugin) Load(ctx context.Context, id string) (string, error) {
 		return "", fmt.Errorf("keychain lookup failed: %w", err)
 	}
 
-	return strings.TrimSpace(string(out)), nil
+	return string(out), nil
 }
 
 func parseKeychainID(id string) (service, account string) {
