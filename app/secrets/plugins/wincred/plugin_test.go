@@ -58,6 +58,43 @@ func TestDecodeUTF16LEBlobInvalid(t *testing.T) {
 	}
 }
 
+func TestDecodeUTF16LEBlobEmptyAfterTrim(t *testing.T) {
+	blob := []byte{0x00, 0x00}
+	got, ok := decodeUTF16LEBlob(blob)
+	if !ok || got != "" {
+		t.Fatalf("decodeUTF16LEBlob() = (%q,%v), want (\"\",true)", got, ok)
+	}
+}
+
+func TestDecodeUTF16LEBlobValidSurrogatePair(t *testing.T) {
+	blob := encodeUTF16LE("🔐")
+	got, ok := decodeUTF16LEBlob(blob)
+	if !ok || got != "🔐" {
+		t.Fatalf("decodeUTF16LEBlob() = (%q,%v), want (\"🔐\",true)", got, ok)
+	}
+}
+
+func TestDecodeUTF16LEBlobInvalidHighSurrogatePairing(t *testing.T) {
+	blob := []byte{0x00, 0xD8, 0x41, 0x00}
+	if _, ok := decodeUTF16LEBlob(blob); ok {
+		t.Fatal("expected invalid surrogate pairing")
+	}
+}
+
+func TestDecodeUTF16LEBlobLoneHighSurrogate(t *testing.T) {
+	blob := []byte{0x00, 0xD8}
+	if _, ok := decodeUTF16LEBlob(blob); ok {
+		t.Fatal("expected lone high surrogate to be invalid")
+	}
+}
+
+func TestDecodeUTF16LEBlobOddLength(t *testing.T) {
+	blob := []byte{0x41, 0x00, 0x42}
+	if _, ok := decodeUTF16LEBlob(blob); ok {
+		t.Fatal("expected odd-length blob to be invalid UTF-16")
+	}
+}
+
 func encodeUTF16LE(s string) []byte {
 	u16 := utf16.Encode([]rune(s))
 	blob := make([]byte, (len(u16)+1)*2)

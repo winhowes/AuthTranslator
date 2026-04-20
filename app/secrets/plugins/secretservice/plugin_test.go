@@ -2,6 +2,7 @@ package plugins
 
 import (
 	"context"
+	"errors"
 	"reflect"
 	"testing"
 )
@@ -35,6 +36,20 @@ func TestSecretServicePluginLoadInvalidID(t *testing.T) {
 	p := secretServicePlugin{}
 	if _, err := p.Load(context.Background(), "bad"); err == nil {
 		t.Fatal("expected parse error")
+	}
+}
+
+func TestSecretServicePluginLoadCommandError(t *testing.T) {
+	old := execSecretTool
+	t.Cleanup(func() { execSecretTool = old })
+
+	execSecretTool = func(ctx context.Context, args ...string) ([]byte, error) {
+		return nil, errors.New("secret-tool failed")
+	}
+
+	p := secretServicePlugin{}
+	if _, err := p.Load(context.Background(), "service=slack"); err == nil {
+		t.Fatal("expected command error")
 	}
 }
 

@@ -2,6 +2,7 @@ package plugins
 
 import (
 	"context"
+	"errors"
 	"os/exec"
 	"reflect"
 	"testing"
@@ -70,6 +71,34 @@ func TestKeychainPluginLoadExitError(t *testing.T) {
 
 	p := keychainPlugin{}
 	if _, err := p.Load(context.Background(), "missing"); err == nil {
+		t.Fatal("expected lookup error")
+	}
+}
+
+func TestKeychainPluginLoadExitErrorNoStderr(t *testing.T) {
+	old := execSecurityCommand
+	t.Cleanup(func() { execSecurityCommand = old })
+
+	execSecurityCommand = func(ctx context.Context, args ...string) ([]byte, error) {
+		return nil, &exec.ExitError{}
+	}
+
+	p := keychainPlugin{}
+	if _, err := p.Load(context.Background(), "missing"); err == nil {
+		t.Fatal("expected lookup error")
+	}
+}
+
+func TestKeychainPluginLoadCommandError(t *testing.T) {
+	old := execSecurityCommand
+	t.Cleanup(func() { execSecurityCommand = old })
+
+	execSecurityCommand = func(ctx context.Context, args ...string) ([]byte, error) {
+		return nil, errors.New("command missing")
+	}
+
+	p := keychainPlugin{}
+	if _, err := p.Load(context.Background(), "service"); err == nil {
 		t.Fatal("expected lookup error")
 	}
 }
