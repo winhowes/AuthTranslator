@@ -5,7 +5,6 @@ package plugins
 import (
 	"fmt"
 	"syscall"
-	"unicode/utf16"
 	"unsafe"
 )
 
@@ -60,25 +59,4 @@ func loadWindowsCredential(id string) (string, error) {
 
 	blob := unsafe.Slice(cred.CredentialBlob, cred.CredentialBlobSize)
 	return decodeCredentialBlob(blob), nil
-}
-
-func decodeCredentialBlob(blob []byte) string {
-	if len(blob)%2 == 0 {
-		u16 := make([]uint16, 0, len(blob)/2)
-		looksUTF16 := true
-		for i := 0; i < len(blob); i += 2 {
-			v := uint16(blob[i]) | uint16(blob[i+1])<<8
-			u16 = append(u16, v)
-			if blob[i+1] != 0 {
-				looksUTF16 = false
-			}
-		}
-		if looksUTF16 {
-			for len(u16) > 0 && u16[len(u16)-1] == 0 {
-				u16 = u16[:len(u16)-1]
-			}
-			return string(utf16.Decode(u16))
-		}
-	}
-	return string(blob)
 }
