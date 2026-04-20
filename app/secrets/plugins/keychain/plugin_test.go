@@ -121,6 +121,15 @@ func TestKeychainPluginLoadCommandError(t *testing.T) {
 	}
 }
 
+func TestExecSecurityCommandDefault(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	if _, err := execSecurityCommand(ctx, "find-generic-password", "-w", "-s", "unused"); err == nil {
+		t.Fatal("expected error from canceled context")
+	}
+}
+
 func TestParseKeychainID(t *testing.T) {
 	service, account := parseKeychainID("svc#acc")
 	if service != "svc" || account != "acc" {

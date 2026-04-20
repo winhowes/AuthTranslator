@@ -82,6 +82,15 @@ func TestParseSecretServiceAttrs(t *testing.T) {
 	}
 }
 
+func TestExecSecretToolDefault(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	if _, err := execSecretTool(ctx, "lookup", "service", "unused"); err == nil {
+		t.Fatal("expected error from canceled context")
+	}
+}
+
 func TestParseSecretServiceAttrsErrors(t *testing.T) {
 	cases := []string{"", "missingequals", "=value", "key="}
 	for _, tc := range cases {
