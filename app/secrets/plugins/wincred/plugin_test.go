@@ -32,15 +32,29 @@ func TestDecodeCredentialBlobUTF16Unicode(t *testing.T) {
 
 func TestDecodeCredentialBlobInvalidUTF16FallsBackToBytes(t *testing.T) {
 	blob := []byte{0x00, 0xD8, 0x41, 0x00} // lone high surrogate + 'A'
-	if got := decodeCredentialBlob(blob); got != string(blob) {
+	if got := decodeCredentialBlob(blob); got != string(blob[:3]) {
 		t.Fatalf("decodeCredentialBlob() = %q, want byte fallback", got)
 	}
 }
 
 func TestDecodeCredentialBlobOddLengthFallsBackToBytes(t *testing.T) {
 	blob := []byte{0x61, 0x62, 0x63}
-	if got := decodeCredentialBlob(blob); got != string(blob) {
-		t.Fatalf("decodeCredentialBlob() = %q, want byte fallback", got)
+	if got := decodeCredentialBlob(blob); got != "abc" {
+		t.Fatalf("decodeCredentialBlob() = %q, want %q", got, "abc")
+	}
+}
+
+func TestDecodeCredentialBlobUTF8WithTrailingNull(t *testing.T) {
+	blob := append([]byte("päss-東京"), 0x00, 0x00)
+	if got := decodeCredentialBlob(blob); got != "päss-東京" {
+		t.Fatalf("decodeCredentialBlob() = %q, want %q", got, "päss-東京")
+	}
+}
+
+func TestDecodeUTF16LEBlobInvalid(t *testing.T) {
+	blob := []byte{0x00, 0xDC} // lone low surrogate
+	if _, ok := decodeUTF16LEBlob(blob); ok {
+		t.Fatal("expected invalid UTF-16 blob")
 	}
 }
 
