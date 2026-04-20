@@ -22,6 +22,13 @@ func TestDecodeCredentialBlobUTF16ASCII(t *testing.T) {
 	}
 }
 
+func TestDecodeCredentialBlobUTF16WithBOM(t *testing.T) {
+	blob := append([]byte{0xFF, 0xFE}, encodeUTF16LE("secret")...)
+	if got := decodeCredentialBlob(blob); got != "secret" {
+		t.Fatalf("decodeCredentialBlob() = %q, want %q", got, "secret")
+	}
+}
+
 func TestDecodeCredentialBlobUTF16Unicode(t *testing.T) {
 	want := "päss-東京-🔐"
 	blob := encodeUTF16LE(want)

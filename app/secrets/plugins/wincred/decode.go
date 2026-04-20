@@ -72,6 +72,9 @@ func decodeUTF16LEBlob(blob []byte) (string, bool) {
 	for len(u16) > 0 && u16[len(u16)-1] == 0 {
 		u16 = u16[:len(u16)-1]
 	}
+	if len(u16) > 0 && u16[0] == 0xFEFF {
+		u16 = u16[1:]
+	}
 	if len(u16) == 0 {
 		return "", true
 	}
