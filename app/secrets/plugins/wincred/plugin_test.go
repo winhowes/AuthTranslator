@@ -37,6 +37,13 @@ func TestDecodeCredentialBlobUTF16Unicode(t *testing.T) {
 	}
 }
 
+func TestDecodeCredentialBlobShortEvenWithSingleZeroFallsBack(t *testing.T) {
+	blob := []byte{0x00, 0xAB, 0xCD, 0xEF}
+	if got := decodeCredentialBlob(blob); got != string(blob) {
+		t.Fatalf("decodeCredentialBlob() = %q, want raw bytes", got)
+	}
+}
+
 func TestDecodeCredentialBlobInvalidUTF16FallsBackToBytes(t *testing.T) {
 	blob := []byte{0x00, 0xD8, 0x41, 0x00} // lone high surrogate + 'A'
 	if got := decodeCredentialBlob(blob); got != string(blob) {
@@ -65,9 +72,10 @@ func TestLooksLikeUTF16LE(t *testing.T) {
 		want bool
 	}{
 		{name: "odd length", blob: []byte{0x41}, want: false},
-		{name: "len2 threshold path", blob: []byte{0x00, 0x00}, want: true},
 		{name: "bom", blob: []byte{0xFF, 0xFE, 0x41, 0x00}, want: true},
 		{name: "ascii utf16 style", blob: []byte{0x41, 0x00, 0x42, 0x00}, want: true},
+		{name: "short even one zero", blob: []byte{0x00, 0xAB, 0xCD, 0xEF}, want: false},
+		{name: "null terminated plausible utf16", blob: []byte{0x71, 0x67, 0xAC, 0x4E, 0x00, 0x00}, want: true},
 		{name: "binary without nul pattern", blob: []byte{0x80, 0x81, 0x82, 0x83}, want: false},
 	}
 
@@ -84,6 +92,18 @@ func TestDecodeCredentialBlobUTF8WithTrailingNull(t *testing.T) {
 	blob := append([]byte("päss-東京"), 0x00, 0x00)
 	if got := decodeCredentialBlob(blob); got != "päss-東京" {
 		t.Fatalf("decodeCredentialBlob() = %q, want %q", got, "päss-東京")
+	}
+}
+
+func TestIsProbablyText(t *testing.T) {
+	if !isProbablyText("hello東京\n\r\t") {
+		t.Fatal("expected printable text to be accepted")
+	}
+	if !isProbablyText("") {
+		t.Fatal("expected empty string to be accepted")
+	}
+	if isProbablyText("bad\x01text") {
+		t.Fatal("expected control-character text to be rejected")
 	}
 }
 

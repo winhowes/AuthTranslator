@@ -3,6 +3,7 @@ package plugins
 import (
 	"bytes"
 	"encoding/binary"
+	"unicode"
 	"unicode/utf16"
 	"unicode/utf8"
 )
@@ -11,7 +12,7 @@ import (
 //
 // For CRED_TYPE_GENERIC, CredentialBlob is application-defined bytes. To avoid
 // corrupting non-UTF16 blobs, we only decode as UTF-16LE when the payload looks
-// like UTF-16LE (BOM or enough NUL-byte structure). Otherwise we keep bytes as-is.
+// like UTF-16LE. Otherwise we keep bytes as-is.
 func decodeCredentialBlob(blob []byte) string {
 	trimmedNUL := bytes.TrimRight(blob, "\x00")
 	if utf8.Valid(trimmedNUL) && !bytes.Contains(trimmedNUL, []byte{0x00}) {
@@ -33,13 +34,14 @@ func looksLikeUTF16LE(blob []byte) bool {
 	}
 
 	// UTF-16LE BOM.
-	if len(blob) >= 2 && blob[0] == 0xFF && blob[1] == 0xFE {
+	if blob[0] == 0xFF && blob[1] == 0xFE {
 		return true
 	}
 
-	// Heuristic: UTF-16 text often contains many zero bytes in one parity (ASCII
-	// in UTF-16LE has zeros at odd indices) or explicit NUL terminators.
+	// Strong structural signal: one parity is almost all zero bytes (ASCII-like
+	// UTF-16LE has zeros at odd indices).
 	oddZeros, evenZeros := 0, 0
+	paritySlots := len(blob) / 2
 	for i, b := range blob {
 		if b != 0 {
 			continue
@@ -50,13 +52,35 @@ func looksLikeUTF16LE(blob []byte) bool {
 			oddZeros++
 		}
 	}
-
-	threshold := len(blob) / 4
-	if threshold == 0 {
-		threshold = 1
+	if oddZeros == paritySlots || evenZeros == paritySlots {
+		return true
 	}
 
-	return oddZeros >= threshold || evenZeros >= threshold
+	// Also accept a UTF-16-style null-terminated payload when it decodes cleanly
+	// to plausible text.
+	if len(blob) >= 4 && blob[len(blob)-2] == 0 && blob[len(blob)-1] == 0 {
+		s, ok := decodeUTF16LEBlob(blob)
+		if ok && isProbablyText(s) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func isProbablyText(s string) bool {
+	if s == "" {
+		return true
+	}
+	for _, r := range s {
+		if r == '\n' || r == '\r' || r == '\t' {
+			continue
+		}
+		if unicode.IsControl(r) {
+			return false
+		}
+	}
+	return true
 }
 
 func decodeUTF16LEBlob(blob []byte) (string, bool) {
