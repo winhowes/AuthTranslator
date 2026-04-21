@@ -3,6 +3,7 @@ package plugins
 import (
 	"context"
 	"encoding/binary"
+	"runtime"
 	"testing"
 	"unicode/utf16"
 )
@@ -29,6 +30,9 @@ func TestWinCredPluginLoad(t *testing.T) {
 }
 
 func TestLoadWindowsCredentialUnsupported(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("non-windows unsupported-path test")
+	}
 	if _, err := loadWindowsCredential("target", "raw"); err == nil {
 		t.Fatal("expected unsupported-platform error")
 	}
