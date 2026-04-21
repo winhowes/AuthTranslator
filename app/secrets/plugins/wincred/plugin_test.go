@@ -107,6 +107,17 @@ func TestDecodeCredentialBlobUTF16WithBOM(t *testing.T) {
 	}
 }
 
+func TestDecodeCredentialBlobUTF16UnicodeNoTerminator(t *testing.T) {
+	blob := encodeUTF16LENoTerminator("東京🔐")
+	got, err := decodeCredentialBlob(blob, "utf16le")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "東京🔐" {
+		t.Fatalf("decodeCredentialBlob(utf16le) = %q, want %q", got, "東京🔐")
+	}
+}
+
 func TestDecodeCredentialBlobUTF16Invalid(t *testing.T) {
 	blob := []byte{0x00, 0xD8, 0x41, 0x00}
 	if _, err := decodeCredentialBlob(blob, "utf16le"); err == nil {
@@ -162,6 +173,15 @@ func TestDecodeUTF16LEBlobOddLength(t *testing.T) {
 	if _, ok := decodeUTF16LEBlob(blob); ok {
 		t.Fatal("expected odd-length blob to be invalid UTF-16")
 	}
+}
+
+func encodeUTF16LENoTerminator(s string) []byte {
+	u16 := utf16.Encode([]rune(s))
+	blob := make([]byte, len(u16)*2)
+	for i, v := range u16 {
+		binary.LittleEndian.PutUint16(blob[i*2:], v)
+	}
+	return blob
 }
 
 func encodeUTF16LE(s string) []byte {
