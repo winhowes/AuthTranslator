@@ -66,11 +66,7 @@ func parseKeychainID(id string) (service, account string, err error) {
 }
 
 func trimCommandLineTerminator(out []byte) string {
-	secret := string(out)
-	if strings.HasSuffix(secret, "\r\n") {
-		return strings.TrimSuffix(secret, "\r\n")
-	}
-	return strings.TrimSuffix(secret, "\n")
+	return strings.TrimSuffix(string(out), "\n")
 }
 
 func init() { secrets.Register(keychainPlugin{}) }

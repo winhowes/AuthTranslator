@@ -51,7 +51,7 @@ func TestKeychainPluginLoadPreservesWhitespace(t *testing.T) {
 	}
 }
 
-func TestKeychainPluginLoadTrimsCRLFCommandTerminator(t *testing.T) {
+func TestKeychainPluginLoadPreservesTrailingCRBeforeCommandLF(t *testing.T) {
 	old := execSecurityCommand
 	t.Cleanup(func() { execSecurityCommand = old })
 
@@ -64,8 +64,8 @@ func TestKeychainPluginLoadTrimsCRLFCommandTerminator(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if got != "secret" {
-		t.Fatalf("expected command terminator to be trimmed, got %q", got)
+	if got != "secret\r" {
+		t.Fatalf("expected trailing carriage return to be preserved, got %q", got)
 	}
 }
 
