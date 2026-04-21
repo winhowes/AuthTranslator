@@ -47,7 +47,7 @@ func (keychainPlugin) Load(ctx context.Context, id string) (string, error) {
 		return "", fmt.Errorf("keychain lookup failed: %w", err)
 	}
 
-	return string(out), nil
+	return trimCommandLineTerminator(out), nil
 }
 
 func parseKeychainID(id string) (service, account string, err error) {
@@ -63,6 +63,10 @@ func parseKeychainID(id string) (service, account string, err error) {
 		}
 	}
 	return service, account, nil
+}
+
+func trimCommandLineTerminator(out []byte) string {
+	return strings.TrimSuffix(string(out), "\n")
 }
 
 func init() { secrets.Register(keychainPlugin{}) }

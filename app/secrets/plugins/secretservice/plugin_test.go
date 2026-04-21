@@ -50,6 +50,24 @@ func TestSecretServicePluginLoadPreservesWhitespace(t *testing.T) {
 	}
 }
 
+func TestSecretServicePluginLoadPreservesCRLFTrailingBytes(t *testing.T) {
+	old := execSecretTool
+	t.Cleanup(func() { execSecretTool = old })
+
+	execSecretTool = func(ctx context.Context, args ...string) ([]byte, error) {
+		return []byte("secret\r\n"), nil
+	}
+
+	p := secretServicePlugin{}
+	got, err := p.Load(context.Background(), "service=slack")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "secret\r\n" {
+		t.Fatalf("expected exact secret bytes, got %q", got)
+	}
+}
+
 func TestSecretServicePluginLoadInvalidID(t *testing.T) {
 	p := secretServicePlugin{}
 	if _, err := p.Load(context.Background(), "bad"); err == nil {
