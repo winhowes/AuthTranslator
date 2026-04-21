@@ -35,7 +35,7 @@ func (secretServicePlugin) Load(ctx context.Context, id string) (string, error) 
 	if err != nil {
 		return "", fmt.Errorf("secretservice lookup failed: %w", err)
 	}
-	return trimCommandLineTerminator(out), nil
+	return string(out), nil
 }
 
 func parseSecretServiceAttrs(id string) ([][2]string, error) {
@@ -58,14 +58,6 @@ func parseSecretServiceAttrs(id string) ([][2]string, error) {
 		attrs = append(attrs, [2]string{k, v})
 	}
 	return attrs, nil
-}
-
-func trimCommandLineTerminator(out []byte) string {
-	secret := string(out)
-	if strings.HasSuffix(secret, "\r\n") {
-		return strings.TrimSuffix(secret, "\r\n")
-	}
-	return strings.TrimSuffix(secret, "\n")
 }
 
 func init() { secrets.Register(secretServicePlugin{}) }
