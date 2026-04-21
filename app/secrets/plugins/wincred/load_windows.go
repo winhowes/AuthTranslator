@@ -31,8 +31,8 @@ var (
 	procFree  = advapi32.NewProc("CredFree")
 )
 
-func loadWindowsCredential(id string) (string, error) {
-	target, err := syscall.UTF16PtrFromString(id)
+func loadWindowsCredential(targetName, mode string) (string, error) {
+	target, err := syscall.UTF16PtrFromString(targetName)
 	if err != nil {
 		return "", err
 	}
@@ -58,5 +58,5 @@ func loadWindowsCredential(id string) (string, error) {
 	}
 
 	blob := unsafe.Slice(cred.CredentialBlob, cred.CredentialBlobSize)
-	return decodeCredentialBlob(blob), nil
+	return decodeCredentialBlob(blob, mode)
 }

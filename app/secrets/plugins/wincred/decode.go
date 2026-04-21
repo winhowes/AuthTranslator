@@ -1,86 +1,30 @@
 package plugins
 
 import (
-	"bytes"
 	"encoding/binary"
-	"unicode"
+	"fmt"
 	"unicode/utf16"
 	"unicode/utf8"
 )
 
-// decodeCredentialBlob converts a CredentialBlob to text conservatively.
-//
-// For CRED_TYPE_GENERIC, CredentialBlob is application-defined bytes. To avoid
-// corrupting non-UTF16 blobs, we only decode as UTF-16LE when the payload looks
-// like UTF-16LE. Otherwise we keep bytes as-is.
-func decodeCredentialBlob(blob []byte) string {
-	trimmedNUL := bytes.TrimRight(blob, "\x00")
-	if utf8.Valid(trimmedNUL) && !bytes.Contains(trimmedNUL, []byte{0x00}) {
-		return string(trimmedNUL)
-	}
-
-	if looksLikeUTF16LE(blob) {
-		if s, ok := decodeUTF16LEBlob(blob); ok {
-			return s
+func decodeCredentialBlob(blob []byte, mode string) (string, error) {
+	switch mode {
+	case "raw":
+		return string(blob), nil
+	case "utf8":
+		if !utf8.Valid(blob) {
+			return "", fmt.Errorf("credential blob is not valid utf-8")
 		}
-	}
-
-	return string(blob)
-}
-
-func looksLikeUTF16LE(blob []byte) bool {
-	if len(blob) < 2 || len(blob)%2 != 0 {
-		return false
-	}
-
-	// UTF-16LE BOM.
-	if blob[0] == 0xFF && blob[1] == 0xFE {
-		return true
-	}
-
-	// Strong structural signal: one parity is almost all zero bytes (ASCII-like
-	// UTF-16LE has zeros at odd indices).
-	oddZeros, evenZeros := 0, 0
-	paritySlots := len(blob) / 2
-	for i, b := range blob {
-		if b != 0 {
-			continue
-		}
-		if i%2 == 0 {
-			evenZeros++
-		} else {
-			oddZeros++
-		}
-	}
-	if oddZeros == paritySlots || evenZeros == paritySlots {
-		return true
-	}
-
-	// Also accept a UTF-16-style null-terminated payload when it decodes cleanly
-	// to plausible text.
-	if len(blob) >= 4 && blob[len(blob)-2] == 0 && blob[len(blob)-1] == 0 {
+		return string(blob), nil
+	case "utf16le":
 		s, ok := decodeUTF16LEBlob(blob)
-		if ok && isProbablyText(s) {
-			return true
+		if !ok {
+			return "", fmt.Errorf("credential blob is not valid utf-16le")
 		}
+		return s, nil
+	default:
+		return "", fmt.Errorf("unsupported decode mode %q", mode)
 	}
-
-	return false
-}
-
-func isProbablyText(s string) bool {
-	if s == "" {
-		return true
-	}
-	for _, r := range s {
-		if r == '\n' || r == '\r' || r == '\t' {
-			continue
-		}
-		if unicode.IsControl(r) {
-			return false
-		}
-	}
-	return true
 }
 
 func decodeUTF16LEBlob(blob []byte) (string, bool) {

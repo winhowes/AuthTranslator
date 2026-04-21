@@ -4,6 +4,6 @@ package plugins
 
 import "fmt"
 
-func loadWindowsCredential(id string) (string, error) {
+func loadWindowsCredential(targetName, mode string) (string, error) {
 	return "", fmt.Errorf("wincred plugin is only supported on windows")
 }

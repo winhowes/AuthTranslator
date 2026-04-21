@@ -29,7 +29,7 @@ outgoing_auth:
 | `vault`          | `vault:secret/data/slack`                                       | Self‑hosted **HashiCorp Vault** cluster.                      |
 | `keychain`       | `keychain:github-cli#octocat`                                   | macOS hosts with secrets in Keychain (`service#account`). |
 | `secretservice`  | `secretservice:service=slack,user=bot`                          | Linux desktops/servers with D-Bus Secret Service (`secret-tool`). |
-| `wincred`        | `wincred:github-cli`                                             | Windows hosts using Credential Manager generic credentials. |
+| `wincred`        | `wincred:github-cli#utf16le`                                    | Windows hosts using Credential Manager generic credentials. Use `#raw` (default), `#utf8`, or `#utf16le`. |
 | `dangerousLiteral` | `dangerousLiteral:__PLACEHOLDER__`                              | Rare cases where you need a literal sentinel string. |
 
 ### Literal placeholders (`dangerousLiteral:`)
@@ -68,7 +68,7 @@ Some schemes rely on environment variables for authentication or decryption:
 | `vault` | `VAULT_ADDR`, `VAULT_TOKEN` | Fetches secrets from HashiCorp Vault via its HTTP API. | `vault:secret/data/api` reads from Vault |
 | `keychain` | _none_ | Uses the macOS `security` CLI and current keychain access permissions. | `keychain:service#account` |
 | `secretservice` | _none_ | Uses Linux `secret-tool` to query attributes like `service=...`. | `secretservice:service=slack,user=bot` |
-| `wincred` | _none_ | Reads generic credentials by target name from Windows Credential Manager. | `wincred:github-cli` |
+| `wincred` | _none_ | Reads generic credentials by target name from Windows Credential Manager. | `wincred:github-cli#raw` |
 | `dangerousLiteral` | _none_ | Value is stored directly in config; no external dependencies. | `dangerousLiteral:__PLACEHOLDER__` |
 
 For `file:` URIs that use the `:KEY` suffix, AuthTranslator treats the file as a simple `KEY=value` list:

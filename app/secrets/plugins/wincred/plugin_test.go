@@ -15,95 +15,108 @@ func TestWinCredPluginLoad(t *testing.T) {
 	}
 }
 
-func TestDecodeCredentialBlobUTF16ASCII(t *testing.T) {
-	blob := encodeUTF16LE("secret")
-	if got := decodeCredentialBlob(blob); got != "secret" {
-		t.Fatalf("decodeCredentialBlob() = %q, want %q", got, "secret")
+func TestWinCredPluginLoadInvalidID(t *testing.T) {
+	p := winCredPlugin{}
+	if _, err := p.Load(context.Background(), "#utf8"); err == nil {
+		t.Fatal("expected parse error")
 	}
 }
 
-func TestDecodeCredentialBlobUTF16WithBOM(t *testing.T) {
-	blob := append([]byte{0xFF, 0xFE}, encodeUTF16LE("secret")...)
-	if got := decodeCredentialBlob(blob); got != "secret" {
-		t.Fatalf("decodeCredentialBlob() = %q, want %q", got, "secret")
-	}
-}
-
-func TestDecodeCredentialBlobUTF16Unicode(t *testing.T) {
-	want := "päss-東京-🔐"
-	blob := encodeUTF16LE(want)
-	if got := decodeCredentialBlob(blob); got != want {
-		t.Fatalf("decodeCredentialBlob() = %q, want %q", got, want)
-	}
-}
-
-func TestDecodeCredentialBlobShortEvenWithSingleZeroFallsBack(t *testing.T) {
-	blob := []byte{0x00, 0xAB, 0xCD, 0xEF}
-	if got := decodeCredentialBlob(blob); got != string(blob) {
-		t.Fatalf("decodeCredentialBlob() = %q, want raw bytes", got)
-	}
-}
-
-func TestDecodeCredentialBlobInvalidUTF16FallsBackToBytes(t *testing.T) {
-	blob := []byte{0x00, 0xD8, 0x41, 0x00} // lone high surrogate + 'A'
-	if got := decodeCredentialBlob(blob); got != string(blob) {
-		t.Fatalf("decodeCredentialBlob() = %q, want byte fallback", got)
-	}
-}
-
-func TestDecodeCredentialBlobOddLengthFallsBackToBytes(t *testing.T) {
-	blob := []byte{0x61, 0x62, 0x63}
-	if got := decodeCredentialBlob(blob); got != "abc" {
-		t.Fatalf("decodeCredentialBlob() = %q, want %q", got, "abc")
-	}
-}
-
-func TestDecodeCredentialBlobEvenLengthNonUTF16Binary(t *testing.T) {
-	blob := []byte{0x80, 0x81, 0x82, 0x83}
-	if got := decodeCredentialBlob(blob); got != string(blob) {
-		t.Fatalf("decodeCredentialBlob() = %q, want raw bytes", got)
-	}
-}
-
-func TestLooksLikeUTF16LE(t *testing.T) {
+func TestParseWinCredID(t *testing.T) {
 	tests := []struct {
-		name string
-		blob []byte
-		want bool
+		name      string
+		input     string
+		wantTgt   string
+		wantMode  string
+		wantError bool
 	}{
-		{name: "odd length", blob: []byte{0x41}, want: false},
-		{name: "bom", blob: []byte{0xFF, 0xFE, 0x41, 0x00}, want: true},
-		{name: "ascii utf16 style", blob: []byte{0x41, 0x00, 0x42, 0x00}, want: true},
-		{name: "short even one zero", blob: []byte{0x00, 0xAB, 0xCD, 0xEF}, want: false},
-		{name: "null terminated plausible utf16", blob: []byte{0x71, 0x67, 0xAC, 0x4E, 0x00, 0x00}, want: true},
-		{name: "binary without nul pattern", blob: []byte{0x80, 0x81, 0x82, 0x83}, want: false},
+		{name: "default raw", input: "target", wantTgt: "target", wantMode: "raw"},
+		{name: "utf8 mode", input: "target#utf8", wantTgt: "target", wantMode: "utf8"},
+		{name: "utf16 mode", input: "target#utf16le", wantTgt: "target", wantMode: "utf16le"},
+		{name: "invalid mode", input: "target#auto", wantError: true},
+		{name: "missing target", input: "   #utf8", wantError: true},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := looksLikeUTF16LE(tc.blob); got != tc.want {
-				t.Fatalf("looksLikeUTF16LE(%v) = %v, want %v", tc.blob, got, tc.want)
+			target, mode, err := parseWinCredID(tc.input)
+			if tc.wantError {
+				if err == nil {
+					t.Fatal("expected error")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if target != tc.wantTgt || mode != tc.wantMode {
+				t.Fatalf("parseWinCredID(%q) = (%q,%q), want (%q,%q)", tc.input, target, mode, tc.wantTgt, tc.wantMode)
 			}
 		})
 	}
 }
 
-func TestDecodeCredentialBlobUTF8WithTrailingNull(t *testing.T) {
-	blob := append([]byte("päss-東京"), 0x00, 0x00)
-	if got := decodeCredentialBlob(blob); got != "päss-東京" {
-		t.Fatalf("decodeCredentialBlob() = %q, want %q", got, "päss-東京")
+func TestDecodeCredentialBlobRaw(t *testing.T) {
+	blob := []byte{0x00, 0xAB, 0xCD, 0xEF}
+	got, err := decodeCredentialBlob(blob, "raw")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != string(blob) {
+		t.Fatalf("decodeCredentialBlob(raw) = %q, want raw bytes", got)
 	}
 }
 
-func TestIsProbablyText(t *testing.T) {
-	if !isProbablyText("hello東京\n\r\t") {
-		t.Fatal("expected printable text to be accepted")
+func TestDecodeCredentialBlobUTF8(t *testing.T) {
+	blob := []byte("päss-東京")
+	got, err := decodeCredentialBlob(blob, "utf8")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
-	if !isProbablyText("") {
-		t.Fatal("expected empty string to be accepted")
+	if got != "päss-東京" {
+		t.Fatalf("decodeCredentialBlob(utf8) = %q", got)
 	}
-	if isProbablyText("bad\x01text") {
-		t.Fatal("expected control-character text to be rejected")
+}
+
+func TestDecodeCredentialBlobUTF8Invalid(t *testing.T) {
+	blob := []byte{0xff, 0xfe}
+	if _, err := decodeCredentialBlob(blob, "utf8"); err == nil {
+		t.Fatal("expected utf8 decode error")
+	}
+}
+
+func TestDecodeCredentialBlobUTF16ASCII(t *testing.T) {
+	blob := encodeUTF16LE("secret")
+	got, err := decodeCredentialBlob(blob, "utf16le")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "secret" {
+		t.Fatalf("decodeCredentialBlob(utf16le) = %q, want %q", got, "secret")
+	}
+}
+
+func TestDecodeCredentialBlobUTF16WithBOM(t *testing.T) {
+	blob := append([]byte{0xFF, 0xFE}, encodeUTF16LE("secret")...)
+	got, err := decodeCredentialBlob(blob, "utf16le")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "secret" {
+		t.Fatalf("decodeCredentialBlob(utf16le) = %q, want %q", got, "secret")
+	}
+}
+
+func TestDecodeCredentialBlobUTF16Invalid(t *testing.T) {
+	blob := []byte{0x00, 0xD8, 0x41, 0x00}
+	if _, err := decodeCredentialBlob(blob, "utf16le"); err == nil {
+		t.Fatal("expected utf16 decode error")
+	}
+}
+
+func TestDecodeCredentialBlobUnsupportedMode(t *testing.T) {
+	if _, err := decodeCredentialBlob([]byte("x"), "bogus"); err == nil {
+		t.Fatal("expected unsupported mode error")
 	}
 }
 
