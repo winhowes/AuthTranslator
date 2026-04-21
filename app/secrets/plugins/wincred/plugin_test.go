@@ -8,10 +8,29 @@ import (
 )
 
 func TestWinCredPluginLoad(t *testing.T) {
+	old := winCredLoader
+	t.Cleanup(func() { winCredLoader = old })
+
+	winCredLoader = func(targetName, mode string) (string, error) {
+		if targetName != "my-target" || mode != "raw" {
+			t.Fatalf("unexpected loader args: %q %q", targetName, mode)
+		}
+		return "loaded-secret", nil
+	}
+
 	p := winCredPlugin{}
-	_, err := p.Load(context.Background(), "my-target")
-	if err == nil {
-		t.Fatal("expected wincred loader error on non-windows test environment")
+	got, err := p.Load(context.Background(), "my-target")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "loaded-secret" {
+		t.Fatalf("expected loaded secret, got %q", got)
+	}
+}
+
+func TestLoadWindowsCredentialUnsupported(t *testing.T) {
+	if _, err := loadWindowsCredential("target", "raw"); err == nil {
+		t.Fatal("expected unsupported-platform error")
 	}
 }
 

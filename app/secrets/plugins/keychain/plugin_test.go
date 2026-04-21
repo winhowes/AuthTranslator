@@ -131,18 +131,33 @@ func TestExecSecurityCommandDefault(t *testing.T) {
 }
 
 func TestParseKeychainID(t *testing.T) {
-	service, account := parseKeychainID("svc#acc")
+	service, account, err := parseKeychainID("svc#acc")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	if service != "svc" || account != "acc" {
 		t.Fatalf("unexpected parse result: %q %q", service, account)
 	}
 
-	service, account = parseKeychainID("svc-only")
+	service, account, err = parseKeychainID("svc-only")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	if service != "svc-only" || account != "" {
 		t.Fatalf("unexpected parse result: %q %q", service, account)
 	}
 
-	service, account = parseKeychainID("  svc  #  acc  ")
+	service, account, err = parseKeychainID("  svc  #  acc  ")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	if service != "svc" || account != "acc" {
 		t.Fatalf("unexpected trimmed parse result: %q %q", service, account)
+	}
+}
+
+func TestParseKeychainIDMissingAccount(t *testing.T) {
+	if _, _, err := parseKeychainID("svc#"); err == nil {
+		t.Fatal("expected error for empty account")
 	}
 }

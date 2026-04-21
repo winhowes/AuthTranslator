@@ -15,6 +15,8 @@ import (
 //   - "target#utf16le"
 type winCredPlugin struct{}
 
+var winCredLoader = loadWindowsCredential
+
 func (winCredPlugin) Prefix() string { return "wincred" }
 
 func (winCredPlugin) Load(ctx context.Context, id string) (string, error) {
@@ -22,7 +24,7 @@ func (winCredPlugin) Load(ctx context.Context, id string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return loadWindowsCredential(target, mode)
+	return winCredLoader(target, mode)
 }
 
 func parseWinCredID(id string) (target, mode string, err error) {
