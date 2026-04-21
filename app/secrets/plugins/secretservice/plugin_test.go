@@ -22,7 +22,7 @@ func TestSecretServicePluginLoad(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if got != "secret\n" {
+	if got != "secret" {
 		t.Fatalf("expected exact secret bytes, got %q", got)
 	}
 
@@ -45,8 +45,26 @@ func TestSecretServicePluginLoadPreservesWhitespace(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if got != "  secret with spaces  \n" {
+	if got != "  secret with spaces  " {
 		t.Fatalf("expected exact secret bytes, got %q", got)
+	}
+}
+
+func TestSecretServicePluginLoadTrimsCRLFCommandTerminator(t *testing.T) {
+	old := execSecretTool
+	t.Cleanup(func() { execSecretTool = old })
+
+	execSecretTool = func(ctx context.Context, args ...string) ([]byte, error) {
+		return []byte("secret\r\n"), nil
+	}
+
+	p := secretServicePlugin{}
+	got, err := p.Load(context.Background(), "service=slack")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "secret" {
+		t.Fatalf("expected command terminator to be trimmed, got %q", got)
 	}
 }
 

@@ -23,7 +23,7 @@ func TestKeychainPluginLoad(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if got != "super-secret\n" {
+	if got != "super-secret" {
 		t.Fatalf("expected exact secret bytes, got %q", got)
 	}
 
@@ -46,8 +46,26 @@ func TestKeychainPluginLoadPreservesWhitespace(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if got != "  secret with spaces  \n" {
+	if got != "  secret with spaces  " {
 		t.Fatalf("expected exact secret bytes, got %q", got)
+	}
+}
+
+func TestKeychainPluginLoadTrimsCRLFCommandTerminator(t *testing.T) {
+	old := execSecurityCommand
+	t.Cleanup(func() { execSecurityCommand = old })
+
+	execSecurityCommand = func(ctx context.Context, args ...string) ([]byte, error) {
+		return []byte("secret\r\n"), nil
+	}
+
+	p := keychainPlugin{}
+	got, err := p.Load(context.Background(), "svc")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "secret" {
+		t.Fatalf("expected command terminator to be trimmed, got %q", got)
 	}
 }
 

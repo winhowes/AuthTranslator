@@ -147,7 +147,7 @@ func TestRateLimiterRedisAuthUsername(t *testing.T) {
 }
 
 func TestRateLimiterRedisTLSAuthRequiresVerification(t *testing.T) {
-	key, _ := rsa.GenerateKey(rand.Reader, 1024)
+	key, _ := rsa.GenerateKey(rand.Reader, 2048)
 	tmpl := &x509.Certificate{
 		SerialNumber: big.NewInt(1),
 		Subject:      pkix.Name{CommonName: "srv"},
@@ -201,7 +201,7 @@ func TestRateLimiterRedisTLSAuthRequiresVerification(t *testing.T) {
 }
 
 func TestRateLimiterRedisTLSWithCA(t *testing.T) {
-	key, _ := rsa.GenerateKey(rand.Reader, 1024)
+	key, _ := rsa.GenerateKey(rand.Reader, 2048)
 	tmpl := &x509.Certificate{
 		SerialNumber: big.NewInt(1),
 		Subject:      pkix.Name{CommonName: "srv"},
