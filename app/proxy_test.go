@@ -213,6 +213,54 @@ func TestProxyHandlerUsesHost(t *testing.T) {
 	}
 }
 
+func TestProxyHandlerLatencyMetricsForProxiedRequest(t *testing.T) {
+	denylists.Lock()
+	denylists.m = make(map[string]map[string][]CallRule)
+	denylists.Unlock()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusAccepted)
+	}))
+	defer srv.Close()
+
+	integ := Integration{Name: "latency-ok", Destination: srv.URL, InRateLimit: 1, OutRateLimit: 1}
+	if err := AddIntegration(&integ); err != nil {
+		t.Fatalf("failed to add integration: %v", err)
+	}
+	t.Cleanup(func() {
+		integ.inLimiter.Stop()
+		integ.outLimiter.Stop()
+		DeleteIntegration(integ.Name)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "http://latency-ok/test", nil)
+	req.Host = "latency-ok"
+	rr := httptest.NewRecorder()
+
+	beforeUpstream := promCounterValue(t, `authtranslator_upstream_response_headers_duration_seconds_count{integration="latency-ok"}`)
+	beforeTotal := promCounterValue(t, `authtranslator_end_to_end_duration_seconds_count{integration="latency-ok"}`)
+	beforePreProxy := promCounterValue(t, `authtranslator_pre_proxy_duration_seconds_count{integration="latency-ok"}`)
+	beforeResponseProcessing := promCounterValue(t, `authtranslator_response_processing_duration_seconds_count{integration="latency-ok"}`)
+
+	proxyHandler(rr, req)
+
+	if rr.Code != http.StatusAccepted {
+		t.Fatalf("expected status from host integration, got %d", rr.Code)
+	}
+	if afterUpstream := promCounterValue(t, `authtranslator_upstream_response_headers_duration_seconds_count{integration="latency-ok"}`); afterUpstream != beforeUpstream+1 {
+		t.Fatalf("expected upstream duration metric to increment by 1, got before=%v after=%v", beforeUpstream, afterUpstream)
+	}
+	if afterTotal := promCounterValue(t, `authtranslator_end_to_end_duration_seconds_count{integration="latency-ok"}`); afterTotal != beforeTotal+1 {
+		t.Fatalf("expected end-to-end duration metric to increment by 1, got before=%v after=%v", beforeTotal, afterTotal)
+	}
+	if afterPreProxy := promCounterValue(t, `authtranslator_pre_proxy_duration_seconds_count{integration="latency-ok"}`); afterPreProxy != beforePreProxy+1 {
+		t.Fatalf("expected pre-proxy duration metric to increment by 1, got before=%v after=%v", beforePreProxy, afterPreProxy)
+	}
+	if afterResponseProcessing := promCounterValue(t, `authtranslator_response_processing_duration_seconds_count{integration="latency-ok"}`); afterResponseProcessing != beforeResponseProcessing+1 {
+		t.Fatalf("expected response processing duration metric to increment by 1, got before=%v after=%v", beforeResponseProcessing, afterResponseProcessing)
+	}
+}
+
 func TestProxyHandlerHostCaseInsensitive(t *testing.T) {
 	denylists.Lock()
 	denylists.m = make(map[string]map[string][]CallRule)
@@ -689,6 +737,10 @@ func TestProxyHandlerAuthFailure(t *testing.T) {
 	rr := httptest.NewRecorder()
 	beforeAuthFailures := promCounterValue(t, `authtranslator_auth_failures_total{integration="authfail"}`)
 	beforeInternal := promCounterValue(t, `authtranslator_internal_responses_total{integration="authfail",code="401",reason="incoming_auth_failure"}`)
+	beforeUpstream := promCounterValue(t, `authtranslator_upstream_response_headers_duration_seconds_count{integration="authfail"}`)
+	beforeTotal := promCounterValue(t, `authtranslator_end_to_end_duration_seconds_count{integration="authfail"}`)
+	beforePreProxy := promCounterValue(t, `authtranslator_pre_proxy_duration_seconds_count{integration="authfail"}`)
+	beforeResponseProcessing := promCounterValue(t, `authtranslator_response_processing_duration_seconds_count{integration="authfail"}`)
 	proxyHandler(rr, req)
 	if rr.Code != http.StatusUnauthorized {
 		t.Fatalf("expected 401, got %d", rr.Code)
@@ -707,6 +759,18 @@ func TestProxyHandlerAuthFailure(t *testing.T) {
 	}
 	if afterInternal := promCounterValue(t, `authtranslator_internal_responses_total{integration="authfail",code="401",reason="incoming_auth_failure"}`); afterInternal != beforeInternal+1 {
 		t.Fatalf("expected incoming auth failure metric to increment by 1, got before=%v after=%v", beforeInternal, afterInternal)
+	}
+	if afterUpstream := promCounterValue(t, `authtranslator_upstream_response_headers_duration_seconds_count{integration="authfail"}`); afterUpstream != beforeUpstream {
+		t.Fatalf("expected upstream duration metric to remain unchanged, got before=%v after=%v", beforeUpstream, afterUpstream)
+	}
+	if afterTotal := promCounterValue(t, `authtranslator_end_to_end_duration_seconds_count{integration="authfail"}`); afterTotal != beforeTotal+1 {
+		t.Fatalf("expected end-to-end duration metric to increment by 1, got before=%v after=%v", beforeTotal, afterTotal)
+	}
+	if afterPreProxy := promCounterValue(t, `authtranslator_pre_proxy_duration_seconds_count{integration="authfail"}`); afterPreProxy != beforePreProxy+1 {
+		t.Fatalf("expected pre-proxy duration metric to increment by 1, got before=%v after=%v", beforePreProxy, afterPreProxy)
+	}
+	if afterResponseProcessing := promCounterValue(t, `authtranslator_response_processing_duration_seconds_count{integration="authfail"}`); afterResponseProcessing != beforeResponseProcessing {
+		t.Fatalf("expected response processing duration metric to remain unchanged, got before=%v after=%v", beforeResponseProcessing, afterResponseProcessing)
 	}
 }
 

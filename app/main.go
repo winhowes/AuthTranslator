@@ -1243,6 +1243,16 @@ const (
 
 // proxyHandler handles incoming requests and proxies them according to the integration.
 func proxyHandler(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
+	integrationName := "unknown"
+	preProxyRecorded := false
+	defer func() {
+		if !preProxyRecorded {
+			metrics.RecordPreProxyDuration(integrationName, time.Since(start))
+		}
+		metrics.RecordEndToEndDuration(integrationName, time.Since(start))
+	}()
+
 	host := r.Host
 	if !*disableXATInt {
 		hdr := r.Header.Get("X-AT-Int")
@@ -1262,6 +1272,7 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("integration for host %s not found", host), http.StatusNotFound)
 		return
 	}
+	integrationName = integ.Name
 
 	clientIP, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
@@ -1409,6 +1420,8 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	metrics.RecordPreProxyDuration(integ.Name, time.Since(start))
+	preProxyRecorded = true
 	metrics.OnRequest(integ.Name, r)
 	rec := &statusRecorder{ResponseWriter: w}
 	integ.proxy.ServeHTTP(rec, r)

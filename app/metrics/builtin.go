@@ -20,16 +20,17 @@ import (
 const metricKeySeparator = "|"
 
 var (
-	requestCounts          = expvar.NewMap("authtranslator_requests_total")
-	rateLimitCounts        = expvar.NewMap("authtranslator_rate_limit_events_total")
-	authFailureCounts      = expvar.NewMap("authtranslator_auth_failures_total")
-	internalResponseCounts = expvar.NewMap("authtranslator_internal_responses_total")
-	upstreamStatusCounts   = expvar.NewMap("authtranslator_upstream_responses_total")
-	requestDurations       = expvar.NewMap("authtranslator_request_duration_seconds")
-	LastReloadTime         = expvar.NewString("authtranslator_last_reload")
-	durationHistsMu        sync.Mutex
-	durationHists          = make(map[string]*histogram)
-	durationBuckets        = []float64{0.1, 0.25, 0.5, 1, 2.5, 5, 10}
+	requestCounts                    = expvar.NewMap("authtranslator_requests_total")
+	rateLimitCounts                  = expvar.NewMap("authtranslator_rate_limit_events_total")
+	authFailureCounts                = expvar.NewMap("authtranslator_auth_failures_total")
+	internalResponseCounts           = expvar.NewMap("authtranslator_internal_responses_total")
+	upstreamStatusCounts             = expvar.NewMap("authtranslator_upstream_responses_total")
+	upstreamResponseHeadersDurations = newDurationMetric("authtranslator_upstream_response_headers_duration_seconds")
+	endToEndDurations                = newDurationMetric("authtranslator_end_to_end_duration_seconds")
+	preProxyDurations                = newDurationMetric("authtranslator_pre_proxy_duration_seconds")
+	responseProcessingDurations      = newDurationMetric("authtranslator_response_processing_duration_seconds")
+	LastReloadTime                   = expvar.NewString("authtranslator_last_reload")
+	durationBuckets                  = []float64{0.1, 0.25, 0.5, 1, 2.5, 5, 10}
 )
 
 type histogram struct {
@@ -39,10 +40,26 @@ type histogram struct {
 	sum     float64
 }
 
+type durationMetric struct {
+	name string
+	exp  *expvar.Map
+
+	mu    sync.Mutex
+	hists map[string]*histogram
+}
+
 func newHistogram() *histogram {
 	return &histogram{
 		buckets: durationBuckets,
 		counts:  make([]uint64, len(durationBuckets)+1),
+	}
+}
+
+func newDurationMetric(name string) *durationMetric {
+	return &durationMetric{
+		name:  name,
+		exp:   expvar.NewMap(name),
+		hists: make(map[string]*histogram),
 	}
 }
 
@@ -89,7 +106,7 @@ func (h *histogram) String() string {
 	return string(buf)
 }
 
-func (h *histogram) writeProm(w http.ResponseWriter, integ string) {
+func (h *histogram) writeProm(w http.ResponseWriter, name, integ string) {
 	h.mu.Lock()
 	buckets := append([]float64(nil), h.buckets...)
 	counts := append([]uint64(nil), h.counts...)
@@ -98,12 +115,51 @@ func (h *histogram) writeProm(w http.ResponseWriter, integ string) {
 	var cum uint64
 	for i, b := range buckets {
 		cum += counts[i]
-		fmt.Fprintf(w, "authtranslator_request_duration_seconds_bucket{integration=%q,le=%q} %d\n", integ, strconv.FormatFloat(b, 'f', -1, 64), cum)
+		fmt.Fprintf(w, "%s_bucket{integration=%q,le=%q} %d\n", name, integ, strconv.FormatFloat(b, 'f', -1, 64), cum)
 	}
 	cum += counts[len(buckets)]
-	fmt.Fprintf(w, "authtranslator_request_duration_seconds_bucket{integration=%q,le=\"+Inf\"} %d\n", integ, cum)
-	fmt.Fprintf(w, "authtranslator_request_duration_seconds_sum{integration=%q} %f\n", integ, sum)
-	fmt.Fprintf(w, "authtranslator_request_duration_seconds_count{integration=%q} %d\n", integ, cum)
+	fmt.Fprintf(w, "%s_bucket{integration=%q,le=\"+Inf\"} %d\n", name, integ, cum)
+	fmt.Fprintf(w, "%s_sum{integration=%q} %f\n", name, integ, sum)
+	fmt.Fprintf(w, "%s_count{integration=%q} %d\n", name, integ, cum)
+}
+
+func (m *durationMetric) Record(integration string, d time.Duration) {
+	m.mu.Lock()
+	h, ok := m.hists[integration]
+	if !ok {
+		h = newHistogram()
+		m.hists[integration] = h
+		m.exp.Set(integration, h)
+	}
+	m.mu.Unlock()
+	h.Observe(d.Seconds())
+}
+
+func (m *durationMetric) Reset() {
+	m.exp.Init()
+	m.mu.Lock()
+	m.hists = make(map[string]*histogram)
+	m.mu.Unlock()
+}
+
+func (m *durationMetric) WriteProm(w http.ResponseWriter) {
+	writePromType(w, m.name, "histogram")
+
+	type histSnapshot struct {
+		name string
+		h    *histogram
+	}
+
+	m.mu.Lock()
+	hists := make([]histSnapshot, 0, len(m.hists))
+	for name, h := range m.hists {
+		hists = append(hists, histSnapshot{name: name, h: h})
+	}
+	m.mu.Unlock()
+
+	for _, hs := range hists {
+		hs.h.writeProm(w, m.name, hs.name)
+	}
 }
 
 // IncRequest increments the request counter for the integration.
@@ -128,17 +184,29 @@ func RecordStatus(integration string, status int) {
 	upstreamStatusCounts.Add(key, 1)
 }
 
-// RecordDuration records the upstream request duration.
-func RecordDuration(integration string, d time.Duration) {
-	durationHistsMu.Lock()
-	h, ok := durationHists[integration]
-	if !ok {
-		h = newHistogram()
-		durationHists[integration] = h
-		requestDurations.Set(integration, h)
-	}
-	durationHistsMu.Unlock()
-	h.Observe(d.Seconds())
+// RecordUpstreamResponseHeadersDuration records the duration from proxy handoff
+// until AuthTranslator receives the upstream response headers.
+func RecordUpstreamResponseHeadersDuration(integration string, d time.Duration) {
+	upstreamResponseHeadersDurations.Record(integration, d)
+}
+
+// RecordEndToEndDuration records full request latency as observed by the
+// AuthTranslator handler.
+func RecordEndToEndDuration(integration string, d time.Duration) {
+	endToEndDurations.Record(integration, d)
+}
+
+// RecordPreProxyDuration records request-side processing time before
+// AuthTranslator proxies upstream or returns a local response.
+func RecordPreProxyDuration(integration string, d time.Duration) {
+	preProxyDurations.Record(integration, d)
+}
+
+// RecordResponseProcessingDuration records response-side processing time inside
+// AuthTranslator after an upstream response is received and before streaming the
+// body to the client begins.
+func RecordResponseProcessingDuration(integration string, d time.Duration) {
+	responseProcessingDurations.Record(integration, d)
 }
 
 func writePromType(w http.ResponseWriter, name, metricType string) {
@@ -152,20 +220,10 @@ func WriteProm(w http.ResponseWriter) {
 	requestCounts.Do(func(kv expvar.KeyValue) {
 		fmt.Fprintf(w, "authtranslator_requests_total{integration=%q} %s\n", kv.Key, kv.Value.String())
 	})
-	writePromType(w, "authtranslator_request_duration_seconds", "histogram")
-	durationHistsMu.Lock()
-	type histSnapshot struct {
-		name string
-		h    *histogram
-	}
-	hists := make([]histSnapshot, 0, len(durationHists))
-	for name, h := range durationHists {
-		hists = append(hists, histSnapshot{name: name, h: h})
-	}
-	durationHistsMu.Unlock()
-	for _, hs := range hists {
-		hs.h.writeProm(w, hs.name)
-	}
+	upstreamResponseHeadersDurations.WriteProm(w)
+	endToEndDurations.WriteProm(w)
+	preProxyDurations.WriteProm(w)
+	responseProcessingDurations.WriteProm(w)
 	writePromType(w, "authtranslator_rate_limit_events_total", "counter")
 	rateLimitCounts.Do(func(kv expvar.KeyValue) {
 		fmt.Fprintf(w, "authtranslator_rate_limit_events_total{integration=%q} %s\n", kv.Key, kv.Value.String())
