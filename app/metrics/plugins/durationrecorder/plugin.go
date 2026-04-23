@@ -19,7 +19,7 @@ func (*durationRecorder) OnRequest(integration string, r *http.Request) {
 
 func (*durationRecorder) OnResponse(integration, caller string, r *http.Request, resp *http.Response) {
 	if t, ok := r.Context().Value(startKey{}).(time.Time); ok {
-		metrics.RecordUpstreamResponseHeadersDuration(integration, time.Since(t))
+		metrics.RecordUpstreamRoundtripDuration(integration, time.Since(t))
 	}
 }
 

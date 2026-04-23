@@ -33,7 +33,7 @@ sets `X-AT-Error-Reason` with a short explanation such as "integration not found
 | ----------------------------------------- | --------- | --------------------- | ------------------------------------------------ |
 | `authtranslator_requests_total`           | counter   | `integration`         | Total requests processed per integration.        |
 | `authtranslator_upstream_responses_total` | counter   | `integration`, `code` | HTTP status codes returned by upstreams.         |
-| `authtranslator_upstream_response_headers_duration_seconds` | histogram | `integration` | Time from proxy handoff until the upstream response is received. |
+| `authtranslator_upstream_roundtrip_duration_seconds` | histogram | `integration` | Time from proxy handoff until the upstream response is received. |
 | `authtranslator_end_to_end_duration_seconds` | histogram | `integration` | Full request latency from handler entry until AuthTranslator finishes responding. |
 | `authtranslator_pre_proxy_duration_seconds` | histogram | `integration` | Request-side processing time inside AuthTranslator before proxy handoff or a local response. |
 | `authtranslator_response_processing_duration_seconds` | histogram | `integration` | Response-side processing time inside AuthTranslator after an upstream response is received. |
@@ -73,7 +73,7 @@ assume you scrape the metrics under the default job label
 | Request rate per upstream  | `sum(rate(authtranslator_requests_total{job="authtranslator"}[5m])) by (integration)`     | Highlights traffic leaders and sudden drops. |
 | Error ratio                | `sum(rate(authtranslator_upstream_responses_total{job="authtranslator",code=~"5.."}[5m]))`<br>`/`<br>`sum(rate(authtranslator_upstream_responses_total{job="authtranslator"}[5m]))` | Surfaces spikes in upstream failures. |
 | 95th percentile total latency | `histogram_quantile(0.95, sum(rate(authtranslator_end_to_end_duration_seconds_bucket{job="authtranslator"}[5m])) by (le, integration))` | Tracks the latency callers actually experience. |
-| 95th percentile upstream latency | `histogram_quantile(0.95, sum(rate(authtranslator_upstream_response_headers_duration_seconds_bucket{job="authtranslator"}[5m])) by (le, integration))` | Separates upstream slowness from local proxy overhead. |
+| 95th percentile upstream latency | `histogram_quantile(0.95, sum(rate(authtranslator_upstream_roundtrip_duration_seconds_bucket{job="authtranslator"}[5m])) by (le, integration))` | Separates upstream slowness from local proxy overhead. |
 | 95th percentile pre-proxy latency | `histogram_quantile(0.95, sum(rate(authtranslator_pre_proxy_duration_seconds_bucket{job="authtranslator"}[5m])) by (le, integration))` | Shows request-side latency introduced by AuthTranslator before proxying. |
 | Rate-limit rejections      | `sum(rate(authtranslator_rate_limit_events_total{job="authtranslator"}[5m])) by (integration)` | Shows when callers are constrained and need more quota. |
 | Internal failures by reason | `sum(rate(authtranslator_internal_responses_total{job="authtranslator"}[5m])) by (integration, reason)` | Separates local proxy rejections from upstream failures. |

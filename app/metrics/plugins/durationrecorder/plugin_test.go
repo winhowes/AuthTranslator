@@ -20,10 +20,10 @@ func TestDurationRecorder(t *testing.T) {
 	rr := httptest.NewRecorder()
 	metrics.Handler(rr, httptest.NewRequest(http.MethodGet, "/metrics", nil), "", "")
 	body := rr.Body.String()
-	if !strings.Contains(body, `authtranslator_upstream_response_headers_duration_seconds_sum{integration="foo"}`) {
+	if !strings.Contains(body, `authtranslator_upstream_roundtrip_duration_seconds_sum{integration="foo"}`) {
 		t.Fatalf("duration histogram missing: %s", body)
 	}
-	if !strings.Contains(body, `authtranslator_upstream_response_headers_duration_seconds_count{integration="foo"} 1`) {
+	if !strings.Contains(body, `authtranslator_upstream_roundtrip_duration_seconds_count{integration="foo"} 1`) {
 		t.Fatalf("duration count missing: %s", body)
 	}
 }

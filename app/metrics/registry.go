@@ -40,7 +40,7 @@ func Reset() {
 	authFailureCounts.Init()
 	internalResponseCounts.Init()
 	upstreamStatusCounts.Init()
-	upstreamResponseHeadersDurations.Reset()
+	upstreamRoundtripDurations.Reset()
 	endToEndDurations.Reset()
 	preProxyDurations.Reset()
 	responseProcessingDurations.Reset()

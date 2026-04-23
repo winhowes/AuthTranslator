@@ -20,17 +20,17 @@ import (
 const metricKeySeparator = "|"
 
 var (
-	requestCounts                    = expvar.NewMap("authtranslator_requests_total")
-	rateLimitCounts                  = expvar.NewMap("authtranslator_rate_limit_events_total")
-	authFailureCounts                = expvar.NewMap("authtranslator_auth_failures_total")
-	internalResponseCounts           = expvar.NewMap("authtranslator_internal_responses_total")
-	upstreamStatusCounts             = expvar.NewMap("authtranslator_upstream_responses_total")
-	upstreamResponseHeadersDurations = newDurationMetric("authtranslator_upstream_response_headers_duration_seconds")
-	endToEndDurations                = newDurationMetric("authtranslator_end_to_end_duration_seconds")
-	preProxyDurations                = newDurationMetric("authtranslator_pre_proxy_duration_seconds")
-	responseProcessingDurations      = newDurationMetric("authtranslator_response_processing_duration_seconds")
-	LastReloadTime                   = expvar.NewString("authtranslator_last_reload")
-	durationBuckets                  = []float64{0.1, 0.25, 0.5, 1, 2.5, 5, 10}
+	requestCounts               = expvar.NewMap("authtranslator_requests_total")
+	rateLimitCounts             = expvar.NewMap("authtranslator_rate_limit_events_total")
+	authFailureCounts           = expvar.NewMap("authtranslator_auth_failures_total")
+	internalResponseCounts      = expvar.NewMap("authtranslator_internal_responses_total")
+	upstreamStatusCounts        = expvar.NewMap("authtranslator_upstream_responses_total")
+	upstreamRoundtripDurations  = newDurationMetric("authtranslator_upstream_roundtrip_duration_seconds")
+	endToEndDurations           = newDurationMetric("authtranslator_end_to_end_duration_seconds")
+	preProxyDurations           = newDurationMetric("authtranslator_pre_proxy_duration_seconds")
+	responseProcessingDurations = newDurationMetric("authtranslator_response_processing_duration_seconds")
+	LastReloadTime              = expvar.NewString("authtranslator_last_reload")
+	durationBuckets             = []float64{0.1, 0.25, 0.5, 1, 2.5, 5, 10}
 )
 
 type histogram struct {
@@ -184,10 +184,10 @@ func RecordStatus(integration string, status int) {
 	upstreamStatusCounts.Add(key, 1)
 }
 
-// RecordUpstreamResponseHeadersDuration records the duration from proxy handoff
-// until AuthTranslator receives the upstream response headers.
-func RecordUpstreamResponseHeadersDuration(integration string, d time.Duration) {
-	upstreamResponseHeadersDurations.Record(integration, d)
+// RecordUpstreamRoundtripDuration records the duration from proxy handoff until
+// AuthTranslator receives the upstream response.
+func RecordUpstreamRoundtripDuration(integration string, d time.Duration) {
+	upstreamRoundtripDurations.Record(integration, d)
 }
 
 // RecordEndToEndDuration records full request latency as observed by the
@@ -220,7 +220,7 @@ func WriteProm(w http.ResponseWriter) {
 	requestCounts.Do(func(kv expvar.KeyValue) {
 		fmt.Fprintf(w, "authtranslator_requests_total{integration=%q} %s\n", kv.Key, kv.Value.String())
 	})
-	upstreamResponseHeadersDurations.WriteProm(w)
+	upstreamRoundtripDurations.WriteProm(w)
 	endToEndDurations.WriteProm(w)
 	preProxyDurations.WriteProm(w)
 	responseProcessingDurations.WriteProm(w)
