@@ -1160,7 +1160,42 @@ var newWatcher = func() (fileWatcher, error) {
 	return fswatcher{w}, nil
 }
 
+var watchAbsPath = filepath.Abs
+
 const watchDebounceDelay = 100 * time.Millisecond
+
+type watchDebouncer struct {
+	delay  time.Duration
+	timer  *time.Timer
+	timerC <-chan time.Time
+}
+
+func newWatchDebouncer(delay time.Duration) *watchDebouncer {
+	return &watchDebouncer{delay: delay}
+}
+
+func (d *watchDebouncer) trigger() <-chan time.Time {
+	if d.timer == nil {
+		d.timer = time.NewTimer(d.delay)
+		d.timerC = d.timer.C
+		return d.timerC
+	}
+	d.timer.Stop()
+	d.timer.Reset(d.delay)
+	d.timerC = d.timer.C
+	return d.timerC
+}
+
+func (d *watchDebouncer) fired() {
+	d.timerC = nil
+}
+
+func (d *watchDebouncer) stop() {
+	if d.timer == nil {
+		return
+	}
+	d.timer.Stop()
+}
 
 func watchFiles(ctx context.Context, files []string, out chan<- struct{}) {
 	w, err := newWatcher()
@@ -1172,7 +1207,7 @@ func watchFiles(ctx context.Context, files []string, out chan<- struct{}) {
 
 	watchedDirs := make(map[string]struct{})
 	for _, f := range files {
-		abs, err := filepath.Abs(f)
+		abs, err := watchAbsPath(f)
 		if err != nil {
 			logger.Error("watch path failed", "file", f, "error", err)
 			continue
@@ -1186,39 +1221,15 @@ func watchFiles(ctx context.Context, files []string, out chan<- struct{}) {
 		}
 	}
 
-	timer := time.NewTimer(watchDebounceDelay)
-	if !timer.Stop() {
-		select {
-		case <-timer.C:
-		default:
-		}
-	}
+	debouncer := newWatchDebouncer(watchDebounceDelay)
+	defer debouncer.stop()
 	var timerC <-chan time.Time
-	trigger := func() {
-		if timerC != nil && !timer.Stop() {
-			select {
-			case <-timer.C:
-			default:
-			}
-		}
-		timer.Reset(watchDebounceDelay)
-		timerC = timer.C
-	}
 	notify := func() {
 		select {
 		case out <- struct{}{}:
 		default:
 		}
 	}
-	stopTimer := func() {
-		if timerC != nil && !timer.Stop() {
-			select {
-			case <-timer.C:
-			default:
-			}
-		}
-	}
-	defer stopTimer()
 
 	for {
 		select {
@@ -1226,13 +1237,14 @@ func watchFiles(ctx context.Context, files []string, out chan<- struct{}) {
 			return
 		case <-timerC:
 			timerC = nil
+			debouncer.fired()
 			notify()
 		case ev, ok := <-w.Events():
 			if !ok {
 				return
 			}
 			if watchEventInDirs(ev, watchedDirs) && ev.Op&(fsnotify.Write|fsnotify.Create|fsnotify.Rename|fsnotify.Remove|fsnotify.Chmod) != 0 {
-				trigger()
+				timerC = debouncer.trigger()
 			}
 		case err, ok := <-w.Errors():
 			if !ok {
