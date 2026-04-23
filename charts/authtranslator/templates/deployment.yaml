@@ -30,6 +30,15 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command: ["./authtranslator"]
           args:
+            - "-config"
+            - "/conf/config.yaml"
+            - "-allowlist"
+            - "/conf/allowlist.yaml"
+            - "-denylist"
+            - "/conf/denylist.yaml"
+            {{- if .Values.watch }}
+            - "-watch"
+            {{- end }}
             {{- if .Values.redisAddress }}
             - "-redis-addr"
             - {{ .Values.redisAddress | quote }}
@@ -44,14 +53,8 @@ spec:
             {{- end }}
           volumeMounts:
             - name: config
-              mountPath: /conf/config.yaml
-              subPath: config.yaml
-            - name: config
-              mountPath: /conf/allowlist.yaml
-              subPath: allowlist.yaml
-            - name: config
-              mountPath: /conf/denylist.yaml
-              subPath: denylist.yaml
+              mountPath: /conf
+              readOnly: true
           ports:
             - containerPort: 8080
               name: http

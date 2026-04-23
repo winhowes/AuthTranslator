@@ -12,6 +12,7 @@ This chart deploys [AuthTranslator](https://github.com/winhowes/AuthTranslator) 
 | `redisAddress` | Address passed to `-redis-addr` – either `host:port` or a `redis://`/`rediss://` URL | `""` |
 | `redisCA` | CA file for verifying Redis TLS passed to `-redis-ca` | `""` |
 | `secretRefresh` | Value passed to `-secret-refresh` | `""` |
+| `watch` | Run with `-watch` so projected ConfigMap updates trigger reloads | `true` |
 | `resources` | Pod resource requests/limits | see `values.yaml` |
 | `imagePullSecrets` | List of image pull secrets | `[]` |
 | `serviceAccountName` | Pod service account | `""` |
