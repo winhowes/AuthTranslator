@@ -232,6 +232,17 @@ func TestCallerContext(t *testing.T) {
 	}
 }
 
+func TestUpstreamRoundtripStartContext(t *testing.T) {
+	start := time.Now()
+	ctx := WithUpstreamRoundtripStart(context.Background(), start)
+	if got, ok := UpstreamRoundtripStart(ctx); !ok || !got.Equal(start) {
+		t.Fatalf("expected upstream roundtrip start %v, got %v ok=%v", start, got, ok)
+	}
+	if _, ok := UpstreamRoundtripStart(context.Background()); ok {
+		t.Fatal("expected missing upstream roundtrip start on background context")
+	}
+}
+
 func TestWritePromPlugins(t *testing.T) {
 	Reset()
 	mu.Lock()

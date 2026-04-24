@@ -9,7 +9,9 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	authplugins "github.com/winhowes/AuthTranslator/app/auth"
 	_ "github.com/winhowes/AuthTranslator/app/auth/plugins/token"
@@ -103,6 +105,20 @@ func init() {
 type roundTripFunc func(*http.Request) (*http.Response, error)
 
 func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+type delayedMetricsPlugin struct{}
+
+func (*delayedMetricsPlugin) OnRequest(_ string, r *http.Request) {
+	if r.Host == "hook-latency" {
+		time.Sleep(50 * time.Millisecond)
+	}
+}
+
+func (*delayedMetricsPlugin) OnResponse(string, string, *http.Request, *http.Response) {}
+
+func (*delayedMetricsPlugin) WriteProm(http.ResponseWriter) {}
+
+var delayedMetricsPluginOnce sync.Once
 
 func promCounterValue(t *testing.T, prefix string) float64 {
 	t.Helper()
@@ -258,6 +274,54 @@ func TestProxyHandlerLatencyMetricsForProxiedRequest(t *testing.T) {
 	}
 	if afterResponseProcessing := promCounterValue(t, `authtranslator_response_processing_duration_seconds_count{integration="latency-ok"}`); afterResponseProcessing != beforeResponseProcessing+1 {
 		t.Fatalf("expected response processing duration metric to increment by 1, got before=%v after=%v", beforeResponseProcessing, afterResponseProcessing)
+	}
+}
+
+func TestProxyHandlerPreProxyIncludesMetricsRequestHooks(t *testing.T) {
+	delayedMetricsPluginOnce.Do(func() {
+		metrics.Register(&delayedMetricsPlugin{})
+	})
+
+	denylists.Lock()
+	denylists.m = make(map[string]map[string][]CallRule)
+	denylists.Unlock()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusAccepted)
+	}))
+	defer srv.Close()
+
+	integ := Integration{Name: "hook-latency", Destination: srv.URL, InRateLimit: 1, OutRateLimit: 1}
+	if err := AddIntegration(&integ); err != nil {
+		t.Fatalf("failed to add integration: %v", err)
+	}
+	t.Cleanup(func() {
+		integ.inLimiter.Stop()
+		integ.outLimiter.Stop()
+		DeleteIntegration(integ.Name)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "http://hook-latency/test", nil)
+	req.Host = "hook-latency"
+	rr := httptest.NewRecorder()
+
+	beforePreProxy := promCounterValue(t, `authtranslator_pre_proxy_duration_seconds_sum{integration="hook-latency"}`)
+	beforeUpstream := promCounterValue(t, `authtranslator_upstream_roundtrip_duration_seconds_sum{integration="hook-latency"}`)
+
+	proxyHandler(rr, req)
+
+	if rr.Code != http.StatusAccepted {
+		t.Fatalf("expected status from host integration, got %d", rr.Code)
+	}
+
+	preProxyDelta := promCounterValue(t, `authtranslator_pre_proxy_duration_seconds_sum{integration="hook-latency"}`) - beforePreProxy
+	upstreamDelta := promCounterValue(t, `authtranslator_upstream_roundtrip_duration_seconds_sum{integration="hook-latency"}`) - beforeUpstream
+
+	if preProxyDelta < 0.04 {
+		t.Fatalf("expected pre-proxy duration to include request hook delay, got %f", preProxyDelta)
+	}
+	if upstreamDelta > 0.04 {
+		t.Fatalf("expected upstream roundtrip duration to exclude request hook delay, got %f", upstreamDelta)
 	}
 }
 

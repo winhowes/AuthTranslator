@@ -1420,9 +1420,11 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	metrics.RecordPreProxyDuration(integ.Name, time.Since(start))
-	preProxyRecorded = true
 	metrics.OnRequest(integ.Name, r)
+	handoffStart := time.Now()
+	r = r.WithContext(metrics.WithUpstreamRoundtripStart(r.Context(), handoffStart))
+	metrics.RecordPreProxyDuration(integ.Name, handoffStart.Sub(start))
+	preProxyRecorded = true
 	rec := &statusRecorder{ResponseWriter: w}
 	integ.proxy.ServeHTTP(rec, r)
 	if rec.status == 0 {
