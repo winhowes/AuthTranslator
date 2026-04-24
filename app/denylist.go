@@ -62,10 +62,10 @@ func validateDenylistCallers(name string, callers []DenylistCaller) error {
 	return nil
 }
 
-func SetDenylist(name string, callers []DenylistCaller) error {
+func buildDenylist(name string, callers []DenylistCaller) (map[string][]CallRule, error) {
 	name = strings.ToLower(name)
 	if err := validateDenylistCallers(name, callers); err != nil {
-		return err
+		return nil, err
 	}
 
 	processed := make(map[string][]CallRule, len(callers))
@@ -88,9 +88,17 @@ func SetDenylist(name string, callers []DenylistCaller) error {
 		}
 		processed[id] = rules
 	}
+	return processed, nil
+}
+
+func SetDenylist(name string, callers []DenylistCaller) error {
+	processed, err := buildDenylist(name, callers)
+	if err != nil {
+		return err
+	}
 
 	denylists.Lock()
-	denylists.m[name] = processed
+	denylists.m[strings.ToLower(name)] = processed
 	denylists.Unlock()
 	return nil
 }

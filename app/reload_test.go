@@ -455,6 +455,62 @@ func TestReloadInvalidAllowlist(t *testing.T) {
 	}
 }
 
+func TestReloadInvalidAllowlistKeepsExistingIntegrations(t *testing.T) {
+	integrations.Lock()
+	integrations.m = make(map[string]*Integration)
+	integrations.Unlock()
+	allowlists.Lock()
+	allowlists.m = make(map[string]map[string]CallerConfig)
+	allowlists.Unlock()
+	resetDenylistState()
+
+	base := &Integration{Name: "base", Destination: "http://example.com"}
+	if err := AddIntegration(base); err != nil {
+		t.Fatalf("setup base integration: %v", err)
+	}
+	t.Cleanup(func() {
+		for _, i := range ListIntegrations() {
+			i.inLimiter.Stop()
+			i.outLimiter.Stop()
+		}
+	})
+
+	cfgFile, err := os.CreateTemp("", "cfg*.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(cfgFile.Name())
+	cfg := `{"integrations":[{"name":"test","destination":"http://example.com"}]}`
+	if _, err := cfgFile.WriteString(cfg); err != nil {
+		t.Fatal(err)
+	}
+	cfgFile.Close()
+
+	alFile, err := os.CreateTemp("", "al*.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(alFile.Name())
+	al := `[{"integration":"test","callers":[{"id":"a"},{"id":"a"}]}]`
+	if err := os.WriteFile(alFile.Name(), []byte(al), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	flag.Set("config", cfgFile.Name())
+	flag.Set("allowlist", alFile.Name())
+	flag.Set("denylist", writeEmptyDenylist(t))
+
+	if err := reload(); err == nil {
+		t.Fatal("expected allowlist validation error")
+	}
+	if _, ok := GetIntegration("base"); !ok {
+		t.Fatal("existing integration lost after failed reload")
+	}
+	if _, ok := GetIntegration("test"); ok {
+		t.Fatal("new integration should not be loaded after failed reload")
+	}
+}
+
 func TestReloadInvalidDenylist(t *testing.T) {
 	integrations.Lock()
 	integrations.m = make(map[string]*Integration)
@@ -499,6 +555,92 @@ func TestReloadInvalidDenylist(t *testing.T) {
 	flag.Set("denylist", dlFile.Name())
 	if err := reload(); err == nil {
 		t.Fatal("expected denylist validation error")
+	}
+}
+
+func TestReloadInvalidDenylistRestoresPreviousState(t *testing.T) {
+	integrations.Lock()
+	integrations.m = make(map[string]*Integration)
+	integrations.Unlock()
+	allowlists.Lock()
+	allowlists.m = make(map[string]map[string]CallerConfig)
+	allowlists.Unlock()
+	resetDenylistState()
+
+	base := &Integration{Name: "base", Destination: "http://example.com"}
+	if err := AddIntegration(base); err != nil {
+		t.Fatalf("setup base integration: %v", err)
+	}
+	if err := SetAllowlist("base", []CallerConfig{{
+		ID: "*",
+		Rules: []CallRule{{
+			Path:    "/base",
+			Methods: map[string]RequestConstraint{"GET": {}},
+		}},
+	}}); err != nil {
+		t.Fatalf("setup base allowlist: %v", err)
+	}
+	t.Cleanup(func() {
+		for _, i := range ListIntegrations() {
+			i.inLimiter.Stop()
+			i.outLimiter.Stop()
+		}
+	})
+
+	cfgFile, err := os.CreateTemp("", "cfg*.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(cfgFile.Name())
+	cfg := `{"integrations":[{"name":"test","destination":"http://example.com"}]}`
+	if _, err := cfgFile.WriteString(cfg); err != nil {
+		t.Fatal(err)
+	}
+	cfgFile.Close()
+
+	alFile, err := os.CreateTemp("", "al*.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(alFile.Name())
+	al := `[{"integration":"test","callers":[{"id":"a","rules":[{"path":"/","methods":{"GET":{}}}]}]}]`
+	if err := os.WriteFile(alFile.Name(), []byte(al), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	dlFile, err := os.CreateTemp("", "dl*.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(dlFile.Name())
+	dl := `[{"integration":"test","callers":[{"id":"*","rules":[{"path":"/a","methods":{"GET":{},"get":{}}}]}]}]`
+	if err := os.WriteFile(dlFile.Name(), []byte(dl), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	flag.Set("config", cfgFile.Name())
+	flag.Set("allowlist", alFile.Name())
+	flag.Set("denylist", dlFile.Name())
+
+	if err := reload(); err == nil {
+		t.Fatal("expected denylist validation error")
+	}
+	if _, ok := GetIntegration("base"); !ok {
+		t.Fatal("existing integration lost after failed reload")
+	}
+	if _, ok := GetIntegration("test"); ok {
+		t.Fatal("new integration should not be loaded after failed reload")
+	}
+
+	allowlists.RLock()
+	_, haveBaseAllowlist := allowlists.m["base"]
+	_, haveTestAllowlist := allowlists.m["test"]
+	allowlists.RUnlock()
+	if !haveBaseAllowlist {
+		t.Fatal("existing allowlist lost after failed reload")
+	}
+	if haveTestAllowlist {
+		t.Fatal("new allowlist should not remain after failed reload")
 	}
 }
 
@@ -619,17 +761,19 @@ func TestReloadSetDenylistError(t *testing.T) {
 	flag.Set("allowlist", alFile.Name())
 	flag.Set("denylist", dlFile.Name())
 
-	old := setDenylist
-	setDenylist = func(string, []DenylistCaller) error { return fmt.Errorf("boom") }
-	defer func() { setDenylist = old }()
+	old := buildDenylistForReload
+	buildDenylistForReload = func(string, []DenylistCaller) (map[string][]CallRule, error) {
+		return nil, fmt.Errorf("boom")
+	}
+	defer func() { buildDenylistForReload = old }()
 
 	err = reload()
 	if err == nil || !strings.Contains(err.Error(), "boom") {
 		t.Fatalf("expected boom error, got %v", err)
 	}
 
-	if _, ok := GetIntegration("test"); !ok {
-		t.Fatal("integration not loaded")
+	if _, ok := GetIntegration("test"); ok {
+		t.Fatal("integration should not be loaded on denylist error")
 	}
 	denylists.RLock()
 	_, ok := denylists.m["test"]
@@ -641,6 +785,132 @@ func TestReloadSetDenylistError(t *testing.T) {
 	for _, i := range ListIntegrations() {
 		t.Cleanup(i.inLimiter.Stop)
 		t.Cleanup(i.outLimiter.Stop)
+	}
+}
+
+func TestReloadSetDenylistErrorRestoresExistingState(t *testing.T) {
+	integrations.Lock()
+	integrations.m = make(map[string]*Integration)
+	integrations.Unlock()
+	allowlists.Lock()
+	allowlists.m = make(map[string]map[string]CallerConfig)
+	allowlists.Unlock()
+	resetDenylistState()
+
+	base := &Integration{Name: "base", Destination: "http://example.com"}
+	if err := AddIntegration(base); err != nil {
+		t.Fatalf("setup base integration: %v", err)
+	}
+	if err := SetAllowlist("base", []CallerConfig{{
+		ID: "*",
+		Rules: []CallRule{{
+			Path:    "/base",
+			Methods: map[string]RequestConstraint{"GET": {}},
+		}},
+	}}); err != nil {
+		t.Fatalf("setup base allowlist: %v", err)
+	}
+	if err := SetDenylist("base", []DenylistCaller{{
+		ID: "*",
+		Rules: []CallRule{{
+			Path:    "/blocked",
+			Methods: map[string]RequestConstraint{"GET": {}},
+		}},
+	}}); err != nil {
+		t.Fatalf("setup base denylist: %v", err)
+	}
+	t.Cleanup(func() {
+		for _, i := range ListIntegrations() {
+			i.inLimiter.Stop()
+			i.outLimiter.Stop()
+		}
+	})
+
+	cfgFile, err := os.CreateTemp("", "cfg*.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(cfgFile.Name())
+	cfg := `{"integrations":[{"name":"test","destination":"http://example.com"}]}`
+	if _, err := cfgFile.WriteString(cfg); err != nil {
+		t.Fatal(err)
+	}
+	cfgFile.Close()
+
+	alFile, err := os.CreateTemp("", "al*.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(alFile.Name())
+	al := `[{"integration":"test","callers":[{"id":"a","rules":[{"path":"/","methods":{"GET":{}}}]}]}]`
+	if _, err := alFile.WriteString(al); err != nil {
+		t.Fatal(err)
+	}
+	alFile.Close()
+
+	dlFile, err := os.CreateTemp("", "dl*.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(dlFile.Name())
+	dl := `[{"integration":"test","callers":[{"id":"*","rules":[{"path":"/blocked","methods":{"GET":{}}}]}]}]`
+	if _, err := dlFile.WriteString(dl); err != nil {
+		t.Fatal(err)
+	}
+	dlFile.Close()
+
+	flag.Set("config", cfgFile.Name())
+	flag.Set("allowlist", alFile.Name())
+	flag.Set("denylist", dlFile.Name())
+
+	old := buildDenylistForReload
+	buildDenylistForReload = func(string, []DenylistCaller) (map[string][]CallRule, error) {
+		allowlists.RLock()
+		_, haveBaseAllowlist := allowlists.m["base"]
+		_, haveTestAllowlist := allowlists.m["test"]
+		allowlists.RUnlock()
+		if !haveBaseAllowlist {
+			t.Fatal("existing allowlist changed before denylist error")
+		}
+		if haveTestAllowlist {
+			t.Fatal("new allowlist published before denylist error")
+		}
+		return nil, fmt.Errorf("boom")
+	}
+	defer func() { buildDenylistForReload = old }()
+
+	err = reload()
+	if err == nil || !strings.Contains(err.Error(), "boom") {
+		t.Fatalf("expected boom error, got %v", err)
+	}
+
+	if _, ok := GetIntegration("base"); !ok {
+		t.Fatal("existing integration lost after failed reload")
+	}
+	if _, ok := GetIntegration("test"); ok {
+		t.Fatal("new integration should not be loaded on denylist error")
+	}
+
+	allowlists.RLock()
+	_, haveBaseAllowlist := allowlists.m["base"]
+	_, haveTestAllowlist := allowlists.m["test"]
+	allowlists.RUnlock()
+	if !haveBaseAllowlist {
+		t.Fatal("existing allowlist lost after failed reload")
+	}
+	if haveTestAllowlist {
+		t.Fatal("new allowlist should not remain after failed reload")
+	}
+
+	denylists.RLock()
+	_, haveBaseDenylist := denylists.m["base"]
+	_, haveTestDenylist := denylists.m["test"]
+	denylists.RUnlock()
+	if !haveBaseDenylist {
+		t.Fatal("existing denylist lost after failed reload")
+	}
+	if haveTestDenylist {
+		t.Fatal("new denylist should not remain after failed reload")
 	}
 }
 
@@ -839,17 +1109,19 @@ func TestReloadSetAllowlistError(t *testing.T) {
 	flag.Set("allowlist", alFile.Name())
 	flag.Set("denylist", writeEmptyDenylist(t))
 
-	old := setAllowlist
-	setAllowlist = func(string, []CallerConfig) error { return fmt.Errorf("boom") }
-	defer func() { setAllowlist = old }()
+	old := buildAllowlistForReload
+	buildAllowlistForReload = func(string, []CallerConfig) (map[string]CallerConfig, error) {
+		return nil, fmt.Errorf("boom")
+	}
+	defer func() { buildAllowlistForReload = old }()
 
 	err = reload()
 	if err == nil || !strings.Contains(err.Error(), "boom") {
 		t.Fatalf("expected boom error, got %v", err)
 	}
 
-	if _, ok := GetIntegration("test"); !ok {
-		t.Fatal("integration not loaded")
+	if _, ok := GetIntegration("test"); ok {
+		t.Fatal("integration should not be loaded on allowlist error")
 	}
 	allowlists.RLock()
 	_, ok := allowlists.m["test"]
@@ -861,6 +1133,101 @@ func TestReloadSetAllowlistError(t *testing.T) {
 	for _, i := range ListIntegrations() {
 		t.Cleanup(i.inLimiter.Stop)
 		t.Cleanup(i.outLimiter.Stop)
+	}
+}
+
+func TestReloadSetAllowlistErrorRestoresExistingState(t *testing.T) {
+	integrations.Lock()
+	integrations.m = make(map[string]*Integration)
+	integrations.Unlock()
+	allowlists.Lock()
+	allowlists.m = make(map[string]map[string]CallerConfig)
+	allowlists.Unlock()
+	resetDenylistState()
+
+	base := &Integration{Name: "base", Destination: "http://example.com"}
+	if err := AddIntegration(base); err != nil {
+		t.Fatalf("setup base integration: %v", err)
+	}
+	if err := SetAllowlist("base", []CallerConfig{{
+		ID: "*",
+		Rules: []CallRule{{
+			Path:    "/base",
+			Methods: map[string]RequestConstraint{"GET": {}},
+		}},
+	}}); err != nil {
+		t.Fatalf("setup base allowlist: %v", err)
+	}
+	t.Cleanup(func() {
+		for _, i := range ListIntegrations() {
+			i.inLimiter.Stop()
+			i.outLimiter.Stop()
+		}
+	})
+
+	cfgFile, err := os.CreateTemp("", "cfg*.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(cfgFile.Name())
+	cfg := `{"integrations":[{"name":"test","destination":"http://example.com"}]}`
+	if _, err := cfgFile.WriteString(cfg); err != nil {
+		t.Fatal(err)
+	}
+	cfgFile.Close()
+
+	alFile, err := os.CreateTemp("", "al*.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(alFile.Name())
+	al := `[{"integration":"test","callers":[{"id":"a","rules":[{"path":"/","methods":{"GET":{}}}]}]}]`
+	if _, err := alFile.WriteString(al); err != nil {
+		t.Fatal(err)
+	}
+	alFile.Close()
+
+	flag.Set("config", cfgFile.Name())
+	flag.Set("allowlist", alFile.Name())
+	flag.Set("denylist", writeEmptyDenylist(t))
+
+	old := buildAllowlistForReload
+	buildAllowlistForReload = func(string, []CallerConfig) (map[string]CallerConfig, error) {
+		allowlists.RLock()
+		_, haveBaseAllowlist := allowlists.m["base"]
+		_, haveTestAllowlist := allowlists.m["test"]
+		allowlists.RUnlock()
+		if !haveBaseAllowlist {
+			t.Fatal("existing allowlist changed before allowlist error")
+		}
+		if haveTestAllowlist {
+			t.Fatal("new allowlist published before allowlist error")
+		}
+		return nil, fmt.Errorf("boom")
+	}
+	defer func() { buildAllowlistForReload = old }()
+
+	err = reload()
+	if err == nil || !strings.Contains(err.Error(), "boom") {
+		t.Fatalf("expected boom error, got %v", err)
+	}
+
+	if _, ok := GetIntegration("base"); !ok {
+		t.Fatal("existing integration lost after failed reload")
+	}
+	if _, ok := GetIntegration("test"); ok {
+		t.Fatal("new integration should not be loaded on allowlist error")
+	}
+
+	allowlists.RLock()
+	_, haveBaseAllowlist := allowlists.m["base"]
+	_, haveTestAllowlist := allowlists.m["test"]
+	allowlists.RUnlock()
+	if !haveBaseAllowlist {
+		t.Fatal("existing allowlist lost after failed reload")
+	}
+	if haveTestAllowlist {
+		t.Fatal("new allowlist should not remain after failed reload")
 	}
 }
 

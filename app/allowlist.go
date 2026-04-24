@@ -74,13 +74,11 @@ func validateAllowlist(name string, callers []CallerConfig) error {
 	return nil
 }
 
-// SetAllowlist registers the caller allowlist for an integration. It returns an
-// error if duplicate caller IDs or rules are detected.
-func SetAllowlist(name string, callers []CallerConfig) error {
+func buildAllowlist(name string, callers []CallerConfig) (map[string]CallerConfig, error) {
 	name = strings.ToLower(name)
 	callers = integrationplugins.ExpandCapabilities(name, callers)
 	if err := validateAllowlist(name, callers); err != nil {
-		return err
+		return nil, err
 	}
 
 	m := make(map[string]CallerConfig, len(callers))
@@ -94,8 +92,19 @@ func SetAllowlist(name string, callers []CallerConfig) error {
 		}
 		m[id] = c
 	}
+	return m, nil
+}
+
+// SetAllowlist registers the caller allowlist for an integration. It returns an
+// error if duplicate caller IDs or rules are detected.
+func SetAllowlist(name string, callers []CallerConfig) error {
+	m, err := buildAllowlist(name, callers)
+	if err != nil {
+		return err
+	}
+
 	allowlists.Lock()
-	allowlists.m[name] = m
+	allowlists.m[strings.ToLower(name)] = m
 	allowlists.Unlock()
 	return nil
 }
