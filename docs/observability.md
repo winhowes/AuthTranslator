@@ -31,7 +31,7 @@ sets `X-AT-Error-Reason` with a short explanation such as "integration not found
 
 | Metric                                    | Type      | Labels                | Description                                      |
 | ----------------------------------------- | --------- | --------------------- | ------------------------------------------------ |
-| `authtranslator_requests_total`           | counter   | `integration`         | Total requests handled per integration, including local rejections. Unmatched hosts are labeled `unknown`. |
+| `authtranslator_requests_total`           | counter   | `integration`         | Total requests handled per integration, including local rejections. Requests that do not match a configured integration are labeled `unknown`. |
 | `authtranslator_upstream_responses_total` | counter   | `integration`, `code` | HTTP status codes returned by upstreams.         |
 | `authtranslator_upstream_roundtrip_duration_seconds` | histogram | `integration` | Time from proxy handoff until the upstream response is received. |
 | `authtranslator_end_to_end_duration_seconds` | histogram | `integration` | Full request latency from handler entry until AuthTranslator finishes responding. |
