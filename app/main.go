@@ -1273,6 +1273,7 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	integrationName = integ.Name
+	metrics.IncRequest(integ.Name)
 
 	clientIP, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
