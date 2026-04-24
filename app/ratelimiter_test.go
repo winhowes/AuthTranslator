@@ -229,6 +229,27 @@ func TestTokenBucketMaxTokens(t *testing.T) {
 	}
 }
 
+func TestTokenBucketRefillClampsToLimit(t *testing.T) {
+	rl := NewRateLimiter(2, time.Second, "token_bucket")
+	t.Cleanup(rl.Stop)
+	key := "caller"
+
+	rl.mu.Lock()
+	rl.buckets[key] = &tokenBucket{tokens: 5, last: time.Now().Add(-time.Second)}
+	rl.mu.Unlock()
+
+	if !rl.Allow(key) {
+		t.Fatal("call should be allowed after refill")
+	}
+
+	rl.mu.Lock()
+	tokens := rl.buckets[key].tokens
+	rl.mu.Unlock()
+	if tokens != 1 {
+		t.Fatalf("expected refill to clamp to limit before consuming one token, got %v", tokens)
+	}
+}
+
 func TestTokenBucketEvictsIdleBuckets(t *testing.T) {
 	rl := NewRateLimiter(1, 30*time.Millisecond, "token_bucket")
 	t.Cleanup(rl.Stop)

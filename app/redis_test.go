@@ -158,6 +158,21 @@ func TestRedisCmdIntReadError(t *testing.T) {
 	}
 }
 
+func TestRedisCmdIntLineReadError(t *testing.T) {
+	srv, cli := net.Pipe()
+	defer cli.Close()
+	go func() {
+		br := bufio.NewReader(srv)
+		br.ReadBytes('\n')
+		br.ReadBytes('\n')
+		srv.Write([]byte(":"))
+		srv.Close()
+	}()
+	if _, err := redisCmdInt(cli, "INCR", "key"); err == nil {
+		t.Fatal("expected line read error")
+	}
+}
+
 func TestRedisCmdReadError(t *testing.T) {
 	srv, cli := net.Pipe()
 	defer cli.Close()
@@ -169,6 +184,21 @@ func TestRedisCmdReadError(t *testing.T) {
 	}()
 	if err := redisCmd(cli, "PING"); err == nil {
 		t.Fatal("expected read error")
+	}
+}
+
+func TestRedisCmdLineReadError(t *testing.T) {
+	srv, cli := net.Pipe()
+	defer cli.Close()
+	go func() {
+		br := bufio.NewReader(srv)
+		br.ReadBytes('\n')
+		br.ReadBytes('\n')
+		srv.Write([]byte("+"))
+		srv.Close()
+	}()
+	if err := redisCmd(cli, "PING"); err == nil {
+		t.Fatal("expected line read error")
 	}
 }
 
@@ -265,6 +295,51 @@ func TestRedisCmdStringReadError(t *testing.T) {
 	}()
 	if _, err := redisCmdString(cli, "GET", "key"); err == nil {
 		t.Fatal("expected read error")
+	}
+}
+
+func TestRedisCmdStringLineReadError(t *testing.T) {
+	srv, cli := net.Pipe()
+	defer cli.Close()
+	go func() {
+		br := bufio.NewReader(srv)
+		br.ReadBytes('\n')
+		br.ReadBytes('\n')
+		srv.Write([]byte("+"))
+		srv.Close()
+	}()
+	if _, err := redisCmdString(cli, "GET", "key"); err == nil {
+		t.Fatal("expected line read error")
+	}
+}
+
+func TestRedisCmdStringInvalidBulkLength(t *testing.T) {
+	srv, cli := net.Pipe()
+	defer cli.Close()
+	go func() {
+		br := bufio.NewReader(srv)
+		br.ReadBytes('\n')
+		br.ReadBytes('\n')
+		srv.Write([]byte("$bad\r\n"))
+		srv.Close()
+	}()
+	if _, err := redisCmdString(cli, "GET", "key"); err == nil {
+		t.Fatal("expected invalid bulk length error")
+	}
+}
+
+func TestRedisCmdStringBulkReadError(t *testing.T) {
+	srv, cli := net.Pipe()
+	defer cli.Close()
+	go func() {
+		br := bufio.NewReader(srv)
+		br.ReadBytes('\n')
+		br.ReadBytes('\n')
+		srv.Write([]byte("$5\r\nabc"))
+		srv.Close()
+	}()
+	if _, err := redisCmdString(cli, "GET", "key"); err == nil {
+		t.Fatal("expected bulk read error")
 	}
 }
 

@@ -384,6 +384,16 @@ func TestWatchFilesNewWatcherError(t *testing.T) {
 	}
 }
 
+func TestNewWatcherPropagatesFSNotifyError(t *testing.T) {
+	old := newFSNotifyWatcher
+	newFSNotifyWatcher = func() (*fsnotify.Watcher, error) { return nil, fmt.Errorf("fail") }
+	defer func() { newFSNotifyWatcher = old }()
+
+	if _, err := newWatcher(); err == nil {
+		t.Fatal("expected fsnotify watcher error")
+	}
+}
+
 func TestWatchDebouncer(t *testing.T) {
 	d := newWatchDebouncer(10 * time.Millisecond)
 	d.stop()

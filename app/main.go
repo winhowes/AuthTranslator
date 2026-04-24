@@ -335,22 +335,17 @@ func reload() error {
 	integrations.RUnlock()
 
 	newMap := make(map[string]*Integration)
+	stopNewIntegrations := func() {
+		for _, ni := range newMap {
+			ni.inLimiter.Stop()
+			ni.outLimiter.Stop()
+		}
+	}
 	for i := range cfg.Integrations {
 		integ := &cfg.Integrations[i]
 		if err := prepareIntegration(integ); err != nil {
-			// cleanup any created limiters
-			for _, ni := range newMap {
-				ni.inLimiter.Stop()
-				ni.outLimiter.Stop()
-			}
+			stopNewIntegrations()
 			return fmt.Errorf("failed to load integration %s: %w", integ.Name, err)
-		}
-		if _, exists := newMap[integ.Name]; exists {
-			for _, ni := range newMap {
-				ni.inLimiter.Stop()
-				ni.outLimiter.Stop()
-			}
-			return fmt.Errorf("integration %s already exists", integ.Name)
 		}
 		window := integ.rateLimitDur
 		if window == 0 {
@@ -1152,8 +1147,10 @@ type fswatcher struct{ *fsnotify.Watcher }
 func (f fswatcher) Events() <-chan fsnotify.Event { return f.Watcher.Events }
 func (f fswatcher) Errors() <-chan error          { return f.Watcher.Errors }
 
+var newFSNotifyWatcher = fsnotify.NewWatcher
+
 var newWatcher = func() (fileWatcher, error) {
-	w, err := fsnotify.NewWatcher()
+	w, err := newFSNotifyWatcher()
 	if err != nil {
 		return nil, err
 	}
@@ -1370,9 +1367,6 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 		metrics.IncInternalResponse(integ.Name, http.StatusTooManyRequests, internalReasonCallerRateLimited)
 		if d := integ.inLimiter.RetryAfter(limiterKey); d > 0 {
 			secs := int(math.Ceil(d.Seconds()))
-			if secs < 1 {
-				secs = 1
-			}
 			w.Header().Set("Retry-After", strconv.Itoa(secs))
 		}
 		w.Header().Set("X-AT-Upstream-Error", "false")
@@ -1387,9 +1381,6 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 		metrics.IncInternalResponse(integ.Name, http.StatusTooManyRequests, internalReasonIntegrationRateLimited)
 		if d := integ.outLimiter.RetryAfter(host); d > 0 {
 			secs := int(math.Ceil(d.Seconds()))
-			if secs < 1 {
-				secs = 1
-			}
 			w.Header().Set("Retry-After", strconv.Itoa(secs))
 		}
 		w.Header().Set("X-AT-Upstream-Error", "false")
@@ -1496,6 +1487,14 @@ type server interface {
 	ListenAndServeTLS(certFile, keyFile string) error
 }
 
+type shutdowner interface {
+	Shutdown(context.Context) error
+}
+
+type closer interface {
+	Close() error
+}
+
 func serve(s server, cert, key string) error {
 	switch {
 	case cert != "" && key != "":
@@ -1504,6 +1503,18 @@ func serve(s server, cert, key string) error {
 		return s.ListenAndServe()
 	default:
 		return fmt.Errorf("both cert and key must be provided")
+	}
+}
+
+func shutdownHTTPServer(ctx context.Context, srv shutdowner) {
+	if err := srv.Shutdown(ctx); err != nil {
+		logger.Error("server shutdown", "error", err)
+	}
+}
+
+func closeHTTP3Server(s closer) {
+	if err := s.Close(); err != nil {
+		logger.Error("http3 shutdown", "error", err)
 	}
 }
 
@@ -1623,13 +1634,9 @@ shutdown:
 	logger.Info("shutting down")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if err := srv.Shutdown(ctx); err != nil {
-		logger.Error("server shutdown", "error", err)
-	}
+	shutdownHTTPServer(ctx, srv)
 	if h3srv != nil {
-		if err := h3srv.Close(); err != nil {
-			logger.Error("http3 shutdown", "error", err)
-		}
+		closeHTTP3Server(h3srv)
 	}
 
 	for _, i := range ListIntegrations() {

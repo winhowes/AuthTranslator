@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"strings"
 	"testing"
@@ -291,7 +292,7 @@ func TestReloadIntegrationError(t *testing.T) {
 	}
 }
 
-func TestReloadPrepareIntegrationErrorBranch(t *testing.T) {
+func TestReloadPrepareIntegrationFailureRollsBack(t *testing.T) {
 	integrations.Lock()
 	integrations.m = make(map[string]*Integration)
 	integrations.Unlock()
@@ -305,7 +306,7 @@ func TestReloadPrepareIntegrationErrorBranch(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.Remove(cfgFile.Name())
-	cfg := `{"integrations":[{"name":"Bad Name","destination":"http://example.com"}]}`
+	cfg := `{"integrations":[{"name":"first","destination":"http://example.com"},{"name":"second","destination":"http://example.org"}]}`
 	if _, err := cfgFile.WriteString(cfg); err != nil {
 		t.Fatal(err)
 	}
@@ -324,104 +325,26 @@ func TestReloadPrepareIntegrationErrorBranch(t *testing.T) {
 	flag.Set("allowlist", alFile.Name())
 	flag.Set("denylist", writeEmptyDenylist(t))
 
-	if err := reload(); err == nil {
-		t.Fatal("expected prepareIntegration error")
+	oldParseURL := parseURL
+	calls := 0
+	parseURL = func(raw string) (*url.URL, error) {
+		calls++
+		if calls == 2 {
+			return nil, fmt.Errorf("parse boom")
+		}
+		return oldParseURL(raw)
+	}
+	defer func() { parseURL = oldParseURL }()
+
+	err = reload()
+	if err == nil || !strings.Contains(err.Error(), "parse boom") {
+		t.Fatalf("expected prepareIntegration error, got %v", err)
 	}
 
 	integrations.RLock()
 	if len(integrations.m) != 0 {
 		integrations.RUnlock()
 		t.Fatalf("expected integrations to remain empty, got %d", len(integrations.m))
-	}
-	integrations.RUnlock()
-}
-
-func TestReloadPrepareIntegrationStopsLimitersOnFailure(t *testing.T) {
-	integrations.Lock()
-	integrations.m = make(map[string]*Integration)
-	integrations.Unlock()
-	allowlists.Lock()
-	allowlists.m = make(map[string]map[string]CallerConfig)
-	allowlists.Unlock()
-	resetDenylistState()
-
-	cfgFile, err := os.CreateTemp("", "cfg*.yaml")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.Remove(cfgFile.Name())
-	cfg := `{"integrations":[{"name":"first","destination":"http://example.com"},{"name":"Bad Name","destination":"http://example.org"}]}`
-	if _, err := cfgFile.WriteString(cfg); err != nil {
-		t.Fatal(err)
-	}
-	cfgFile.Close()
-
-	alFile, err := os.CreateTemp("", "al*.yaml")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.Remove(alFile.Name())
-	if err := os.WriteFile(alFile.Name(), []byte("[]"), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	flag.Set("config", cfgFile.Name())
-	flag.Set("allowlist", alFile.Name())
-	flag.Set("denylist", writeEmptyDenylist(t))
-
-	if err := reload(); err == nil {
-		t.Fatal("expected prepareIntegration error")
-	}
-
-	integrations.RLock()
-	if len(integrations.m) != 0 {
-		integrations.RUnlock()
-		t.Fatalf("expected integrations to remain empty, got %d", len(integrations.m))
-	}
-	integrations.RUnlock()
-}
-
-func TestReloadDuplicateIntegrationBranch(t *testing.T) {
-	integrations.Lock()
-	integrations.m = make(map[string]*Integration)
-	integrations.Unlock()
-	allowlists.Lock()
-	allowlists.m = make(map[string]map[string]CallerConfig)
-	allowlists.Unlock()
-	resetDenylistState()
-
-	cfgFile, err := os.CreateTemp("", "cfg*.yaml")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.Remove(cfgFile.Name())
-	cfg := `{"integrations":[{"name":"dup","destination":"http://example.com"},{"name":"dup","destination":"http://example.org"}]}`
-	if _, err := cfgFile.WriteString(cfg); err != nil {
-		t.Fatal(err)
-	}
-	cfgFile.Close()
-
-	alFile, err := os.CreateTemp("", "al*.yaml")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.Remove(alFile.Name())
-	if err := os.WriteFile(alFile.Name(), []byte("[]"), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	flag.Set("config", cfgFile.Name())
-	flag.Set("allowlist", alFile.Name())
-	flag.Set("denylist", writeEmptyDenylist(t))
-
-	if err := reload(); err == nil {
-		t.Fatal("expected duplicate integration error")
-	}
-
-	integrations.RLock()
-	if len(integrations.m) != 0 {
-		integrations.RUnlock()
-		t.Fatalf("expected no integrations to be loaded, got %d", len(integrations.m))
 	}
 	integrations.RUnlock()
 }
