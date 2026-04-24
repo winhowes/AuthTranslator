@@ -234,11 +234,16 @@ func prepareIntegration(i *Integration) error {
 	}
 
 	i.proxy.ModifyResponse = func(resp *http.Response) error {
+		start := time.Now()
+		if t, ok := metrics.UpstreamRoundtripStart(resp.Request.Context()); ok {
+			metrics.RecordUpstreamRoundtripDuration(i.Name, time.Since(t))
+		}
 		caller := metrics.Caller(resp.Request.Context())
 		metrics.OnResponse(i.Name, caller, resp.Request, resp)
 		if resp.StatusCode < http.StatusOK || resp.StatusCode >= 300 {
 			resp.Header.Set("X-AT-Upstream-Error", "true")
 		}
+		metrics.RecordResponseProcessingDuration(i.Name, time.Since(start))
 		return nil
 	}
 

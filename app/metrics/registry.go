@@ -40,10 +40,10 @@ func Reset() {
 	authFailureCounts.Init()
 	internalResponseCounts.Init()
 	upstreamStatusCounts.Init()
-	durationHistsMu.Lock()
-	durationHists = make(map[string]*histogram)
-	durationHistsMu.Unlock()
-	requestDurations.Init()
+	upstreamRoundtripDurations.Reset()
+	endToEndDurations.Reset()
+	preProxyDurations.Reset()
+	responseProcessingDurations.Reset()
 }
 
 // Register adds a metrics plugin.

@@ -49,7 +49,10 @@ func TestMetricsHandlerEmpty(t *testing.T) {
 	body := rr.Body.String()
 	for _, line := range []string{
 		"# TYPE authtranslator_requests_total counter",
-		"# TYPE authtranslator_request_duration_seconds histogram",
+		"# TYPE authtranslator_upstream_roundtrip_duration_seconds histogram",
+		"# TYPE authtranslator_end_to_end_duration_seconds histogram",
+		"# TYPE authtranslator_pre_proxy_duration_seconds histogram",
+		"# TYPE authtranslator_response_processing_duration_seconds histogram",
 		"# TYPE authtranslator_rate_limit_events_total counter",
 		"# TYPE authtranslator_auth_failures_total counter",
 		"# TYPE authtranslator_internal_responses_total counter",
@@ -74,9 +77,15 @@ func TestMetricsHandlerOutput(t *testing.T) {
 	RecordStatus("foo", http.StatusOK)
 	RecordStatus("bar", http.StatusTeapot)
 	IncRequest("bar")
-	RecordDuration("foo", 100*time.Millisecond)
-	RecordDuration("foo", 200*time.Millisecond)
-	RecordDuration("bar", 50*time.Millisecond)
+	RecordUpstreamRoundtripDuration("foo", 100*time.Millisecond)
+	RecordUpstreamRoundtripDuration("foo", 200*time.Millisecond)
+	RecordUpstreamRoundtripDuration("bar", 50*time.Millisecond)
+	RecordEndToEndDuration("foo", 250*time.Millisecond)
+	RecordEndToEndDuration("bar", 75*time.Millisecond)
+	RecordPreProxyDuration("foo", 20*time.Millisecond)
+	RecordPreProxyDuration("bar", 10*time.Millisecond)
+	RecordResponseProcessingDuration("foo", 15*time.Millisecond)
+	RecordResponseProcessingDuration("bar", 5*time.Millisecond)
 
 	req := httptest.NewRequest(http.MethodGet, "/_at_internal/metrics", nil)
 	rr := httptest.NewRecorder()
@@ -89,7 +98,10 @@ func TestMetricsHandlerOutput(t *testing.T) {
 	body := rr.Body.String()
 	for _, line := range []string{
 		"# TYPE authtranslator_requests_total counter",
-		"# TYPE authtranslator_request_duration_seconds histogram",
+		"# TYPE authtranslator_upstream_roundtrip_duration_seconds histogram",
+		"# TYPE authtranslator_end_to_end_duration_seconds histogram",
+		"# TYPE authtranslator_pre_proxy_duration_seconds histogram",
+		"# TYPE authtranslator_response_processing_duration_seconds histogram",
 		"# TYPE authtranslator_rate_limit_events_total counter",
 		"# TYPE authtranslator_auth_failures_total counter",
 		"# TYPE authtranslator_internal_responses_total counter",
@@ -120,11 +132,20 @@ func TestMetricsHandlerOutput(t *testing.T) {
 	if !strings.Contains(body, `authtranslator_upstream_responses_total{integration="bar",code="418"} 1`) {
 		t.Fatal("missing bar status metric")
 	}
-	if !strings.Contains(body, `authtranslator_request_duration_seconds_sum{integration="foo"}`) {
-		t.Fatal("missing foo duration histogram")
+	if !strings.Contains(body, `authtranslator_upstream_roundtrip_duration_seconds_sum{integration="foo"}`) {
+		t.Fatal("missing foo upstream duration histogram")
 	}
-	if !strings.Contains(body, `authtranslator_request_duration_seconds_sum{integration="bar"}`) {
-		t.Fatal("missing bar duration histogram")
+	if !strings.Contains(body, `authtranslator_upstream_roundtrip_duration_seconds_sum{integration="bar"}`) {
+		t.Fatal("missing bar upstream duration histogram")
+	}
+	if !strings.Contains(body, `authtranslator_end_to_end_duration_seconds_sum{integration="foo"}`) {
+		t.Fatal("missing foo end-to-end duration histogram")
+	}
+	if !strings.Contains(body, `authtranslator_pre_proxy_duration_seconds_sum{integration="foo"}`) {
+		t.Fatal("missing foo pre-proxy duration histogram")
+	}
+	if !strings.Contains(body, `authtranslator_response_processing_duration_seconds_sum{integration="foo"}`) {
+		t.Fatal("missing foo response processing duration histogram")
 	}
 }
 
@@ -135,7 +156,7 @@ func TestMetricsHandlerOutputWithPunctuation(t *testing.T) {
 	underscoreName := "with_underscore"
 
 	IncRequest(dotName)
-	RecordDuration(dotName, 150*time.Millisecond)
+	RecordUpstreamRoundtripDuration(dotName, 150*time.Millisecond)
 	RecordStatus(dotName, http.StatusAccepted)
 	IncInternalResponse(dotName, http.StatusBadRequest, "invalid_destination")
 
@@ -149,7 +170,7 @@ func TestMetricsHandlerOutputWithPunctuation(t *testing.T) {
 	if !strings.Contains(body, fmt.Sprintf(`authtranslator_requests_total{integration=%q} 1`, dotName)) {
 		t.Fatalf("missing request counter for %s: %s", dotName, body)
 	}
-	if !strings.Contains(body, fmt.Sprintf(`authtranslator_request_duration_seconds_sum{integration=%q}`, dotName)) {
+	if !strings.Contains(body, fmt.Sprintf(`authtranslator_upstream_roundtrip_duration_seconds_sum{integration=%q}`, dotName)) {
 		t.Fatalf("missing duration histogram for %s: %s", dotName, body)
 	}
 	if !strings.Contains(body, fmt.Sprintf(`authtranslator_upstream_responses_total{integration=%q,code=%q} 1`, dotName, "202")) {
@@ -211,6 +232,17 @@ func TestCallerContext(t *testing.T) {
 	}
 }
 
+func TestUpstreamRoundtripStartContext(t *testing.T) {
+	start := time.Now()
+	ctx := WithUpstreamRoundtripStart(context.Background(), start)
+	if got, ok := UpstreamRoundtripStart(ctx); !ok || !got.Equal(start) {
+		t.Fatalf("expected upstream roundtrip start %v, got %v ok=%v", start, got, ok)
+	}
+	if _, ok := UpstreamRoundtripStart(context.Background()); ok {
+		t.Fatal("expected missing upstream roundtrip start on background context")
+	}
+}
+
 func TestWritePromPlugins(t *testing.T) {
 	Reset()
 	mu.Lock()
@@ -260,7 +292,7 @@ func TestWritePromSkipsMalformedUpstreamKeys(t *testing.T) {
 
 func TestWritePromDoesNotBlockRecordDurationForOtherIntegrations(t *testing.T) {
 	Reset()
-	RecordDuration("one", 100*time.Millisecond)
+	RecordUpstreamRoundtripDuration("one", 100*time.Millisecond)
 
 	blockCh := make(chan struct{})
 	started := make(chan struct{})
@@ -284,14 +316,14 @@ func TestWritePromDoesNotBlockRecordDurationForOtherIntegrations(t *testing.T) {
 
 	recordDone := make(chan struct{})
 	go func() {
-		RecordDuration("two", 50*time.Millisecond)
+		RecordUpstreamRoundtripDuration("two", 50*time.Millisecond)
 		close(recordDone)
 	}()
 
 	select {
 	case <-recordDone:
 	case <-time.After(300 * time.Millisecond):
-		t.Fatal("RecordDuration blocked while metrics response writer was blocked")
+		t.Fatal("RecordUpstreamRoundtripDuration blocked while metrics response writer was blocked")
 	}
 
 	close(blockCh)

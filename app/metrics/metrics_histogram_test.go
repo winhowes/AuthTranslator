@@ -50,7 +50,7 @@ func TestHistogramWriteProm(t *testing.T) {
 	h.Observe(1)
 
 	rr := httptest.NewRecorder()
-	h.writeProm(rr, "foo")
+	h.writeProm(rr, "authtranslator_upstream_roundtrip_duration_seconds", "foo")
 
 	lines := strings.Split(strings.TrimSpace(rr.Body.String()), "\n")
 	if len(lines) != 10 {
@@ -59,7 +59,7 @@ func TestHistogramWriteProm(t *testing.T) {
 	if !strings.Contains(lines[0], "le=\"0.1\"") || !strings.HasSuffix(lines[0], " 0") {
 		t.Fatalf("unexpected first line: %s", lines[0])
 	}
-	if !strings.HasPrefix(lines[8], "authtranslator_request_duration_seconds_sum{integration=\"foo\"}") {
+	if !strings.HasPrefix(lines[8], "authtranslator_upstream_roundtrip_duration_seconds_sum{integration=\"foo\"}") {
 		t.Fatalf("missing sum line")
 	}
 	if !strings.HasSuffix(lines[9], " 2") {
