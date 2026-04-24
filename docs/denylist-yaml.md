@@ -7,7 +7,7 @@ The **denylist** answers another narrow question:
 It lives beside `config.yaml` and `allowlist.yaml`, is hot‑reloaded, and is entirely optional. In day‑to‑day operation you should
 prefer shaping access through the [allowlist](allowlist-yaml.md); the denylist is best reserved for defensive blocks (for
 example, temporarily disabling tool calls in the OpenAI Responses API or blocking a channel in Slack that should never be posted to). Both files can be used in tandem: a
-request must first be permitted by the allowlist and then **avoid matching** any deny rules.
+request must first **avoid matching** any deny rules and then be permitted by the allowlist.
 
 ---
 
@@ -71,9 +71,9 @@ strict:
 
 While the denylist can stand alone, using both files together gives the best control:
 
-1. The request must appear on the allowlist for the caller.
-2. The proxy evaluates the denylist for that integration and caller. If any rule matches, the proxy responds with **403 Forbidden**
+1. The proxy evaluates the denylist for that integration and caller. If any rule matches, the proxy responds with **403 Forbidden**
    and sets `X-AT-Error-Reason` to the matching rule path.
+2. If no deny rule matches, the request must appear on the allowlist for the caller.
 
 Use the allowlist to declare the **intended** access surface, and keep the denylist as a precise safety net for exceptional cases
 or incident response.

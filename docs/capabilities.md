@@ -1,8 +1,8 @@
 # Built-in Capabilities
 
-Each integration plugin can expose **capabilities** – named groups of rules that map to common API actions. Assigning a capability in `allowlist.yaml` expands to the underlying HTTP rules automatically.
+Each runtime integration plugin can expose **capabilities** – named groups of rules that map to common API actions. Assigning a capability in `allowlist.yaml` expands to the underlying HTTP rules automatically.
 
-Run `go run ./cmd/allowlist list` to list capabilities from your build. For quick reference, the table below summarises the capabilities bundled with AuthTranslator.
+For quick reference, the table below summarises the capabilities bundled into the proxy runtime. The `cmd/allowlist` helper has its own registry for generating YAML, so `go run ./cmd/allowlist list` shows what that helper can emit rather than every runtime capability below.
 
 | Integration | Capability | Parameters |
 |-------------|-----------|------------|
@@ -64,4 +64,4 @@ Run `go run ./cmd/allowlist list` to list capabilities from your build. For quic
 | zendesk | update_ticket | – |
 
 For SendGrid `send_email`, if `replyTo` is omitted the reply address is empty. Provide `null` explicitly to leave the reply-to header unset.
-Capabilities not listed above may be added by custom plugins. Use the CLI to discover them in your build.
+Capabilities not listed above may be added by custom runtime plugins.

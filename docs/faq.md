@@ -12,7 +12,7 @@ A lightweight reverse‑proxy that swaps the caller’s short‑lived credential
 
 ### 2 Does AuthTranslator ever store the caller’s credential?
 
-No. Incoming plugins validate or inspect the token, derive a **caller ID**, then discard the credential before the request leaves the proxy.
+No. Incoming plugins validate or inspect the credential, and plugins that implement caller identification derive a **caller ID**. Plugins that implement credential stripping remove the original credential before the request leaves the proxy.
 
 ---
 
@@ -51,7 +51,7 @@ Set `in_rate_limit: 0` and `out_rate_limit: 0` (or omit the fields entirely). Ra
 * `env:` (environment variable)
 * `file:` (volume‑mounted file)
 * `gcp:` (Cloud KMS)
-* `aws:` (AWS Secrets Manager)
+* `aws:` (AES-GCM encrypted value using `AWS_KMS_KEY`)
 * `azure:` (Azure Key Vault)
 * `vault:` (HashiCorp Vault)
 
@@ -79,7 +79,7 @@ Yes. Both protocols are proxied transparently so long as the upstream service sp
 
 ### 11 Why am I seeing 429s even though I set `requests` high?
 
-Remember limits are **per caller ID** *and* **per integration**. If your load‑test tool randomises caller IDs, each ID uses the limit configured in `config.yaml`. Consolidate IDs or raise the limit as needed.
+Remember inbound limits are **per caller ID** and **per integration**. If your load-test tool randomises caller IDs, each ID uses the limit configured in `config.yaml`. Outbound limits are per integration host. Consolidate IDs, raise the limit, or adjust the strategy as needed.
 
 ---
 
@@ -104,4 +104,4 @@ Not built‑in. Most users expose Prometheus metrics to Grafana.
 
 ### 14 How do I log request/response headers for debugging?
 
-Run the proxy with `-log-level DEBUG`. Secrets are automatically redacted.
+The proxy does not dump request or response headers. Use WARN logs and `X-AT-Error-Reason` response headers to debug proxy-generated failures.

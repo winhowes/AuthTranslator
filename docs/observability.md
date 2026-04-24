@@ -9,7 +9,7 @@ AuthTranslator surfaces **health probes, Prometheus metrics, and structured logs
 | Path                    | Method | Purpose                                                                                               | Typical probe                         |
 | ----------------------- | ------ | ----------------------------------------------------------------------------------------------------- | ------------------------------------- |
 | `/_at_internal/healthz` | `GET`  | Liveness: returns **200 OK** once the HTTP server is up. No external deps are checked.                | Kubernetes `livenessProbe` every 10 s |
-| `/_at_internal/metrics` | `GET`  | Exposes **Prometheus** text format. Includes Go runtime metrics and AuthTranslator‑specific counters. | Prometheus `scrape_interval` 15 s     |
+| `/_at_internal/metrics` | `GET`  | Exposes **Prometheus** text format with AuthTranslator-specific counters and custom metrics plugin output. | Prometheus `scrape_interval` 15 s     |
 
 The health endpoint is always available and returns an `X-Last-Reload` header
 showing the most recent configuration reload time. The metrics endpoint is
@@ -40,7 +40,6 @@ sets `X-AT-Error-Reason` with a short explanation such as "integration not found
 | `authtranslator_rate_limit_events_total`  | counter   | `integration`         | Incremented when a request is rejected with 429. |
 | `authtranslator_auth_failures_total`      | counter   | `integration`         | Incoming and outgoing auth plugin failures.      |
 | `authtranslator_internal_responses_total` | counter   | `integration`, `code`, `reason` | Proxy-generated non-upstream responses grouped by coarse reason. |
-| `authtranslator_last_reload`              | gauge     | –                     | Timestamp of the most recent configuration reload. |
 
 The `reason` label on `authtranslator_internal_responses_total` uses bounded categories such as `integration_not_found`, `incoming_auth_failure`, `caller_rate_limited`, `integration_rate_limited`, `invalid_destination`, and `no_proxy_configured`.
 
@@ -110,7 +109,7 @@ Sample line (wrapped for readability):
 ### Log level
 
 - Default: **INFO**
-- Override: run the proxy with `-log-level DEBUG` (adds request/response headers—secrets redacted)
+- Override: run the proxy with `-log-level DEBUG` for lower-level log messages.
 
 ---
 

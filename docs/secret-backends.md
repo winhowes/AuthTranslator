@@ -24,8 +24,8 @@ outgoing_auth:
 | `file`           | `file:///etc/secrets/slack_token`                                   | Kubernetes **secret volume** or Docker bind‑mount. Append `:KEY` to read key/value files; omit it to load the entire file. |
 | `k8s`            | `k8s:default/mysecret#token`         | In‑cluster secret via the Kubernetes API.                     |
 | `gcp`            | `gcp:projects/acme/locations/global/keyRings/auth/cryptoKeys/token:ciphertext` | Running on GKE / Cloud Run; decrypt via **Cloud KMS**. |
-| `aws`            | `aws:Ci0KU29tZUNpcGhlcnRleHQ=` | AES‑GCM encrypted values decrypted using `AWS_KMS_KEY`. |
-| `azure`          | `azure:https://kv-name.vault.azure.net/secrets/secret-name`         | AKS or VM SS with **Managed Identity**.                       |
+| `aws`            | `aws:Ci0KU29tZUNpcGhlcnRleHQ=` | AES-GCM encrypted values decrypted using `AWS_KMS_KEY`. |
+| `azure`          | `azure:https://kv-name.vault.azure.net/secrets/secret-name`         | Azure Key Vault using service-principal credentials.           |
 | `vault`          | `vault:secret/data/slack`                                       | Self‑hosted **HashiCorp Vault** cluster.                      |
 | `keychain`       | `keychain:github-cli#octocat`                                   | macOS hosts with secrets in Keychain (`service#account`). |
 | `secretservice`  | `secretservice:service=slack,user=bot`                          | Linux desktops/servers with D-Bus Secret Service (`secret-tool`). |
@@ -110,9 +110,9 @@ The proxy treats the entire value as opaque until the chosen back‑end returns 
 
 | Behaviour  | Details                                                                                |
 | ---------- | -------------------------------------------------------------------------------------- |
-| On startup | All secret URIs are resolved **once**. Failure → fatal log + exit.                     |
-| Hot reload | On `SIGHUP` / `-watch`, new or changed URIs are fetched; unchanged values are re‑used. |
-| In‑request | Plugins never re‑fetch — avoids per‑call latency and rate limits.                      |
+| On startup | Secret references are validated for a known scheme. Values are fetched lazily on first use. |
+| Hot reload | On `SIGHUP` / `-watch`, the secret cache is cleared so subsequent requests fetch fresh values. |
+| In‑request | The first use of a secret URI fetches it; later uses read from the cache until reload or TTL expiry. |
 | TTL        | Controlled by the `-secret-refresh` flag; `0` disables expiry. |
 
 ---
@@ -123,12 +123,15 @@ The proxy treats the entire value as opaque until the chosen back‑end returns 
 2. Implement:
 
    ```go
-   func Fetch(ctx context.Context, uri *url.URL) ([]byte, error)
+   type Plugin interface {
+       Prefix() string
+       Load(ctx context.Context, id string) (string, error)
+   }
    ```
 3. Register in `init()`:
 
    ```go
-   secrets.Register("<scheme>", Fetch)
+   secrets.Register(plugin{})
    ```
 4. Unit‑test with a fake server or env vars.
 
@@ -139,18 +142,22 @@ package foosecret
 
 import (
     "context"
-    "net/url"
 
     "github.com/winhowes/AuthTranslator/app/secrets"
 )
 
+type plugin struct{}
+
 func init() {
-    secrets.Register("foo", fetch)
+    secrets.Register(plugin{})
 }
 
-func fetch(ctx context.Context, uri *url.URL) ([]byte, error) {
-    // uri.Opaque == "bar/baz#key"
-    // …fetch and return the secret…
+func (plugin) Prefix() string { return "foo" }
+
+func (plugin) Load(ctx context.Context, id string) (string, error) {
+    // id == "bar/baz#key" for foo:bar/baz#key
+    // fetch and return the secret
+    return "", nil
 }
 ```
 
@@ -160,6 +167,6 @@ A working GCP implementation is in [`app/secrets/plugins/gcp`](../app/secrets/pl
 
 ## Best practices
 
-* **Rotate centrally** Because credentials load at start, rotation is instantaneous after a hot reload and zero code changes.
+* **Rotate centrally** After a hot reload or TTL expiry, the next request re-fetches credentials without code changes.
 * **Avoid multi‑line PEMs in env** Use `file:` or a cloud vault instead; most shells mangle newlines.
 * **Handle literals carefully** If you rely on `dangerousLiteral:` placeholders, never commit real credentials and treat them as temporary scaffolding.
