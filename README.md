@@ -136,7 +136,7 @@ make ci         # run full checks + tests with coverage
 make docker     # build container
 ```
 
-* Requires **Go 1.24+**.
+* Requires **Go 1.26.2+**.
 * Run `golangci‑lint run` to match CI.
 
 ---
