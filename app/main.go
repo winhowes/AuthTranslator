@@ -18,6 +18,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -1159,6 +1160,43 @@ var newWatcher = func() (fileWatcher, error) {
 	return fswatcher{w}, nil
 }
 
+var watchAbsPath = filepath.Abs
+
+const watchDebounceDelay = 100 * time.Millisecond
+
+type watchDebouncer struct {
+	delay  time.Duration
+	timer  *time.Timer
+	timerC <-chan time.Time
+}
+
+func newWatchDebouncer(delay time.Duration) *watchDebouncer {
+	return &watchDebouncer{delay: delay}
+}
+
+func (d *watchDebouncer) trigger() <-chan time.Time {
+	if d.timer == nil {
+		d.timer = time.NewTimer(d.delay)
+		d.timerC = d.timer.C
+		return d.timerC
+	}
+	d.timer.Stop()
+	d.timer.Reset(d.delay)
+	d.timerC = d.timer.C
+	return d.timerC
+}
+
+func (d *watchDebouncer) fired() {
+	d.timerC = nil
+}
+
+func (d *watchDebouncer) stop() {
+	if d.timer == nil {
+		return
+	}
+	d.timer.Stop()
+}
+
 func watchFiles(ctx context.Context, files []string, out chan<- struct{}) {
 	w, err := newWatcher()
 	if err != nil {
@@ -1167,9 +1205,29 @@ func watchFiles(ctx context.Context, files []string, out chan<- struct{}) {
 	}
 	defer w.Close()
 
+	watchedDirs := make(map[string]struct{})
 	for _, f := range files {
-		if err := w.Add(f); err != nil {
-			logger.Error("watch add failed", "file", f, "error", err)
+		abs, err := watchAbsPath(f)
+		if err != nil {
+			logger.Error("watch path failed", "file", f, "error", err)
+			continue
+		}
+		watchedDirs[filepath.Dir(filepath.Clean(abs))] = struct{}{}
+	}
+
+	for dir := range watchedDirs {
+		if err := w.Add(dir); err != nil {
+			logger.Error("watch add failed", "dir", dir, "error", err)
+		}
+	}
+
+	debouncer := newWatchDebouncer(watchDebounceDelay)
+	defer debouncer.stop()
+	var timerC <-chan time.Time
+	notify := func() {
+		select {
+		case out <- struct{}{}:
+		default:
 		}
 	}
 
@@ -1177,36 +1235,16 @@ func watchFiles(ctx context.Context, files []string, out chan<- struct{}) {
 		select {
 		case <-ctx.Done():
 			return
+		case <-timerC:
+			timerC = nil
+			debouncer.fired()
+			notify()
 		case ev, ok := <-w.Events():
 			if !ok {
 				return
 			}
-			if ev.Op&(fsnotify.Rename|fsnotify.Remove) != 0 {
-				go func(name string) {
-					for i := 0; i < 50; i++ {
-						if err := w.Add(name); err == nil {
-							return
-						} else if !os.IsNotExist(err) {
-							logger.Error("watch re-add failed", "file", name, "error", err)
-							return
-						}
-						select {
-						case <-ctx.Done():
-							return
-						case <-time.After(10 * time.Millisecond):
-						}
-					}
-				}(ev.Name)
-			} else if ev.Op&fsnotify.Create != 0 {
-				if err := w.Add(ev.Name); err != nil && !os.IsNotExist(err) {
-					logger.Error("watch re-add failed", "file", ev.Name, "error", err)
-				}
-			}
-			if ev.Op&(fsnotify.Write|fsnotify.Create|fsnotify.Rename) != 0 {
-				select {
-				case out <- struct{}{}:
-				default:
-				}
+			if watchEventInDirs(ev, watchedDirs) && ev.Op&(fsnotify.Write|fsnotify.Create|fsnotify.Rename|fsnotify.Remove|fsnotify.Chmod) != 0 {
+				timerC = debouncer.trigger()
 			}
 		case err, ok := <-w.Errors():
 			if !ok {
@@ -1215,6 +1253,21 @@ func watchFiles(ctx context.Context, files []string, out chan<- struct{}) {
 			logger.Error("watch error", "error", err)
 		}
 	}
+}
+
+func watchEventInDirs(ev fsnotify.Event, watchedDirs map[string]struct{}) bool {
+	if ev.Name == "" {
+		return false
+	}
+	name := filepath.Clean(ev.Name)
+	if !filepath.IsAbs(name) {
+		abs, err := filepath.Abs(name)
+		if err == nil {
+			name = abs
+		}
+	}
+	_, ok := watchedDirs[filepath.Dir(name)]
+	return ok
 }
 
 // healthzHandler reports server readiness.

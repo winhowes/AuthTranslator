@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -69,11 +71,11 @@ func TestWatchFilesRename(t *testing.T) {
 		t.Fatal("timeout waiting for rename event")
 	}
 
-	// recreate the original file and modify it; watcher should fire again
+	// recreate the original file and modify it; the directory watch should fire again
 	if err := os.WriteFile(name, []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// give watcher time to re-add
+	// give the filesystem time to deliver the create event before the write
 	time.Sleep(50 * time.Millisecond)
 	if err := os.WriteFile(name, []byte("y"), 0o644); err != nil {
 		t.Fatal(err)
@@ -84,6 +86,63 @@ func TestWatchFilesRename(t *testing.T) {
 		// modification detected
 	case <-time.After(time.Second):
 		t.Fatal("timeout waiting for write event after rename")
+	}
+}
+
+func TestWatchFilesKubernetesSymlinkSwap(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("projected-volume symlink semantics are Unix-specific")
+	}
+
+	dir := t.TempDir()
+	writeProjectedConfig(t, dir, 1, "one", true)
+	name := filepath.Join(dir, "config.yaml")
+
+	ch := make(chan struct{}, 2)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go watchFiles(ctx, []string{name}, ch)
+
+	// give watcher time to start
+	time.Sleep(50 * time.Millisecond)
+
+	writeProjectedConfig(t, dir, 2, "two", false)
+
+	select {
+	case <-ch:
+		// symlink swap detected
+	case <-time.After(time.Second):
+		t.Fatal("timeout waiting for projected volume update")
+	}
+}
+
+func writeProjectedConfig(t *testing.T, dir string, rev int, contents string, createFileLink bool) {
+	t.Helper()
+
+	dataDir := filepath.Join(dir, fmt.Sprintf("..2026_01_01_00_00_%02d.000000000", rev))
+	if err := os.Mkdir(dataDir, 0o755); err != nil {
+		t.Fatalf("mkdir projected data dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dataDir, "config.yaml"), []byte(contents), 0o644); err != nil {
+		t.Fatalf("write projected config: %v", err)
+	}
+
+	tmpLink := filepath.Join(dir, "..data_tmp")
+	dataLink := filepath.Join(dir, "..data")
+	if err := os.Remove(tmpLink); err != nil && !os.IsNotExist(err) {
+		t.Fatalf("remove stale projected tmp link: %v", err)
+	}
+	if err := os.Symlink(filepath.Base(dataDir), tmpLink); err != nil {
+		t.Fatalf("create projected tmp link: %v", err)
+	}
+	if err := os.Rename(tmpLink, dataLink); err != nil {
+		t.Fatalf("swap projected data link: %v", err)
+	}
+
+	if createFileLink {
+		if err := os.Symlink(filepath.Join("..data", "config.yaml"), filepath.Join(dir, "config.yaml")); err != nil {
+			t.Fatalf("create projected config link: %v", err)
+		}
 	}
 }
 
@@ -112,10 +171,24 @@ type mockWatcher struct {
 	addErr error
 }
 
-func (m *mockWatcher) Add(name string) error         { return m.addErr }
-func (m *mockWatcher) Close() error                  { close(m.events); close(m.errors); return nil }
+func (m *mockWatcher) Add(name string) error { return m.addErr }
+func (m *mockWatcher) Close() error {
+	safeCloseEvents(m.events)
+	safeCloseErrors(m.errors)
+	return nil
+}
 func (m *mockWatcher) Events() <-chan fsnotify.Event { return m.events }
 func (m *mockWatcher) Errors() <-chan error          { return m.errors }
+
+func safeCloseEvents(ch chan fsnotify.Event) {
+	defer func() { _ = recover() }()
+	close(ch)
+}
+
+func safeCloseErrors(ch chan error) {
+	defer func() { _ = recover() }()
+	close(ch)
+}
 
 func TestWatchFilesError(t *testing.T) {
 	mw := &mockWatcher{events: make(chan fsnotify.Event), errors: make(chan error, 1)}
@@ -127,12 +200,159 @@ func TestWatchFilesError(t *testing.T) {
 	done := make(chan struct{})
 	go func() { watchFiles(ctx, nil, make(chan struct{})); close(done) }()
 	mw.errors <- fmt.Errorf("boom")
+	close(mw.errors)
+	<-done
+	cancel()
+}
+
+func TestWatchFilesPathError(t *testing.T) {
+	mw := &mockWatcher{events: make(chan fsnotify.Event), errors: make(chan error)}
+	oldWatcher := newWatcher
+	newWatcher = func() (fileWatcher, error) { return mw, nil }
+	defer func() { newWatcher = oldWatcher }()
+	oldAbsPath := watchAbsPath
+	watchAbsPath = func(string) (string, error) { return "", fmt.Errorf("abs failed") }
+	defer func() { watchAbsPath = oldAbsPath }()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() {
+		watchFiles(ctx, []string{"config.yaml"}, make(chan struct{}))
+		close(done)
+	}()
+	time.Sleep(50 * time.Millisecond)
+	cancel()
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("watchFiles did not exit after path error")
+	}
+}
+
+func TestWatchFilesReturnsWhenEventsClosed(t *testing.T) {
+	mw := &mockWatcher{events: make(chan fsnotify.Event), errors: make(chan error)}
+	old := newWatcher
+	newWatcher = func() (fileWatcher, error) { return mw, nil }
+	defer func() { newWatcher = old }()
+
+	done := make(chan struct{})
+	go func() {
+		watchFiles(context.Background(), []string{filepath.Join(t.TempDir(), "config.yaml")}, make(chan struct{}))
+		close(done)
+	}()
+	close(mw.events)
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("watchFiles did not exit after events channel closed")
+	}
+}
+
+func TestWatchFilesReturnsWhenErrorsClosed(t *testing.T) {
+	mw := &mockWatcher{events: make(chan fsnotify.Event), errors: make(chan error)}
+	old := newWatcher
+	newWatcher = func() (fileWatcher, error) { return mw, nil }
+	defer func() { newWatcher = old }()
+
+	done := make(chan struct{})
+	go func() {
+		watchFiles(context.Background(), []string{filepath.Join(t.TempDir(), "config.yaml")}, make(chan struct{}))
+		close(done)
+	}()
+	close(mw.errors)
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("watchFiles did not exit after errors channel closed")
+	}
+}
+
+func TestWatchFilesIgnoresIrrelevantEvents(t *testing.T) {
+	mw := &mockWatcher{events: make(chan fsnotify.Event, 2), errors: make(chan error)}
+	old := newWatcher
+	newWatcher = func() (fileWatcher, error) { return mw, nil }
+	defer func() { newWatcher = old }()
+
+	dir := t.TempDir()
+	name := filepath.Join(dir, "config.yaml")
+	ch := make(chan struct{}, 1)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan struct{})
+	go func() { watchFiles(ctx, []string{name}, ch); close(done) }()
+
+	mw.events <- fsnotify.Event{Name: filepath.Join(t.TempDir(), "other.yaml"), Op: fsnotify.Write}
+	mw.events <- fsnotify.Event{Name: name, Op: 0}
+
+	select {
+	case <-ch:
+		t.Fatal("unexpected notification for irrelevant events")
+	case <-time.After(2*watchDebounceDelay + 50*time.Millisecond):
+	}
 	cancel()
 	<-done
 }
 
-func TestWatchFilesRenameAddError(t *testing.T) {
-	mw := &mockWatcher{events: make(chan fsnotify.Event, 1), errors: make(chan error), addErr: fmt.Errorf("fail")}
+func TestWatchFilesDropsNotificationWhenOutputFull(t *testing.T) {
+	mw := &mockWatcher{events: make(chan fsnotify.Event, 1), errors: make(chan error)}
+	old := newWatcher
+	newWatcher = func() (fileWatcher, error) { return mw, nil }
+	defer func() { newWatcher = old }()
+
+	name := filepath.Join(t.TempDir(), "config.yaml")
+	ch := make(chan struct{}, 1)
+	ch <- struct{}{}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { watchFiles(ctx, []string{name}, ch); close(done) }()
+
+	mw.events <- fsnotify.Event{Name: name, Op: fsnotify.Write}
+	time.Sleep(2*watchDebounceDelay + 50*time.Millisecond)
+	cancel()
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("watchFiles blocked when output channel was full")
+	}
+}
+
+func TestWatchFilesDebouncesBurst(t *testing.T) {
+	mw := &mockWatcher{events: make(chan fsnotify.Event, 2), errors: make(chan error)}
+	old := newWatcher
+	newWatcher = func() (fileWatcher, error) { return mw, nil }
+	defer func() { newWatcher = old }()
+
+	name := filepath.Join(t.TempDir(), "config.yaml")
+	ch := make(chan struct{}, 2)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan struct{})
+	go func() { watchFiles(ctx, []string{name}, ch); close(done) }()
+	mw.events <- fsnotify.Event{Name: name, Op: fsnotify.Write}
+	mw.events <- fsnotify.Event{Name: name, Op: fsnotify.Write}
+
+	select {
+	case <-ch:
+		// success
+	case <-time.After(time.Second):
+		t.Fatal("timeout waiting for debounced event")
+	}
+
+	select {
+	case <-ch:
+		t.Fatal("expected burst events to be coalesced")
+	case <-time.After(2*watchDebounceDelay + 50*time.Millisecond):
+	}
+	cancel()
+	<-done
+}
+
+func TestWatchFilesAddError(t *testing.T) {
+	mw := &mockWatcher{events: make(chan fsnotify.Event), errors: make(chan error), addErr: fmt.Errorf("boom")}
 	old := newWatcher
 	newWatcher = func() (fileWatcher, error) { return mw, nil }
 	defer func() { newWatcher = old }()
@@ -141,54 +361,13 @@ func TestWatchFilesRenameAddError(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
 	go func() { watchFiles(ctx, []string{"f"}, ch); close(done) }()
-	mw.events <- fsnotify.Event{Name: "f", Op: fsnotify.Rename}
-	select {
-	case <-ch:
-	case <-time.After(time.Second):
-		t.Fatal("timeout waiting for event")
-	}
+	time.Sleep(50 * time.Millisecond)
 	cancel()
-	<-done
-}
-
-func TestWatchFilesCreateAddError(t *testing.T) {
-	mw := &mockWatcher{events: make(chan fsnotify.Event, 1), errors: make(chan error), addErr: fmt.Errorf("boom")}
-	old := newWatcher
-	newWatcher = func() (fileWatcher, error) { return mw, nil }
-	defer func() { newWatcher = old }()
-
-	ch := make(chan struct{}, 1)
-	ctx, cancel := context.WithCancel(context.Background())
-	done := make(chan struct{})
-	go func() { watchFiles(ctx, []string{"f"}, ch); close(done) }()
-	mw.events <- fsnotify.Event{Name: "f", Op: fsnotify.Create}
 	select {
-	case <-ch:
+	case <-done:
 	case <-time.After(time.Second):
-		t.Fatal("timeout waiting for create event")
+		t.Fatal("watchFiles did not exit after add error")
 	}
-	cancel()
-	<-done
-}
-
-func TestWatchFilesCreateAddMissing(t *testing.T) {
-	mw := &mockWatcher{events: make(chan fsnotify.Event, 1), errors: make(chan error), addErr: os.ErrNotExist}
-	old := newWatcher
-	newWatcher = func() (fileWatcher, error) { return mw, nil }
-	defer func() { newWatcher = old }()
-
-	ch := make(chan struct{}, 1)
-	ctx, cancel := context.WithCancel(context.Background())
-	done := make(chan struct{})
-	go func() { watchFiles(ctx, []string{"f"}, ch); close(done) }()
-	mw.events <- fsnotify.Event{Name: "f", Op: fsnotify.Create}
-	select {
-	case <-ch:
-	case <-time.After(time.Second):
-		t.Fatal("timeout waiting for create event")
-	}
-	cancel()
-	<-done
 }
 
 func TestWatchFilesNewWatcherError(t *testing.T) {
@@ -202,5 +381,81 @@ func TestWatchFilesNewWatcherError(t *testing.T) {
 	case <-done:
 	case <-time.After(time.Second):
 		t.Fatal("watchFiles did not exit on watcher error")
+	}
+}
+
+func TestWatchDebouncer(t *testing.T) {
+	d := newWatchDebouncer(10 * time.Millisecond)
+	d.stop()
+
+	first := d.trigger()
+	if first == nil {
+		t.Fatal("missing first timer channel")
+	}
+	second := d.trigger()
+	if second == nil {
+		t.Fatal("missing reset timer channel")
+	}
+
+	select {
+	case <-second:
+	case <-time.After(time.Second):
+		t.Fatal("debouncer timer did not fire")
+	}
+	d.fired()
+	if d.timerC != nil {
+		t.Fatal("expected fired debouncer to clear timer channel")
+	}
+	d.stop()
+}
+
+func TestWatchEventInDirs(t *testing.T) {
+	absDir := t.TempDir()
+	absName := filepath.Join(absDir, "config.yaml")
+	relDir := "relative-watch-dir"
+	relName := filepath.Join(relDir, "config.yaml")
+	absRelDir, err := filepath.Abs(relDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	watched := map[string]struct{}{
+		absDir:    {},
+		absRelDir: {},
+	}
+
+	tests := []struct {
+		name string
+		ev   fsnotify.Event
+		want bool
+	}{
+		{
+			name: "empty name",
+			ev:   fsnotify.Event{Name: "", Op: fsnotify.Write},
+			want: false,
+		},
+		{
+			name: "absolute path in watched dir",
+			ev:   fsnotify.Event{Name: absName, Op: fsnotify.Write},
+			want: true,
+		},
+		{
+			name: "relative path in watched dir",
+			ev:   fsnotify.Event{Name: relName, Op: fsnotify.Write},
+			want: true,
+		},
+		{
+			name: "unwatched dir",
+			ev:   fsnotify.Event{Name: filepath.Join(t.TempDir(), "config.yaml"), Op: fsnotify.Write},
+			want: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := watchEventInDirs(tc.ev, watched); got != tc.want {
+				t.Fatalf("watchEventInDirs() = %v, want %v", got, tc.want)
+			}
+		})
 	}
 }

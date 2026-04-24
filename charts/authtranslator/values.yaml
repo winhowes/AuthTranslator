@@ -6,6 +6,7 @@ image:
 redisAddress: ""
 redisCA: ""
 secretRefresh: ""
+watch: true
 
 resources:
   limits:

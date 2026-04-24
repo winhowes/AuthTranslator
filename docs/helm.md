@@ -34,6 +34,7 @@ This:
 | `redisAddress`     | `""`                              | Address passed to `-redis-addr` – either `host:port` or a `redis://`/`rediss://` URL. |
 | `redisCA`          | `""`                              | CA file for `-redis-ca`; empty skips TLS verification. |
 | `secretRefresh`    | `""`                              | Value passed to `-secret-refresh`. |
+| `watch`            | `true`                            | Run with `-watch` so projected ConfigMap updates trigger reloads. |
 | `resources`        | *(object)*                        | Pod resource requests/limits. |
 | `imagePullSecrets` | `[]`                              | Names of image pull secrets. |
 | `serviceAccountName` | `""`                            | Pod service account name. |
