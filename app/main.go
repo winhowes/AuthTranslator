@@ -138,13 +138,13 @@ var remoteFetchTimeout = flag.Duration("remote-fetch-timeout", 10*time.Second, "
 
 var httpClient = &http.Client{Timeout: 10 * time.Second}
 
-// setAllowlist is used by reload to register caller allowlists. It is declared
-// as a variable so tests can override it.
-var setAllowlist = SetAllowlist
+// buildAllowlistForReload is used by reload to prepare caller allowlists. It is
+// declared as a variable so tests can override it.
+var buildAllowlistForReload = buildAllowlist
 
-// setDenylist is used by reload to register integration denylists. It is declared
-// as a variable so tests can override it.
-var setDenylist = SetDenylist
+// buildDenylistForReload is used by reload to prepare integration denylists. It
+// is declared as a variable so tests can override it.
+var buildDenylistForReload = buildDenylist
 
 func usage() {
 	fmt.Fprintf(flag.CommandLine.Output(), "Usage: authtranslator [options]\n\n")
@@ -317,8 +317,8 @@ func parseLevel(s string) slog.Level {
 }
 
 // reload reparses the configuration and allowlist files, replacing all
-// registered integrations and allowlists. Existing rate limiters are
-// stopped before the new configuration is loaded.
+// registered integrations and allowlists. Existing rate limiters are stopped
+// after the new runtime state is ready.
 func reload() error {
 	logger.Info("reloading configuration")
 
@@ -356,27 +356,12 @@ func reload() error {
 		newMap[integ.Name] = integ
 	}
 
-	// Replace integrations and stop the old ones after success.
-	integrations.Lock()
-	integrations.m = newMap
-	integrations.Unlock()
-
-	for _, i := range oldIntegrations {
-		i.inLimiter.Stop()
-		i.outLimiter.Stop()
-	}
-
-	// Clear secret cache so reloaded integrations use fresh values.
-	secrets.ClearCache()
-
 	alSrc := *allowlistFile
 	if *allowlistURL != "" {
 		alSrc = *allowlistURL
 	}
 	entries, err := loadAllowlists(alSrc)
-	allowlists.RLock()
-	old := allowlists.m
-	allowlists.RUnlock()
+	var newAllowlists map[string]map[string]CallerConfig
 	if err != nil {
 		if os.IsNotExist(err) {
 			logger.Warn("allowlist file missing; keeping existing entries", "file", alSrc)
@@ -385,23 +370,18 @@ func reload() error {
 		}
 	} else {
 		if err := validateAllowlistEntries(entries); err != nil {
-			allowlists.Lock()
-			allowlists.m = old
-			allowlists.Unlock()
+			stopNewIntegrations()
 			return fmt.Errorf("invalid allowlist: %w", err)
 		}
 
-		allowlists.Lock()
-		allowlists.m = make(map[string]map[string]CallerConfig)
-		allowlists.Unlock()
-
+		newAllowlists = make(map[string]map[string]CallerConfig)
 		for _, al := range entries {
-			if err := setAllowlist(al.Integration, al.Callers); err != nil {
-				allowlists.Lock()
-				allowlists.m = old
-				allowlists.Unlock()
+			callers, err := buildAllowlistForReload(al.Integration, al.Callers)
+			if err != nil {
+				stopNewIntegrations()
 				return fmt.Errorf("failed to load allowlist for %s: %w", al.Integration, err)
 			}
+			newAllowlists[strings.ToLower(al.Integration)] = callers
 		}
 	}
 
@@ -410,9 +390,7 @@ func reload() error {
 		dlSrc = *denylistURL
 	}
 	drules, err := loadDenylists(dlSrc)
-	denylists.RLock()
-	oldDeny := denylists.m
-	denylists.RUnlock()
+	var newDenylists map[string]map[string][]CallRule
 	if err != nil {
 		if os.IsNotExist(err) {
 			logger.Warn("denylist file missing; keeping existing entries", "file", dlSrc)
@@ -421,25 +399,45 @@ func reload() error {
 		}
 	} else {
 		if err := validateDenylistEntries(drules); err != nil {
-			denylists.Lock()
-			denylists.m = oldDeny
-			denylists.Unlock()
+			stopNewIntegrations()
 			return fmt.Errorf("invalid denylist: %w", err)
 		}
 
-		denylists.Lock()
-		denylists.m = make(map[string]map[string][]CallRule)
-		denylists.Unlock()
-
+		newDenylists = make(map[string]map[string][]CallRule)
 		for _, dl := range drules {
-			if err := setDenylist(dl.Integration, dl.Callers); err != nil {
-				denylists.Lock()
-				denylists.m = oldDeny
-				denylists.Unlock()
+			callers, err := buildDenylistForReload(dl.Integration, dl.Callers)
+			if err != nil {
+				stopNewIntegrations()
 				return fmt.Errorf("failed to load denylist for %s: %w", dl.Integration, err)
 			}
+			newDenylists[strings.ToLower(dl.Integration)] = callers
 		}
 	}
+
+	// Replace integrations and any successfully rebuilt policy maps only after
+	// all fatal reload steps have succeeded.
+	integrations.Lock()
+	integrations.m = newMap
+	integrations.Unlock()
+
+	if newAllowlists != nil {
+		allowlists.Lock()
+		allowlists.m = newAllowlists
+		allowlists.Unlock()
+	}
+	if newDenylists != nil {
+		denylists.Lock()
+		denylists.m = newDenylists
+		denylists.Unlock()
+	}
+
+	for _, i := range oldIntegrations {
+		i.inLimiter.Stop()
+		i.outLimiter.Stop()
+	}
+
+	// Clear secret cache so reloaded integrations use fresh values.
+	secrets.ClearCache()
 
 	metrics.LastReloadTime.Set(time.Now().Format(time.RFC3339))
 
