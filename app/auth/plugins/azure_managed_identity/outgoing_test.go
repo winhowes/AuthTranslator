@@ -363,6 +363,17 @@ func TestFetchTokenMissingIdentityHeader(t *testing.T) {
 	}
 }
 
+func TestFetchTokenMissingMSISecret(t *testing.T) {
+	t.Setenv("IDENTITY_ENDPOINT", "")
+	t.Setenv("IDENTITY_HEADER", "")
+	t.Setenv("MSI_ENDPOINT", "http://localhost/msi/token")
+	t.Setenv("MSI_SECRET", "")
+
+	if _, _, err := fetchToken(context.Background(), "api://res", ""); err == nil {
+		t.Fatal("expected error for missing MSI secret")
+	}
+}
+
 func TestFetchTokenUsesMSIEndpoint(t *testing.T) {
 	resetCache()
 

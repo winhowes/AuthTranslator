@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
@@ -13,7 +14,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"log/slog"
 	"math/big"
 	"net"
 	"net/http"
@@ -495,6 +495,22 @@ func TestServeError(t *testing.T) {
 	}
 }
 
+type shutdownErrServer struct{}
+
+func (shutdownErrServer) Shutdown(context.Context) error { return fmt.Errorf("shutdown err") }
+
+type closeErrServer struct{}
+
+func (closeErrServer) Close() error { return fmt.Errorf("close err") }
+
+func TestShutdownHTTPServerError(t *testing.T) {
+	shutdownHTTPServer(context.Background(), shutdownErrServer{})
+}
+
+func TestCloseHTTP3ServerError(t *testing.T) {
+	closeHTTP3Server(closeErrServer{})
+}
+
 func TestRateLimiterStopClosesConnections(t *testing.T) {
 	old := *redisAddr
 	*redisAddr = "dummy"
@@ -710,6 +726,99 @@ func TestAllowRedisSuccess(t *testing.T) {
 	}
 }
 
+func TestAllowRedisExpireErrorClosesConnection(t *testing.T) {
+	old := *redisAddr
+	*redisAddr = "dummy"
+	rl := NewRateLimiter(1, time.Second, "")
+	t.Cleanup(func() {
+		*redisAddr = old
+		rl.Stop()
+	})
+
+	srv, cli := net.Pipe()
+	rc := &recordingConn{Conn: cli}
+	rl.conns <- rc
+	done := make(chan struct{})
+	go func() {
+		defer func() {
+			srv.Close()
+			close(done)
+		}()
+		br := bufio.NewReader(srv)
+		if err := readRedisRequest(br); err != nil {
+			t.Errorf("read INCR: %v", err)
+			return
+		}
+		srv.Write([]byte(":1\r\n"))
+		if err := readRedisRequest(br); err != nil {
+			t.Errorf("read expire: %v", err)
+			return
+		}
+		srv.Write([]byte("-ERR expire failed\r\n"))
+	}()
+
+	if ok, err := rl.allowRedis("k"); err == nil || ok {
+		t.Fatalf("expected expire error, got ok=%v err=%v", ok, err)
+	}
+	<-done
+	if !rc.closed.Load() {
+		t.Fatal("expected connection to be closed")
+	}
+}
+
+func TestAllowRedisNoPoolClosesConnection(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+
+	old := *redisAddr
+	*redisAddr = ln.Addr().String()
+	rl := NewRateLimiter(1, time.Second, "")
+	rl.conns = nil
+	t.Cleanup(func() {
+		*redisAddr = old
+		rl.Stop()
+	})
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		conn, err := ln.Accept()
+		if err != nil {
+			return
+		}
+		br := bufio.NewReader(conn)
+		if cmd, args := parseRedisCommand(t, br); cmd != "INCR" || args[0] != "k" {
+			t.Errorf("unexpected command %s %v", cmd, args)
+			conn.Close()
+			return
+		}
+		conn.Write([]byte(":1\r\n"))
+		if cmd, args := parseRedisCommand(t, br); cmd != "EXPIRE" || args[0] != "k" {
+			t.Errorf("unexpected command %s %v", cmd, args)
+			conn.Close()
+			return
+		}
+		conn.Write([]byte(":1\r\n"))
+		buf := make([]byte, 1)
+		if n, err := conn.Read(buf); err == nil || n != 0 {
+			t.Errorf("expected connection close, got n=%d err=%v", n, err)
+		}
+		conn.Close()
+	}()
+
+	ok, err := rl.allowRedis("k")
+	if err != nil {
+		t.Fatalf("allowRedis returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("expected allowRedis to return true")
+	}
+	<-done
+}
+
 func TestAllowRedisTokenBucketErrorClosesConnection(t *testing.T) {
 	old := *redisAddr
 	*redisAddr = "dummy"
@@ -767,31 +876,6 @@ func TestAllowRedisTokenBucket(t *testing.T) {
 	<-done
 }
 
-func TestAllowRedisTokenBucketRefillClamp(t *testing.T) {
-	rl := NewRateLimiter(2, time.Second, "token_bucket")
-	t.Cleanup(rl.Stop)
-	srv, cli := net.Pipe()
-	done := make(chan struct{})
-	go func() {
-		defer func() { srv.Close(); close(done) }()
-		br := bufio.NewReader(srv)
-		if cmd, args := parseRedisCommand(t, br); cmd != "EVAL" || args[1] != "1" || args[2] != "k" {
-			t.Errorf("unexpected command %s %v", cmd, args)
-			return
-		}
-		srv.Write([]byte(":1\r\n"))
-	}()
-
-	ok, err := rl.allowRedisTokenBucket(cli, "k")
-	if err != nil {
-		t.Fatalf("allowRedisTokenBucket error: %v", err)
-	}
-	if !ok {
-		t.Fatal("expected token bucket allow")
-	}
-	<-done
-}
-
 func TestAllowRedisTokenBucketReject(t *testing.T) {
 	rl := NewRateLimiter(1, time.Hour, "token_bucket")
 	t.Cleanup(rl.Stop)
@@ -816,6 +900,46 @@ func TestAllowRedisTokenBucketReject(t *testing.T) {
 		t.Fatal("expected token bucket reject")
 	}
 	<-done
+}
+
+func TestAllowRedisTokenBucketTTLEdges(t *testing.T) {
+	cases := []struct {
+		name   string
+		window time.Duration
+		ttl    string
+	}{
+		{name: "zero", window: 0, ttl: "0"},
+		{name: "submillisecond", window: 500 * time.Microsecond, ttl: "1"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			rl := NewRateLimiter(1, tc.window, "token_bucket")
+			t.Cleanup(rl.Stop)
+			srv, cli := net.Pipe()
+			defer cli.Close()
+			done := make(chan struct{})
+			go func() {
+				defer func() { srv.Close(); close(done) }()
+				br := bufio.NewReader(srv)
+				cmd, args := parseRedisCommand(t, br)
+				if cmd != "EVAL" || len(args) < 7 || args[6] != tc.ttl {
+					t.Errorf("unexpected command %s %v", cmd, args)
+					return
+				}
+				srv.Write([]byte(":1\r\n"))
+			}()
+
+			ok, err := rl.allowRedisTokenBucket(cli, "k")
+			if err != nil {
+				t.Fatalf("allowRedisTokenBucket error: %v", err)
+			}
+			if !ok {
+				t.Fatal("expected token bucket allow")
+			}
+			<-done
+		})
+	}
 }
 
 func TestAllowRedisLeakyBucketPoolFullClosesConnection(t *testing.T) {
@@ -924,6 +1048,79 @@ func TestAllowRedisLeakyBucketAllow(t *testing.T) {
 	<-done
 }
 
+func TestAllowRedisLeakyBucketErrorClosesConnection(t *testing.T) {
+	old := *redisAddr
+	*redisAddr = "dummy"
+	rl := NewRateLimiter(1, time.Second, "leaky_bucket")
+	t.Cleanup(func() {
+		*redisAddr = old
+		rl.Stop()
+	})
+
+	srv, cli := net.Pipe()
+	rc := &recordingConn{Conn: cli}
+	rl.conns <- rc
+	done := make(chan struct{})
+	go func() {
+		defer func() {
+			srv.Close()
+			close(done)
+		}()
+		br := bufio.NewReader(srv)
+		if err := readRedisRequest(br); err == nil {
+			srv.Write([]byte("-ERR boom\r\n"))
+		}
+	}()
+
+	if ok, err := rl.allowRedis("k"); err == nil || ok {
+		t.Fatalf("expected error response, got ok=%v err=%v", ok, err)
+	}
+	<-done
+	if !rc.closed.Load() {
+		t.Fatal("expected connection to be closed")
+	}
+}
+
+func TestAllowRedisLeakyBucketTTLEdges(t *testing.T) {
+	cases := []struct {
+		name   string
+		window time.Duration
+		ttl    string
+	}{
+		{name: "zero", window: 0, ttl: "0"},
+		{name: "submillisecond", window: 500 * time.Microsecond, ttl: "1"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			rl := NewRateLimiter(1, tc.window, "leaky_bucket")
+			t.Cleanup(rl.Stop)
+			srv, cli := net.Pipe()
+			defer cli.Close()
+			done := make(chan struct{})
+			go func() {
+				defer func() { srv.Close(); close(done) }()
+				br := bufio.NewReader(srv)
+				cmd, args := parseRedisCommand(t, br)
+				if cmd != "EVAL" || len(args) < 7 || args[6] != tc.ttl {
+					t.Errorf("unexpected command %s %v", cmd, args)
+					return
+				}
+				srv.Write([]byte(":1\r\n"))
+			}()
+
+			ok, err := rl.allowRedisLeakyBucket(cli, "k")
+			if err != nil {
+				t.Fatalf("allowRedisLeakyBucket error: %v", err)
+			}
+			if !ok {
+				t.Fatal("expected leaky bucket allow")
+			}
+			<-done
+		})
+	}
+}
+
 func TestRetryAfterRedisUnsupportedScheme(t *testing.T) {
 	old := *redisAddr
 	*redisAddr = "foo://localhost"
@@ -934,6 +1131,19 @@ func TestRetryAfterRedisUnsupportedScheme(t *testing.T) {
 	})
 	if _, err := rl.retryAfterRedis("k"); err == nil {
 		t.Fatal("expected error for unsupported scheme")
+	}
+}
+
+func TestRetryAfterRedisParseError(t *testing.T) {
+	old := *redisAddr
+	*redisAddr = "://bad"
+	rl := NewRateLimiter(1, time.Second, "")
+	t.Cleanup(func() {
+		*redisAddr = old
+		rl.Stop()
+	})
+	if _, err := rl.retryAfterRedis("k"); err == nil {
+		t.Fatal("expected parse error")
 	}
 }
 
@@ -949,6 +1159,52 @@ func TestRetryAfterRedisTLSCAError(t *testing.T) {
 	})
 	if _, err := rl.retryAfterRedis("k"); err == nil {
 		t.Fatal("expected error reading CA file")
+	}
+}
+
+func TestRetryAfterRedisInvalidCAFile(t *testing.T) {
+	ca, err := os.CreateTemp("", "ca*.pem")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(ca.Name())
+	if _, err := ca.WriteString("not pem"); err != nil {
+		t.Fatal(err)
+	}
+	if err := ca.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	oldAddr, oldCA := *redisAddr, *redisCA
+	*redisAddr = "rediss://localhost:1"
+	*redisCA = ca.Name()
+	rl := NewRateLimiter(1, time.Second, "")
+	t.Cleanup(func() {
+		*redisAddr = oldAddr
+		*redisCA = oldCA
+		rl.Stop()
+	})
+	if _, err := rl.retryAfterRedis("k"); err == nil {
+		t.Fatal("expected invalid CA error")
+	}
+}
+
+func TestRetryAfterRedisTLSUsesCAFile(t *testing.T) {
+	cert, _ := generateTLSFiles(t)
+
+	oldAddr, oldCA, oldTimeout := *redisAddr, *redisCA, *redisTimeout
+	*redisAddr = "rediss://127.0.0.1:1"
+	*redisCA = cert
+	*redisTimeout = 10 * time.Millisecond
+	rl := NewRateLimiter(1, time.Second, "")
+	t.Cleanup(func() {
+		*redisAddr = oldAddr
+		*redisCA = oldCA
+		*redisTimeout = oldTimeout
+		rl.Stop()
+	})
+	if _, err := rl.retryAfterRedis("k"); err == nil {
+		t.Fatal("expected TLS dial error")
 	}
 }
 
@@ -1018,6 +1274,63 @@ func TestRetryAfterRedisTTL(t *testing.T) {
 		}
 	default:
 		t.Fatal("connection was not returned to pool")
+	}
+}
+
+func TestRetryAfterRedisPoolFullClosesConnection(t *testing.T) {
+	old := *redisAddr
+	*redisAddr = "dummy"
+	rl := NewRateLimiter(1, time.Second, "")
+	rl.conns = make(chan net.Conn, 1)
+	t.Cleanup(func() {
+		*redisAddr = old
+		rl.Stop()
+	})
+
+	srv, cli := net.Pipe()
+	rc := &recordingConn{Conn: cli}
+	rl.conns <- rc
+	phReady := make(chan struct{})
+	phInserted := make(chan struct{})
+	phSrv, phCli := net.Pipe()
+	go func() {
+		<-phReady
+		rl.conns <- phCli
+		close(phInserted)
+	}()
+	done := make(chan struct{})
+	go func() {
+		defer func() {
+			srv.Close()
+			close(done)
+		}()
+		br := bufio.NewReader(srv)
+		if cmd, args := parseRedisCommand(t, br); cmd != "PTTL" || args[0] != "k" {
+			t.Errorf("unexpected command %s %v", cmd, args)
+			return
+		}
+		phReady <- struct{}{}
+		<-phInserted
+		srv.Write([]byte(":1\r\n"))
+	}()
+
+	d, err := rl.retryAfterRedis("k")
+	<-done
+	if err != nil {
+		t.Fatalf("retryAfterRedis returned error: %v", err)
+	}
+	if d != time.Millisecond {
+		t.Fatalf("expected 1ms, got %v", d)
+	}
+	if !rc.closed.Load() {
+		t.Fatal("expected connection to be closed when pool is full")
+	}
+	select {
+	case c := <-rl.conns:
+		c.Close()
+		phSrv.Close()
+	default:
+		phSrv.Close()
 	}
 }
 
@@ -1169,6 +1482,98 @@ func TestRetryAfterRedisAuth(t *testing.T) {
 	}
 }
 
+func TestRetryAfterRedisPasswordOnlyAuth(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		c, err := ln.Accept()
+		if err != nil {
+			return
+		}
+		defer c.Close()
+		br := bufio.NewReader(c)
+		if cmd, args := parseRedisCommand(t, br); cmd != "AUTH" || len(args) != 1 || args[0] != "pw" {
+			t.Errorf("unexpected auth command %s %v", cmd, args)
+			return
+		}
+		c.Write([]byte("+OK\r\n"))
+		if cmd, args := parseRedisCommand(t, br); cmd != "PTTL" || args[0] != "k" {
+			t.Errorf("unexpected command %s %v", cmd, args)
+			return
+		}
+		c.Write([]byte(":7\r\n"))
+	}()
+
+	oldAddr, oldTimeout := *redisAddr, *redisTimeout
+	*redisAddr = "redis://:pw@" + ln.Addr().String()
+	*redisTimeout = time.Second
+	rl := NewRateLimiter(1, time.Second, "")
+	t.Cleanup(func() {
+		*redisAddr = oldAddr
+		*redisTimeout = oldTimeout
+		rl.Stop()
+	})
+
+	d, err := rl.retryAfterRedis("k")
+	if err != nil {
+		t.Fatalf("retryAfterRedis error: %v", err)
+	}
+	if d != 7*time.Millisecond {
+		t.Fatalf("expected 7ms, got %v", d)
+	}
+	<-done
+	select {
+	case c := <-rl.conns:
+		c.Close()
+	default:
+		t.Fatal("connection was not returned to pool")
+	}
+}
+
+func TestRetryAfterRedisAuthError(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		c, err := ln.Accept()
+		if err != nil {
+			return
+		}
+		defer c.Close()
+		br := bufio.NewReader(c)
+		if cmd, args := parseRedisCommand(t, br); cmd != "AUTH" || len(args) != 2 || args[0] != "user" || args[1] != "pw" {
+			t.Errorf("unexpected auth command %s %v", cmd, args)
+			return
+		}
+		c.Write([]byte("-ERR nope\r\n"))
+	}()
+
+	oldAddr, oldTimeout := *redisAddr, *redisTimeout
+	*redisAddr = "redis://user:pw@" + ln.Addr().String()
+	*redisTimeout = time.Second
+	rl := NewRateLimiter(1, time.Second, "")
+	t.Cleanup(func() {
+		*redisAddr = oldAddr
+		*redisTimeout = oldTimeout
+		rl.Stop()
+	})
+
+	if _, err := rl.retryAfterRedis("k"); err == nil {
+		t.Fatal("expected auth error")
+	}
+	<-done
+}
+
 func TestAllowRedisDialError(t *testing.T) {
 	oldAddr, oldTimeout := *redisAddr, *redisTimeout
 	*redisAddr = "127.0.0.1:1"
@@ -1267,55 +1672,6 @@ func TestMainReloadFailure(t *testing.T) {
 	}
 }
 
-func TestParseLevelValues(t *testing.T) {
-	cases := map[string]slog.Level{
-		"debug":   slog.LevelDebug,
-		"INFO":    slog.LevelInfo,
-		"Warn":    slog.LevelWarn,
-		"WARNING": slog.LevelWarn,
-		"ERROR":   slog.LevelError,
-		"bogus":   slog.LevelInfo,
-	}
-	for in, want := range cases {
-		if got := parseLevel(in); got != want {
-			t.Errorf("parseLevel(%q)=%v want %v", in, got, want)
-		}
-	}
-}
-
-func TestRedisTTLArgsEdgecases(t *testing.T) {
-	tests := []struct {
-		dur      time.Duration
-		cmd, val string
-	}{
-		{1500 * time.Millisecond, "PEXPIRE", "1500"},
-		{500 * time.Millisecond, "PEXPIRE", "500"},
-		{0, "EXPIRE", "0"},
-		{-500 * time.Millisecond, "EXPIRE", "0"},
-	}
-	for _, tc := range tests {
-		cmd, val := redisTTLArgs(tc.dur)
-		if cmd != tc.cmd || val != tc.val {
-			t.Errorf("redisTTLArgs(%v)=%s %s want %s %s", tc.dur, cmd, val, tc.cmd, tc.val)
-		}
-	}
-}
-
-func TestRedisCmdUnexpectedPrefix(t *testing.T) {
-	srv, cli := net.Pipe()
-	defer cli.Close()
-	go func() {
-		br := bufio.NewReader(srv)
-		br.ReadBytes('\n')
-		br.ReadBytes('\n')
-		srv.Write([]byte("?bad\r\n"))
-		srv.Close()
-	}()
-	if err := redisCmd(cli, "PING"); err == nil {
-		t.Fatal("expected error for unexpected reply prefix")
-	}
-}
-
 func writeTempFile(t *testing.T, data string) string {
 	f, err := os.CreateTemp("", "cfg*.yaml")
 	if err != nil {
@@ -1382,7 +1738,7 @@ func TestMainRunAndShutdown(t *testing.T) {
 	al := writeTempFile(t, `[]`)
 	defer os.Remove(al)
 
-	cmd := runMainCmd("-config", cfg, "-allowlist", al, "-addr", "127.0.0.1:0")
+	cmd := runMainCmd("-config", cfg, "-allowlist", al, "-addr", "127.0.0.1:0", "-log-format", "json")
 	if err := cmd.Start(); err != nil {
 		t.Fatalf("start failed: %v", err)
 	}
@@ -1414,6 +1770,41 @@ func TestMainReloadSignal(t *testing.T) {
 		t.Fatalf("start failed: %v", err)
 	}
 	time.Sleep(200 * time.Millisecond)
+	if err := cmd.Process.Signal(syscall.SIGHUP); err != nil {
+		t.Fatalf("signal failed: %v", err)
+	}
+	time.Sleep(100 * time.Millisecond)
+	if err := cmd.Process.Signal(syscall.Signal(0)); err != nil {
+		t.Fatalf("process exited unexpectedly: %v", err)
+	}
+	cmd.Process.Signal(os.Interrupt)
+	done := make(chan error, 1)
+	go func() { done <- cmd.Wait() }()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("process exit: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		cmd.Process.Kill()
+		t.Fatal("timeout waiting for process exit")
+	}
+}
+
+func TestMainReloadSignalFailureKeepsRunning(t *testing.T) {
+	cfg := writeTempFile(t, `{"integrations":[{"name":"test","destination":"http://example.com"}]}`)
+	defer os.Remove(cfg)
+	al := writeTempFile(t, `[]`)
+	defer os.Remove(al)
+
+	cmd := runMainCmd("-config", cfg, "-allowlist", al, "-addr", "127.0.0.1:0")
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("start failed: %v", err)
+	}
+	time.Sleep(200 * time.Millisecond)
+	if err := os.WriteFile(cfg, []byte("{"), 0o644); err != nil {
+		t.Fatalf("write bad config: %v", err)
+	}
 	if err := cmd.Process.Signal(syscall.SIGHUP); err != nil {
 		t.Fatalf("signal failed: %v", err)
 	}
@@ -1589,6 +1980,14 @@ func TestMainWatchReload(t *testing.T) {
 	if !secondTime.After(firstTime) {
 		t.Fatal("config change did not trigger reload")
 	}
+
+	if err := os.WriteFile(cfg, []byte("{"), 0o644); err != nil {
+		t.Fatalf("write invalid config: %v", err)
+	}
+	time.Sleep(800 * time.Millisecond)
+	if err := cmd.Process.Signal(syscall.Signal(0)); err != nil {
+		t.Fatalf("process exited after failed watch reload: %v", err)
+	}
 }
 
 func TestMainMetricsFlagMismatch(t *testing.T) {
@@ -1650,6 +2049,30 @@ func TestMainHTTP3Enabled(t *testing.T) {
 	}
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+}
+
+func TestMainHTTP3ListenError(t *testing.T) {
+	cfg := writeTempFile(t, `{"integrations":[{"name":"test","destination":"http://example.com"}]}`)
+	defer os.Remove(cfg)
+	al := writeTempFile(t, `[]`)
+	defer os.Remove(al)
+	cert, key := generateTLSFiles(t)
+
+	udp, err := net.ListenPacket("udp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer udp.Close()
+
+	addr := udp.LocalAddr().String()
+	cmd := runMainCmd("-config", cfg, "-allowlist", al, "-addr", addr, "-tls-cert", cert, "-tls-key", key, "-enable-http3")
+	err = cmd.Run()
+	if err == nil {
+		t.Fatal("expected process to exit when HTTP/3 listener cannot bind")
+	}
+	if ee, ok := err.(*exec.ExitError); !ok || ee.ExitCode() == 0 {
+		t.Fatalf("unexpected exit status: %v", err)
 	}
 }
 

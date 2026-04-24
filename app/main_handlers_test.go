@@ -58,11 +58,12 @@ func TestLoadDenylistsValid(t *testing.T) {
 
 func TestParseLevel(t *testing.T) {
 	cases := map[string]slog.Level{
-		"debug": slog.LevelDebug,
-		"INFO":  slog.LevelInfo,
-		"Warn":  slog.LevelWarn,
-		"ERROR": slog.LevelError,
-		"bogus": slog.LevelInfo,
+		"debug":   slog.LevelDebug,
+		"INFO":    slog.LevelInfo,
+		"Warn":    slog.LevelWarn,
+		"WARNING": slog.LevelWarn,
+		"ERROR":   slog.LevelError,
+		"bogus":   slog.LevelInfo,
 	}
 	for s, want := range cases {
 		if got := parseLevel(s); got != want {

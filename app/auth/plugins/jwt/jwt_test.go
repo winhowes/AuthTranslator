@@ -580,6 +580,9 @@ func TestIsRSAPublicPEM(t *testing.T) {
 	if !isRSAPublicPEM(pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: pubBytes})) {
 		t.Fatal("expected PUBLIC KEY rsa pem to be detected")
 	}
+	if isRSAPublicPEM(pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: []byte("bad")})) {
+		t.Fatal("expected invalid PUBLIC KEY pem to return false")
+	}
 	if !isRSAPublicPEM(pem.EncodeToMemory(&pem.Block{Type: "RSA PUBLIC KEY", Bytes: x509.MarshalPKCS1PublicKey(&rsaKey.PublicKey)})) {
 		t.Fatal("expected RSA PUBLIC KEY pem to be detected")
 	}
