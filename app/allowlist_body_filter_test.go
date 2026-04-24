@@ -53,18 +53,12 @@ func TestBodyArrayMatching(t *testing.T) {
 	}
 }
 
-func TestBodyArrayRuleMatchesScalarAllowedSet(t *testing.T) {
+func TestBodyArrayRuleRejectsScalarValue(t *testing.T) {
 	body := []byte(`{"channel":"C123"}`)
 	rule := map[string]interface{}{"channel": []interface{}{"C123", "C456"}}
 	r := req(http.MethodPost, body)
-	if !validateRequest(r, RequestConstraint{Body: rule}) {
-		t.Fatal("expected scalar body value to match one allowed rule value")
-	}
-
-	rule = map[string]interface{}{"channel": []interface{}{"C999"}}
-	r = req(http.MethodPost, body)
 	if validateRequest(r, RequestConstraint{Body: rule}) {
-		t.Fatal("expected scalar body value outside allowed set to fail")
+		t.Fatal("expected scalar body value to fail an array rule")
 	}
 }
 

@@ -27,12 +27,7 @@ func init() {
 			if user == "" || len(ch) == 0 {
 				return nil, fmt.Errorf("username and channels required")
 			}
-			allowed := make([]interface{}, len(ch))
-			for i, c := range ch {
-				allowed[i] = c
-			}
-			rule := integrationplugins.CallRule{Path: "/api/chat.postMessage", Methods: map[string]integrationplugins.RequestConstraint{"POST": {Body: map[string]interface{}{"username": user, "channel": allowed}}}}
-			return []integrationplugins.CallRule{rule}, nil
+			return channelRules(map[string]interface{}{"username": user}, ch), nil
 		},
 	})
 
@@ -43,12 +38,25 @@ func init() {
 			if len(ch) == 0 {
 				return nil, fmt.Errorf("channels required")
 			}
-			allowed := make([]interface{}, len(ch))
-			for i, c := range ch {
-				allowed[i] = c
-			}
-			rule := integrationplugins.CallRule{Path: "/api/chat.postMessage", Methods: map[string]integrationplugins.RequestConstraint{"POST": {Body: map[string]interface{}{"channel": allowed}}}}
-			return []integrationplugins.CallRule{rule}, nil
+			return channelRules(nil, ch), nil
 		},
 	})
+}
+
+func channelRules(base map[string]interface{}, channels []interface{}) []integrationplugins.CallRule {
+	rules := make([]integrationplugins.CallRule, 0, len(channels))
+	for _, channel := range channels {
+		body := make(map[string]interface{}, len(base)+1)
+		for k, v := range base {
+			body[k] = v
+		}
+		body["channel"] = channel
+		rules = append(rules, integrationplugins.CallRule{
+			Path: "/api/chat.postMessage",
+			Methods: map[string]integrationplugins.RequestConstraint{
+				"POST": {Body: body},
+			},
+		})
+	}
+	return rules
 }

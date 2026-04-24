@@ -483,12 +483,9 @@ func TestMatchValueNotOkBranches(t *testing.T) {
 	}
 }
 
-func TestMatchValueScalarAllowedSet(t *testing.T) {
-	if !matchValue("C123", []interface{}{"C123", "C456"}) {
-		t.Fatal("expected scalar value to match one allowed value")
-	}
-	if matchValue("C999", []interface{}{"C123", "C456"}) {
-		t.Fatal("expected scalar value outside allowed set to fail")
+func TestMatchValueArrayRuleRejectsScalarValue(t *testing.T) {
+	if matchValue("C123", []interface{}{"C123", "C456"}) {
+		t.Fatal("expected scalar value to fail an array rule")
 	}
 }
 
