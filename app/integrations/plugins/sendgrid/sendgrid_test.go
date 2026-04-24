@@ -49,10 +49,11 @@ func TestSendgridCapabilities(t *testing.T) {
 			continue
 		}
 		if tt.name == "send_email" {
-			if rc.Body["from"] != "me@example.com" {
+			from, ok := rc.Body["from"].(map[string]interface{})
+			if !ok || from["email"] != "me@example.com" {
 				t.Errorf("from not propagated")
 			}
-			if rc.Body["reply_to"] != nil {
+			if _, ok := rc.Body["reply_to"]; ok {
 				t.Errorf("reply_to default unexpected: %#v", rc.Body["reply_to"])
 			}
 		}
@@ -68,7 +69,8 @@ func TestSendgridCapabilities(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	rc := rules[0].Methods["POST"]
-	if rc.Body["reply_to"] != "r@example.com" {
+	replyTo, ok := rc.Body["reply_to"].(map[string]interface{})
+	if !ok || replyTo["email"] != "r@example.com" {
 		t.Errorf("reply_to value not propagated")
 	}
 
@@ -77,7 +79,11 @@ func TestSendgridCapabilities(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	rc = rules[0].Methods["POST"]
-	if rc.Body["reply_to"] != nil {
+	if _, ok := rc.Body["reply_to"]; ok {
 		t.Errorf("reply_to nil not set")
+	}
+
+	if _, err := spec.Generate(map[string]interface{}{"from": "me@example.com", "replyTo": 123}); err == nil {
+		t.Errorf("expected error for non-string replyTo")
 	}
 }

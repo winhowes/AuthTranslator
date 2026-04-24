@@ -2,10 +2,12 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"flag"
 	"fmt"
 	yaml "gopkg.in/yaml.v3"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/winhowes/AuthTranslator/cmd/allowlist/plugins"
@@ -45,9 +47,22 @@ func main() {
 }
 
 func listCaps() {
-	for integ, caps := range plugins.List() {
+	list := plugins.List()
+	integrations := make([]string, 0, len(list))
+	for integ := range list {
+		integrations = append(integrations, integ)
+	}
+	sort.Strings(integrations)
+	for _, integ := range integrations {
+		caps := list[integ]
 		fmt.Println(integ + ":")
-		for name, spec := range caps {
+		names := make([]string, 0, len(caps))
+		for name := range caps {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		for _, name := range names {
+			spec := caps[name]
 			fmt.Printf("  %s (params: %s)\n", name, strings.Join(spec.Params, ","))
 		}
 	}
@@ -69,21 +84,16 @@ func addEntry(args []string) {
 		fs.Usage()
 		return
 	}
-	var params map[string]interface{}
-	if *paramList != "" {
-		params = make(map[string]interface{})
-		for _, kv := range strings.Split(*paramList, ",") {
-			kv = strings.TrimSpace(kv)
-			if kv == "" {
-				continue
-			}
-			parts := strings.SplitN(kv, "=", 2)
-			if len(parts) == 2 {
-				k := strings.TrimSpace(parts[0])
-				v := strings.TrimSpace(parts[1])
-				params[k] = v
-			}
-		}
+	params, err := parseParams(*paramList)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return
+	}
+
+	wantName := strings.ToLower(*integ)
+	if err := plugins.ValidateCapability(wantName, plugins.CapabilityConfig{Name: *capName, Params: params}); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return
 	}
 
 	// load file
@@ -100,7 +110,6 @@ func addEntry(args []string) {
 		}
 	}
 	// find integration
-	wantName := strings.ToLower(*integ)
 	var entry *plugins.AllowlistEntry
 	for i := range entries {
 		if strings.ToLower(entries[i].Integration) == wantName {
@@ -148,6 +157,104 @@ func addEntry(args []string) {
 	if err := writeFile(*file, out, 0644); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		exitFunc(1)
+	}
+}
+
+func parseParams(paramList string) (map[string]interface{}, error) {
+	if strings.TrimSpace(paramList) == "" {
+		return nil, nil
+	}
+	params := make(map[string]interface{})
+	items, err := splitParamList(paramList)
+	if err != nil {
+		return nil, err
+	}
+	for _, kv := range items {
+		kv = strings.TrimSpace(kv)
+		if kv == "" {
+			continue
+		}
+		parts := strings.SplitN(kv, "=", 2)
+		if len(parts) != 2 || strings.TrimSpace(parts[0]) == "" {
+			return nil, fmt.Errorf("invalid param %q, expected key=value", kv)
+		}
+		value, err := parseParamValue(strings.TrimSpace(parts[1]))
+		if err != nil {
+			return nil, fmt.Errorf("invalid value for param %s: %w", strings.TrimSpace(parts[0]), err)
+		}
+		params[strings.TrimSpace(parts[0])] = value
+	}
+	return params, nil
+}
+
+func splitParamList(paramList string) ([]string, error) {
+	var parts []string
+	start := 0
+	depth := 0
+	inQuote := false
+	escaped := false
+	for i, r := range paramList {
+		if inQuote {
+			if escaped {
+				escaped = false
+				continue
+			}
+			switch r {
+			case '\\':
+				escaped = true
+			case '"':
+				inQuote = false
+			}
+			continue
+		}
+		switch r {
+		case '"':
+			inQuote = true
+		case '[', '{':
+			depth++
+		case ']', '}':
+			if depth == 0 {
+				return nil, fmt.Errorf("invalid params: unmatched %q", r)
+			}
+			depth--
+		case ',':
+			if depth == 0 {
+				parts = append(parts, paramList[start:i])
+				start = i + 1
+			}
+		}
+	}
+	if inQuote {
+		return nil, fmt.Errorf("invalid params: unterminated quoted value")
+	}
+	if depth != 0 {
+		return nil, fmt.Errorf("invalid params: unmatched bracket or brace")
+	}
+	parts = append(parts, paramList[start:])
+	return parts, nil
+}
+
+func parseParamValue(raw string) (interface{}, error) {
+	if raw == "" {
+		return "", nil
+	}
+	switch raw[0] {
+	case '[', '{', '"':
+		var v interface{}
+		if err := json.Unmarshal([]byte(raw), &v); err != nil {
+			return nil, err
+		}
+		return v, nil
+	}
+	switch raw {
+	case "null":
+		return nil, nil
+	case "true":
+		return true, nil
+	case "false":
+		return false, nil
+	default:
+		return raw, nil
 	}
 }
 

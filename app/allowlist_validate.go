@@ -122,6 +122,9 @@ func validateCapability(integration string, cap integrationplugins.CapabilityCon
 			return fmt.Errorf("unknown param %s for capability %s", p, cap.Name)
 		}
 	}
+	if spec.Generate == nil {
+		return fmt.Errorf("capability %s has no rule generator", cap.Name)
+	}
 	if _, err := spec.Generate(cap.Params); err != nil {
 		return fmt.Errorf("invalid params for capability %s: %v", cap.Name, err)
 	}

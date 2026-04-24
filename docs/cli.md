@@ -99,10 +99,14 @@ command is purely a discovery tool to help you decide which capability name and
 parameter keys to pass to `add`.
 
 The `-params` flag accepts a comma-separated list such as
-`username=bot-123,channel=C123`. Each value is stored as a string in the YAML.
-When a capability requires structured data (for example, the Slack plug-in's
-`channels` parameter expects a list), run `add` with the closest shape you can and
-then touch up the generated YAML manually to insert arrays or nested objects.
+`username=bot-123,repo=org/repo`. Plain values are stored as strings. Values that
+start with `[`, `{`, or `"` are parsed as JSON, so structured capability params can
+be written directly:
+
+```bash
+go run ./cmd/allowlist add -integration slack -caller bot \
+  -capability post_channels -params 'channels=["C123","C456"]'
+```
 
 ---
 

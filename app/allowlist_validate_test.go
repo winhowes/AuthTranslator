@@ -261,6 +261,39 @@ func TestValidateAllowlistEntriesGlobalCapability(t *testing.T) {
 	}
 }
 
+func TestValidateAllowlistEntriesCapabilityWithoutGenerator(t *testing.T) {
+	orig := make(map[string]map[string]integrationplugins.CapabilitySpec)
+	for integ, caps := range integrationplugins.AllCapabilities() {
+		m := make(map[string]integrationplugins.CapabilitySpec, len(caps))
+		for name, spec := range caps {
+			m[name] = spec
+		}
+		orig[integ] = m
+	}
+	t.Cleanup(func() {
+		reg := integrationplugins.AllCapabilities()
+		for k := range reg {
+			delete(reg, k)
+		}
+		for k, v := range orig {
+			reg[k] = v
+		}
+	})
+
+	integrationplugins.RegisterCapability("nogenerator", "cap", integrationplugins.CapabilitySpec{})
+	entries := []AllowlistEntry{{
+		Integration: "nogenerator",
+		Callers: []CallerConfig{{
+			ID:           "c",
+			Capabilities: []integrationplugins.CapabilityConfig{{Name: "cap"}},
+		}},
+	}}
+	err := validateAllowlistEntries(entries)
+	if err == nil || !strings.Contains(err.Error(), "has no rule generator") {
+		t.Fatalf("expected no rule generator error, got %v", err)
+	}
+}
+
 func TestCopyAllowlistCallersSkipsEmptyMethod(t *testing.T) {
 	callers := []CallerConfig{{
 		ID: "c",

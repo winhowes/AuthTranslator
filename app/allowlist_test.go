@@ -483,6 +483,15 @@ func TestMatchValueNotOkBranches(t *testing.T) {
 	}
 }
 
+func TestMatchValueScalarAllowedSet(t *testing.T) {
+	if !matchValue("C123", []interface{}{"C123", "C456"}) {
+		t.Fatal("expected scalar value to match one allowed value")
+	}
+	if matchValue("C999", []interface{}{"C123", "C456"}) {
+		t.Fatal("expected scalar value outside allowed set to fail")
+	}
+}
+
 func TestMatchValueReasonNotOkBranches(t *testing.T) {
 	if ok, reason := matchValueReason("not-a-map", map[string]interface{}{"a": 1}, ""); ok {
 		t.Fatalf("expected map type mismatch to fail, got reason: %s", reason)

@@ -365,7 +365,12 @@ func matchValueReason(data, rule interface{}, path string) (bool, string) {
 	case []interface{}:
 		da, ok := data.([]interface{})
 		if !ok {
-			return false, fmt.Sprintf("body field %s not array", path)
+			for _, want := range rv {
+				if ok2, _ := matchValueReason(data, want, path); ok2 {
+					return true, ""
+				}
+			}
+			return false, fmt.Sprintf("body field %s value not in allowed set", path)
 		}
 		for _, want := range rv {
 			found := false
@@ -415,6 +420,11 @@ func matchValue(data, rule interface{}) bool {
 	case []interface{}:
 		da, ok := data.([]interface{})
 		if !ok {
+			for _, want := range rv {
+				if matchValue(data, want) {
+					return true
+				}
+			}
 			return false
 		}
 		for _, want := range rv {

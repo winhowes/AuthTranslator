@@ -24,8 +24,8 @@ outgoing_auth:
 | `file`           | `file:///etc/secrets/slack_token`                                   | Kubernetes **secret volume** or Docker bind‑mount. Append `:KEY` to read key/value files; omit it to load the entire file. |
 | `k8s`            | `k8s:default/mysecret#token`         | In‑cluster secret via the Kubernetes API.                     |
 | `gcp`            | `gcp:projects/acme/locations/global/keyRings/auth/cryptoKeys/token:ciphertext` | Running on GKE / Cloud Run; decrypt via **Cloud KMS**. |
-| `aws`            | `aws:Ci0KU29tZUNpcGhlcnRleHQ=` | AES‑GCM encrypted values decrypted using `AWS_KMS_KEY`. |
-| `azure`          | `azure:https://kv-name.vault.azure.net/secrets/secret-name`         | AKS or VM SS with **Managed Identity**.                       |
+| `aws`            | `aws:Ci0KU29tZUNpcGhlcnRleHQ=` | Legacy local AES‑GCM envelope values decrypted using `AWS_KMS_KEY`; this is not AWS KMS. |
+| `azure`          | `azure:https://kv-name.vault.azure.net/secrets/secret-name`         | Azure Key Vault using service-principal client credentials.                       |
 | `vault`          | `vault:secret/data/slack`                                       | Self‑hosted **HashiCorp Vault** cluster.                      |
 | `keychain`       | `keychain:github-cli#octocat`                                   | macOS hosts with secrets in Keychain (`service#account`). |
 | `secretservice`  | `secretservice:service=slack,user=bot`                          | Linux desktops/servers with D-Bus Secret Service (`secret-tool`). |
@@ -62,7 +62,7 @@ Some schemes rely on environment variables for authentication or decryption:
 | `env`  | Names referenced in the configuration (e.g. `env:IN_TOKEN`) | Secrets are read directly from those variables. | `env:IN_TOKEN` resolves to `$IN_TOKEN` |
 | `file` | _none_ | Reads file contents from disk for `file:` secrets. Append `:KEY` to select entries from `KEY=value` files; omit it to load the whole file. | `file:/etc/secrets.env:SLACK_SECRET` |
 | `k8s` | `KUBERNETES_SERVICE_HOST`, `KUBERNETES_SERVICE_PORT` | Provided by Kubernetes; used with the in-cluster service account. | `k8s:default/mysecret#token` |
-| `aws` | `AWS_KMS_KEY` | Base64 encoded 32 byte key for decrypting `aws:` secrets. | `aws:Ci0KU29tZUNpcGhlcnRleHQ=` |
+| `aws` | `AWS_KMS_KEY` | Base64 encoded 32 byte local AES-GCM key for decrypting legacy `aws:` secrets. | `aws:Ci0KU29tZUNpcGhlcnRleHQ=` |
 | `azure` | `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET` | Credentials for fetching `azure:` secrets from Key Vault. | `azure:https://kv-name.vault.azure.net/secrets/token` |
 | `gcp` | _none_ | Uses the GCP metadata service when resolving `gcp:` secrets. | `gcp:projects/p/locations/l/keyRings/r/cryptoKeys/k:cipher` |
 | `vault` | `VAULT_ADDR`, `VAULT_TOKEN` | Fetches secrets from HashiCorp Vault via its HTTP API. | `vault:secret/data/api` reads from Vault |

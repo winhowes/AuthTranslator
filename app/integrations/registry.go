@@ -50,6 +50,9 @@ func ExpandCapabilities(integration string, callers []CallerConfig) []CallerConf
 			if !ok {
 				continue
 			}
+			if spec.Generate == nil {
+				continue
+			}
 			rules, err := spec.Generate(cap.Params)
 			if err != nil {
 				continue

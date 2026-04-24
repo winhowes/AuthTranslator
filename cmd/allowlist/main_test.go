@@ -16,6 +16,8 @@ import (
 	"github.com/winhowes/AuthTranslator/cmd/allowlist/plugins"
 )
 
+const fullAccessCapability = "dangerously_allow_full_access"
+
 // helper to capture stdout from f
 func captureOutput(f func()) string {
 	r, w, err := os.Pipe()
@@ -51,7 +53,7 @@ func TestAddEntryNewFile(t *testing.T) {
 	*file = path
 	t.Cleanup(func() { *file = old })
 
-	addEntry([]string{"-integration", "foo", "-caller", "u1", "-capability", "cap"})
+	addEntry([]string{"-integration", "foo", "-caller", "u1", "-capability", fullAccessCapability})
 
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -65,7 +67,7 @@ func TestAddEntryNewFile(t *testing.T) {
 		{
 			Integration: "foo",
 			Callers: []plugins.CallerConfig{
-				{ID: "u1", Capabilities: []plugins.CapabilityConfig{{Name: "cap", Params: nil}}},
+				{ID: "u1", Capabilities: []plugins.CapabilityConfig{{Name: fullAccessCapability, Params: nil}}},
 			},
 		},
 	}
@@ -79,7 +81,7 @@ func TestAddEntryUpdateExisting(t *testing.T) {
 	path := filepath.Join(tmpDir, "allow.yaml")
 
 	initial := []plugins.AllowlistEntry{
-		{Integration: "foo", Callers: []plugins.CallerConfig{{ID: "u1"}}},
+		{Integration: "github", Callers: []plugins.CallerConfig{{ID: "u1"}}},
 	}
 	data, _ := yaml.Marshal(initial)
 	if err := os.WriteFile(path, data, 0644); err != nil {
@@ -90,7 +92,7 @@ func TestAddEntryUpdateExisting(t *testing.T) {
 	*file = path
 	t.Cleanup(func() { *file = old })
 
-	addEntry([]string{"-integration", "foo", "-caller", "u1", "-capability", "cap2", "-params", "k=v"})
+	addEntry([]string{"-integration", "github", "-caller", "u1", "-capability", "comment", "-params", "repo=org/repo"})
 
 	out, err := os.ReadFile(path)
 	if err != nil {
@@ -102,8 +104,8 @@ func TestAddEntryUpdateExisting(t *testing.T) {
 	}
 	want := []plugins.AllowlistEntry{
 		{
-			Integration: "foo",
-			Callers:     []plugins.CallerConfig{{ID: "u1", Capabilities: []plugins.CapabilityConfig{{Name: "cap2", Params: map[string]interface{}{"k": "v"}}}}},
+			Integration: "github",
+			Callers:     []plugins.CallerConfig{{ID: "u1", Capabilities: []plugins.CapabilityConfig{{Name: "comment", Params: map[string]interface{}{"repo": "org/repo"}}}}},
 		},
 	}
 	if !reflect.DeepEqual(entries, want) {
@@ -127,7 +129,7 @@ func TestAddEntryIntegrationCaseInsensitive(t *testing.T) {
 	*file = path
 	t.Cleanup(func() { *file = old })
 
-	addEntry([]string{"-integration", "FOO", "-caller", "u1", "-capability", "cap"})
+	addEntry([]string{"-integration", "FOO", "-caller", "u1", "-capability", fullAccessCapability})
 
 	out, err := os.ReadFile(path)
 	if err != nil {
@@ -140,7 +142,7 @@ func TestAddEntryIntegrationCaseInsensitive(t *testing.T) {
 	want := []plugins.AllowlistEntry{
 		{
 			Integration: "foo",
-			Callers:     []plugins.CallerConfig{{ID: "u1", Capabilities: []plugins.CapabilityConfig{{Name: "cap", Params: nil}}}},
+			Callers:     []plugins.CallerConfig{{ID: "u1", Capabilities: []plugins.CapabilityConfig{{Name: fullAccessCapability, Params: nil}}}},
 		},
 	}
 	if !reflect.DeepEqual(entries, want) {
@@ -304,7 +306,7 @@ func TestAddEntryNewCaller(t *testing.T) {
 	*file = path
 	t.Cleanup(func() { *file = old })
 
-	addEntry([]string{"-integration", "foo", "-caller", "u2", "-capability", "cap2"})
+	addEntry([]string{"-integration", "foo", "-caller", "u2", "-capability", fullAccessCapability})
 
 	out, err := os.ReadFile(path)
 	if err != nil {
@@ -319,7 +321,7 @@ func TestAddEntryNewCaller(t *testing.T) {
 			Integration: "foo",
 			Callers: []plugins.CallerConfig{
 				{ID: "u1", Capabilities: []plugins.CapabilityConfig{{Name: "cap1", Params: nil}}},
-				{ID: "u2", Capabilities: []plugins.CapabilityConfig{{Name: "cap2", Params: nil}}},
+				{ID: "u2", Capabilities: []plugins.CapabilityConfig{{Name: fullAccessCapability, Params: nil}}},
 			},
 		},
 	}
@@ -336,9 +338,9 @@ func TestAddEntryDuplicateCapability(t *testing.T) {
 
 	initial := []plugins.AllowlistEntry{
 		{
-			Integration: "foo",
+			Integration: "github",
 			Callers: []plugins.CallerConfig{
-				{ID: "u1", Capabilities: []plugins.CapabilityConfig{{Name: "cap", Params: map[string]interface{}{"k": "v1"}}}},
+				{ID: "u1", Capabilities: []plugins.CapabilityConfig{{Name: "comment", Params: map[string]interface{}{"repo": "org/old"}}}},
 			},
 		},
 	}
@@ -351,7 +353,7 @@ func TestAddEntryDuplicateCapability(t *testing.T) {
 	*file = path
 	t.Cleanup(func() { *file = old })
 
-	addEntry([]string{"-integration", "foo", "-caller", "u1", "-capability", "cap", "-params", "k=v2"})
+	addEntry([]string{"-integration", "github", "-caller", "u1", "-capability", "comment", "-params", "repo=org/new"})
 
 	out, err := os.ReadFile(path)
 	if err != nil {
@@ -363,9 +365,9 @@ func TestAddEntryDuplicateCapability(t *testing.T) {
 	}
 	want := []plugins.AllowlistEntry{
 		{
-			Integration: "foo",
+			Integration: "github",
 			Callers: []plugins.CallerConfig{
-				{ID: "u1", Capabilities: []plugins.CapabilityConfig{{Name: "cap", Params: map[string]interface{}{"k": "v2"}}}},
+				{ID: "u1", Capabilities: []plugins.CapabilityConfig{{Name: "comment", Params: map[string]interface{}{"repo": "org/new"}}}},
 			},
 		},
 	}
@@ -382,7 +384,7 @@ func TestAddEntryParamTrim(t *testing.T) {
 	*file = path
 	t.Cleanup(func() { *file = old })
 
-	addEntry([]string{"-integration", "foo", "-caller", "u1", "-capability", "cap", "-params", "k=v1, bar = baz "})
+	addEntry([]string{"-integration", "sendgrid", "-caller", "u1", "-capability", "send_email", "-params", "from=me@example.com, replyTo = reply@example.com "})
 
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -393,7 +395,7 @@ func TestAddEntryParamTrim(t *testing.T) {
 		t.Fatalf("failed to unmarshal: %v", err)
 	}
 	params := entries[0].Callers[0].Capabilities[0].Params
-	if params["k"] != "v1" || params["bar"] != "baz" {
+	if params["from"] != "me@example.com" || params["replyTo"] != "reply@example.com" {
 		t.Fatalf("params not trimmed: %#v", params)
 	}
 }
@@ -405,7 +407,7 @@ func TestAddEntryIgnoresEmptyParams(t *testing.T) {
 	*file = path
 	t.Cleanup(func() { *file = old })
 
-	addEntry([]string{"-integration", "foo", "-caller", "u1", "-capability", "cap", "-params", "k=v1,, ,other=v2"})
+	addEntry([]string{"-integration", "sendgrid", "-caller", "u1", "-capability", "send_email", "-params", "from=me@example.com,, ,replyTo=reply@example.com"})
 
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -416,8 +418,129 @@ func TestAddEntryIgnoresEmptyParams(t *testing.T) {
 		t.Fatalf("failed to unmarshal: %v", err)
 	}
 	params := entries[0].Callers[0].Capabilities[0].Params
-	if len(params) != 2 || params["k"] != "v1" || params["other"] != "v2" {
+	if len(params) != 2 || params["from"] != "me@example.com" || params["replyTo"] != "reply@example.com" {
 		t.Fatalf("unexpected params: %#v", params)
+	}
+}
+
+func TestAddEntryParsesStructuredParams(t *testing.T) {
+	tmpDir := t.TempDir()
+	path := filepath.Join(tmpDir, "allow.yaml")
+	old := *file
+	*file = path
+	t.Cleanup(func() { *file = old })
+
+	addEntry([]string{"-integration", "slack", "-caller", "u1", "-capability", "post_channels", "-params", `channels=["C123","C456"]`})
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("failed reading file: %v", err)
+	}
+	var entries []plugins.AllowlistEntry
+	if err := yaml.Unmarshal(data, &entries); err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+	params := entries[0].Callers[0].Capabilities[0].Params
+	channels, ok := params["channels"].([]interface{})
+	if !ok || len(channels) != 2 || channels[0] != "C123" || channels[1] != "C456" {
+		t.Fatalf("channels not parsed as JSON array: %#v", params["channels"])
+	}
+}
+
+func TestAddEntryRejectsMalformedParams(t *testing.T) {
+	tmpDir := t.TempDir()
+	path := filepath.Join(tmpDir, "allow.yaml")
+	old := *file
+	*file = path
+	t.Cleanup(func() { *file = old })
+
+	out := captureStderr(func() {
+		addEntry([]string{"-integration", "foo", "-caller", "u1", "-capability", fullAccessCapability, "-params", "repo"})
+	})
+	if !strings.Contains(out, "invalid param") {
+		t.Fatalf("unexpected error output: %s", out)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("file should not be created")
+	}
+}
+
+func TestParseParamsStructuredValues(t *testing.T) {
+	params, err := parseParams(`repo=org/repo,object={"labels":["bug"]},quoted="a\"b",empty=,none=null,enabled=true,disabled=false`)
+	if err != nil {
+		t.Fatalf("parseParams failed: %v", err)
+	}
+
+	want := map[string]interface{}{
+		"repo":     "org/repo",
+		"object":   map[string]interface{}{"labels": []interface{}{"bug"}},
+		"quoted":   `a"b`,
+		"empty":    "",
+		"none":     nil,
+		"enabled":  true,
+		"disabled": false,
+	}
+	if !reflect.DeepEqual(params, want) {
+		t.Fatalf("params mismatch:\n%#v\nwant\n%#v", params, want)
+	}
+}
+
+func TestParseParamsErrors(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{name: "invalid param", input: "repo", want: "invalid param"},
+		{name: "invalid json", input: "channels=[broken]", want: "invalid value for param channels"},
+		{name: "unmatched close", input: "channels=]", want: "unmatched"},
+		{name: "unterminated quote", input: `text="unterminated`, want: "unterminated quoted value"},
+		{name: "unmatched bracket", input: "channels=[", want: "unmatched bracket or brace"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := parseParams(tt.input)
+			if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("expected error containing %q, got %v", tt.want, err)
+			}
+		})
+	}
+}
+
+func TestAddEntryRejectsUnknownCapability(t *testing.T) {
+	tmpDir := t.TempDir()
+	path := filepath.Join(tmpDir, "allow.yaml")
+	old := *file
+	*file = path
+	t.Cleanup(func() { *file = old })
+
+	out := captureStderr(func() {
+		addEntry([]string{"-integration", "foo", "-caller", "u1", "-capability", "missing"})
+	})
+	if !strings.Contains(out, "unknown capability missing") {
+		t.Fatalf("unexpected error output: %s", out)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("file should not be created")
+	}
+}
+
+func TestAddEntryRejectsInvalidCapabilityParam(t *testing.T) {
+	tmpDir := t.TempDir()
+	path := filepath.Join(tmpDir, "allow.yaml")
+	old := *file
+	*file = path
+	t.Cleanup(func() { *file = old })
+
+	out := captureStderr(func() {
+		addEntry([]string{"-integration", "foo", "-caller", "u1", "-capability", fullAccessCapability, "-params", "extra=value"})
+	})
+	if !strings.Contains(out, "unknown param extra") {
+		t.Fatalf("unexpected error output: %s", out)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("file should not be created")
 	}
 }
 
@@ -655,7 +778,7 @@ func TestAddEntryInvalidYAML(t *testing.T) {
 	t.Cleanup(func() { *file = old })
 
 	out := captureStderr(func() {
-		addEntry([]string{"-integration", "foo", "-caller", "u1", "-capability", "c"})
+		addEntry([]string{"-integration", "foo", "-caller", "u1", "-capability", fullAccessCapability})
 	})
 	if out == "" {
 		t.Fatalf("expected error output")
@@ -675,7 +798,7 @@ func TestAddEntryReadFileError(t *testing.T) {
 	t.Cleanup(func() { *file = old })
 
 	out := captureStderr(func() {
-		addEntry([]string{"-integration", "foo", "-caller", "u1", "-capability", "c"})
+		addEntry([]string{"-integration", "foo", "-caller", "u1", "-capability", fullAccessCapability})
 	})
 	if out == "" {
 		t.Fatalf("expected error output")
@@ -701,9 +824,9 @@ func TestMainAddRemoveCommands(t *testing.T) {
 	t.Cleanup(func() { flag.CommandLine = oldFS; file = oldFile })
 
 	origArgs := os.Args
-	os.Args = []string{"allowlist", "add", "-integration", "foo", "-caller", "u1", "-capability", "cap"}
+	os.Args = []string{"allowlist", "add", "-integration", "foo", "-caller", "u1", "-capability", fullAccessCapability}
 	main()
-	os.Args = []string{"allowlist", "remove", "-integration", "foo", "-caller", "u1", "-capability", "cap"}
+	os.Args = []string{"allowlist", "remove", "-integration", "foo", "-caller", "u1", "-capability", fullAccessCapability}
 	main()
 	os.Args = origArgs
 
@@ -723,7 +846,7 @@ func TestAddEntryHelper(t *testing.T) {
 	cfg := os.Getenv("CFG")
 	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 	file = flag.CommandLine.String("file", cfg, "allowlist file")
-	addEntry([]string{"-integration", "foo", "-caller", "u1", "-capability", "cap"})
+	addEntry([]string{"-integration", "foo", "-caller", "u1", "-capability", fullAccessCapability})
 	os.Exit(0)
 }
 
@@ -760,7 +883,7 @@ func TestAddEntryMarshalError(t *testing.T) {
 		}
 	}()
 
-	addEntry([]string{"-integration", "foo", "-caller", "u1", "-capability", "cap"})
+	addEntry([]string{"-integration", "foo", "-caller", "u1", "-capability", fullAccessCapability})
 }
 
 func TestRemoveEntryMarshalError(t *testing.T) {

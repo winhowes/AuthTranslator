@@ -18,10 +18,10 @@ var (
 	newGCM       = cipher.NewGCM
 )
 
-// awsKMSPlugin decrypts secrets using a symmetric key provided via the
-// AWS_KMS_KEY environment variable. The ciphertext must be base64 encoded and
-// include a 12 byte nonce prefix followed by the encrypted data. This is not a
-// real AWS KMS integration but provides basic encryption semantics for tests.
+// awsKMSPlugin decrypts legacy local AES-GCM envelope values using a symmetric
+// key provided via the AWS_KMS_KEY environment variable. The ciphertext must be
+// base64 encoded and include a 12 byte nonce prefix followed by the encrypted
+// data. This is not a real AWS KMS integration.
 type awsKMSPlugin struct {
 	once sync.Once
 	key  []byte
