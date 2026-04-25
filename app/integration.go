@@ -624,4 +624,8 @@ func DeleteIntegration(name string) {
 	allowlists.Lock()
 	delete(allowlists.m, n)
 	allowlists.Unlock()
+
+	denylists.Lock()
+	delete(denylists.m, n)
+	denylists.Unlock()
 }
