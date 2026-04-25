@@ -650,6 +650,33 @@ func TestDeleteIntegrationRemovesAllowlist(t *testing.T) {
 	}
 }
 
+func TestDeleteIntegrationRemovesDenylist(t *testing.T) {
+	denylists.Lock()
+	denylists.m = make(map[string]map[string][]CallRule)
+	denylists.Unlock()
+
+	name := "deldl"
+	i := &Integration{Name: name, Destination: "http://example.com"}
+	if err := AddIntegration(i); err != nil {
+		t.Fatalf("add: %v", err)
+	}
+	if err := SetDenylist(name, []DenylistCaller{{
+		ID: "*",
+		Rules: []CallRule{{
+			Path:    "/blocked",
+			Methods: map[string]RequestConstraint{"GET": {}},
+		}},
+	}}); err != nil {
+		t.Fatalf("set denylist: %v", err)
+	}
+
+	DeleteIntegration(name)
+
+	if got := GetDenylist(name); len(got) != 0 {
+		t.Fatalf("denylist not removed: %v", got)
+	}
+}
+
 func TestIntegrationRateLimitWindow(t *testing.T) {
 	i := &Integration{
 		Name:            "window",
