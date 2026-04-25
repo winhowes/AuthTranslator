@@ -50,8 +50,9 @@ type cachedToken struct {
 
 var tokenCache = struct {
 	sync.Mutex
-	m map[string]cachedToken
-}{m: make(map[string]cachedToken)}
+	m            map[string]cachedToken
+	refreshLocks map[string]*sync.Mutex
+}{m: make(map[string]cachedToken), refreshLocks: make(map[string]*sync.Mutex)}
 
 type tokenResponse struct {
 	AccessToken  string          `json:"access_token"`
@@ -178,7 +179,17 @@ func (o *OAuth2) AddAuth(ctx context.Context, r *http.Request, params interface{
 
 	key := cfg.cacheKey()
 	ct := getCachedToken(key)
-	if ct.accessToken == "" || time.Now().After(ct.exp.Add(-refreshSkew)) {
+	if tokenNeedsRefresh(ct) {
+		refreshLock := getRefreshLock(key)
+		refreshLock.Lock()
+		defer refreshLock.Unlock()
+
+		ct = getCachedToken(key)
+		if !tokenNeedsRefresh(ct) {
+			r.Header.Set(cfg.Header, cfg.Prefix+ct.accessToken)
+			return nil
+		}
+
 		next, err := fetchToken(ctx, cfg, ct.refreshToken)
 		if err != nil {
 			return err
@@ -192,6 +203,10 @@ func (o *OAuth2) AddAuth(ctx context.Context, r *http.Request, params interface{
 
 	r.Header.Set(cfg.Header, cfg.Prefix+ct.accessToken)
 	return nil
+}
+
+func tokenNeedsRefresh(ct cachedToken) bool {
+	return ct.accessToken == "" || time.Now().After(ct.exp.Add(-refreshSkew))
 }
 
 func fetchToken(ctx context.Context, cfg *oauth2Params, cachedRefreshToken string) (cachedToken, error) {
@@ -330,6 +345,17 @@ func setCachedToken(key string, tok cachedToken) {
 	tokenCache.Lock()
 	tokenCache.m[key] = tok
 	tokenCache.Unlock()
+}
+
+func getRefreshLock(key string) *sync.Mutex {
+	tokenCache.Lock()
+	defer tokenCache.Unlock()
+	refreshLock := tokenCache.refreshLocks[key]
+	if refreshLock == nil {
+		refreshLock = &sync.Mutex{}
+		tokenCache.refreshLocks[key] = refreshLock
+	}
+	return refreshLock
 }
 
 func init() { authplugins.RegisterOutgoing(&OAuth2{}) }

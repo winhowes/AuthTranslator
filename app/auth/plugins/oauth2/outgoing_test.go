@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -22,6 +23,7 @@ func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { retu
 func resetCache() {
 	tokenCache.Lock()
 	tokenCache.m = make(map[string]cachedToken)
+	tokenCache.refreshLocks = make(map[string]*sync.Mutex)
 	tokenCache.Unlock()
 	secrets.ClearCache()
 }
@@ -182,6 +184,87 @@ func TestOAuth2RefreshesEarlyAndUsesRotatedRefreshToken(t *testing.T) {
 	}
 	if got := r2.Header.Get("Authorization"); got != "Bearer new" {
 		t.Fatalf("unexpected refreshed header %q", got)
+	}
+}
+
+func TestOAuth2SerializesConcurrentRefresh(t *testing.T) {
+	resetCache()
+	t.Setenv("REFRESH_TOKEN", "refresh-1")
+
+	var hits int32
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseForm(); err != nil {
+			t.Error(err)
+			http.Error(w, "bad form", http.StatusBadRequest)
+			return
+		}
+		switch hit := atomic.AddInt32(&hits, 1); hit {
+		case 1:
+			if got := r.Form.Get("refresh_token"); got != "refresh-1" {
+				t.Errorf("expected first refresh token %q, got %q", "refresh-1", got)
+			}
+			fmt.Fprint(w, `{"access_token":"old","expires_in":30,"refresh_token":"refresh-2"}`)
+		case 2:
+			if got := r.Form.Get("refresh_token"); got != "refresh-2" {
+				t.Errorf("expected rotated refresh token %q, got %q", "refresh-2", got)
+			}
+			time.Sleep(25 * time.Millisecond)
+			fmt.Fprint(w, `{"access_token":"new","expires_in":3600,"refresh_token":"refresh-3"}`)
+		default:
+			http.Error(w, fmt.Sprintf("unexpected concurrent refresh %d", hit), http.StatusBadRequest)
+		}
+	}))
+	defer ts.Close()
+	withTestClient(t, ts.Client())
+
+	p := OAuth2{}
+	cfg, err := p.ParseParams(map[string]interface{}{
+		"token_url":     ts.URL,
+		"grant_type":    "refresh_token",
+		"refresh_token": "env:REFRESH_TOKEN",
+		"client_auth":   "none",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	first := &http.Request{Header: http.Header{}}
+	if err := p.AddAuth(context.Background(), first, cfg); err != nil {
+		t.Fatal(err)
+	}
+	if got := first.Header.Get("Authorization"); got != "Bearer old" {
+		t.Fatalf("unexpected first token %q", got)
+	}
+
+	const workers = 8
+	errs := make(chan error, workers)
+	start := make(chan struct{})
+	var wg sync.WaitGroup
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			r := &http.Request{Header: http.Header{}}
+			if err := p.AddAuth(context.Background(), r, cfg); err != nil {
+				errs <- err
+				return
+			}
+			if got := r.Header.Get("Authorization"); got != "Bearer new" {
+				errs <- fmt.Errorf("unexpected auth header %q", got)
+			}
+		}()
+	}
+	close(start)
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := atomic.LoadInt32(&hits); got != 2 {
+		t.Fatalf("expected exactly two token endpoint calls, got %d", got)
 	}
 }
 
