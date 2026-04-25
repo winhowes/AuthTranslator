@@ -89,6 +89,24 @@ func (s secretFailOutgoingPlugin) AddAuth(ctx context.Context, r *http.Request, 
 func (s secretFailOutgoingPlugin) RequiredParams() []string { return nil }
 func (s secretFailOutgoingPlugin) OptionalParams() []string { return nil }
 
+type providedSecretOutgoingPlugin struct{}
+
+type providedSecretConfig struct {
+	Ref string `json:"ref"`
+}
+
+func (p *providedSecretConfig) SecretRefs() []string { return []string{p.Ref} }
+
+func (p providedSecretOutgoingPlugin) Name() string { return "provided-secret-out" }
+func (p providedSecretOutgoingPlugin) ParseParams(map[string]interface{}) (interface{}, error) {
+	return &providedSecretConfig{Ref: "bogus:VAL"}, nil
+}
+func (p providedSecretOutgoingPlugin) AddAuth(ctx context.Context, r *http.Request, params interface{}) error {
+	return nil
+}
+func (p providedSecretOutgoingPlugin) RequiredParams() []string { return nil }
+func (p providedSecretOutgoingPlugin) OptionalParams() []string { return nil }
+
 func TestAddIntegrationMissingParam(t *testing.T) {
 	i := &Integration{
 		Name:         "test",
@@ -1136,6 +1154,18 @@ func TestPrepareIntegrationOutgoingSecretValidation(t *testing.T) {
 	}
 	if err := prepareIntegration(integ); err == nil || !strings.Contains(err.Error(), "unknown secret source") {
 		t.Fatalf("expected secret validation error, got %v", err)
+	}
+}
+
+func TestPrepareIntegrationOutgoingProvidedSecretValidation(t *testing.T) {
+	authplugins.RegisterOutgoing(providedSecretOutgoingPlugin{})
+	integ := &Integration{
+		Name:         "provided-secret-out",
+		Destination:  "http://example.com",
+		OutgoingAuth: []AuthPluginConfig{{Type: "provided-secret-out", Params: map[string]interface{}{}}},
+	}
+	if err := prepareIntegration(integ); err == nil || !strings.Contains(err.Error(), "unknown secret source") {
+		t.Fatalf("expected provided secret validation error, got %v", err)
 	}
 }
 
