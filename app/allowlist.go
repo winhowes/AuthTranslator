@@ -57,17 +57,18 @@ func validateAllowlist(name string, callers []CallerConfig) error {
 		}
 		seenIDs[id] = struct{}{}
 
-		// track path+method combos to prevent duplicates
-		ruleSeen := make(map[string]map[string]struct{})
+		// Track exact rule duplicates while allowing same route+method
+		// combinations with distinct request constraints.
+		ruleSeen := make(map[string]map[string][]RequestConstraint)
 		for ri, r := range c.Rules {
 			if ruleSeen[r.Path] == nil {
-				ruleSeen[r.Path] = make(map[string]struct{})
+				ruleSeen[r.Path] = make(map[string][]RequestConstraint)
 			}
-			for m := range r.Methods {
-				if _, dup := ruleSeen[r.Path][m]; dup {
+			for m, cons := range r.Methods {
+				if hasMatchingConstraint(ruleSeen[r.Path][m], cons) {
 					return fmt.Errorf("duplicate rule for caller %q path %q method %s (index %d rule %d)", id, r.Path, m, ci, ri)
 				}
-				ruleSeen[r.Path][m] = struct{}{}
+				ruleSeen[r.Path][m] = append(ruleSeen[r.Path][m], cons)
 			}
 		}
 	}
