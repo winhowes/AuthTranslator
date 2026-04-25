@@ -1133,6 +1133,82 @@ func TestProxyHandlerWildcardAddAuthSeesResolvedDestination(t *testing.T) {
 	}
 }
 
+func TestProxyHandlerStaticAddAuthSeesResolvedDestination(t *testing.T) {
+	denylists.Lock()
+	denylists.m = make(map[string]map[string][]CallRule)
+	denylists.Unlock()
+
+	captureAddAuthCount = 0
+	captureLastURL = ""
+
+	upstream, err := url.Parse("http://backend.example.com/base?static=1")
+	if err != nil {
+		t.Fatalf("parse upstream: %v", err)
+	}
+
+	integ := Integration{
+		Name:         "static-auth-url",
+		Destination:  upstream.String(),
+		InRateLimit:  1,
+		OutRateLimit: 1,
+		OutgoingAuth: []AuthPluginConfig{{
+			Type:   "test_capture",
+			Params: map[string]interface{}{"expect_host": upstream.Host},
+		}},
+	}
+	if err := AddIntegration(&integ); err != nil {
+		t.Fatalf("failed to add integration: %v", err)
+	}
+	t.Cleanup(func() {
+		integ.inLimiter.Stop()
+		integ.outLimiter.Stop()
+		DeleteIntegration("static-auth-url")
+	})
+
+	called := false
+	integ.proxy.Transport = roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		called = true
+		if req.URL.Host != upstream.Host {
+			t.Fatalf("unexpected upstream host: %s", req.URL.Host)
+		}
+		if req.Host != upstream.Host {
+			t.Fatalf("unexpected request host: %s", req.Host)
+		}
+		if req.URL.Path != "/base/test" {
+			t.Fatalf("unexpected upstream path: %s", req.URL.Path)
+		}
+		if req.URL.RawQuery != "static=1&foo=bar" {
+			t.Fatalf("unexpected query: %s", req.URL.RawQuery)
+		}
+		resp := &http.Response{
+			StatusCode: http.StatusNoContent,
+			Header:     make(http.Header),
+			Body:       io.NopCloser(strings.NewReader("")),
+			Request:    req,
+		}
+		return resp, nil
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "http://static-auth-url/test?foo=bar", nil)
+	req.Host = "static-auth-url"
+	rr := httptest.NewRecorder()
+
+	proxyHandler(rr, req)
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d", rr.Code)
+	}
+	if !called {
+		t.Fatal("expected transport to be invoked")
+	}
+	if captureAddAuthCount != 1 {
+		t.Fatalf("expected AddAuth to be called once, got %d", captureAddAuthCount)
+	}
+	if captureLastURL != "http://backend.example.com/base/test?static=1&foo=bar" {
+		t.Fatalf("unexpected URL seen by AddAuth: %s", captureLastURL)
+	}
+}
+
 func TestProxyHandlerOutgoingAuthError(t *testing.T) {
 	denylists.Lock()
 	denylists.m = make(map[string]map[string][]CallRule)
