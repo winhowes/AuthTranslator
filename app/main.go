@@ -1418,6 +1418,14 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	metricsHost := r.Host
+	metricsRequestURI := r.RequestURI
+	var metricsURL *url.URL
+	if r.URL != nil {
+		u := *r.URL
+		metricsURL = &u
+	}
+
 	resolvedDest, err := integ.resolveRequestDestination(r)
 	if err != nil {
 		logger.Warn("invalid destination header", "integration", integ.Name, "error", err)
@@ -1429,8 +1437,8 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	r = r.WithContext(contextWithResolvedDestination(r.Context(), resolvedDest))
+	applyResolvedDestination(r, resolvedDest)
 	if integ.requiresDestinationHeader {
-		applyResolvedDestination(r, resolvedDest)
 		r.Header.Del("X-AT-Destination")
 	}
 
@@ -1459,7 +1467,18 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	proxyHost := r.Host
+	proxyRequestURI := r.RequestURI
+	proxyURL := r.URL
+	// Metrics hooks observe the proxy-facing route, but must use the live
+	// request so body reads are restored for the upstream proxy.
+	r.Host = metricsHost
+	r.RequestURI = metricsRequestURI
+	r.URL = metricsURL
 	metrics.OnRequest(integ.Name, r)
+	r.Host = proxyHost
+	r.RequestURI = proxyRequestURI
+	r.URL = proxyURL
 	handoffStart := time.Now()
 	r = r.WithContext(metrics.WithUpstreamRoundtripStart(r.Context(), handoffStart))
 	metrics.RecordPreProxyDuration(integ.Name, handoffStart.Sub(start))

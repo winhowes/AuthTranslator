@@ -122,6 +122,34 @@ func (*delayedMetricsPlugin) WriteProm(http.ResponseWriter) {}
 
 var delayedMetricsPluginOnce sync.Once
 
+type bodyReadingMetricsPlugin struct {
+	matchHost string
+	err       error
+	body      string
+	host      string
+	path      string
+	rawQuery  string
+}
+
+func (p *bodyReadingMetricsPlugin) OnRequest(_ string, r *http.Request) {
+	if r.Host != p.matchHost {
+		return
+	}
+	p.host = r.Host
+	p.path = r.URL.Path
+	p.rawQuery = r.URL.RawQuery
+	body, err := authplugins.GetBody(r)
+	if err != nil {
+		p.err = err
+		return
+	}
+	p.body = string(body)
+}
+
+func (*bodyReadingMetricsPlugin) OnResponse(string, string, *http.Request, *http.Response) {}
+
+func (*bodyReadingMetricsPlugin) WriteProm(http.ResponseWriter) {}
+
 func promCounterValue(t *testing.T, prefix string) float64 {
 	t.Helper()
 
@@ -329,6 +357,63 @@ func TestProxyHandlerPreProxyIncludesMetricsRequestHooks(t *testing.T) {
 	}
 	if preProxyDelta-upstreamDelta < minExpectedDelay {
 		t.Fatalf("expected pre-proxy duration to include hook delay excluded from upstream roundtrip, got pre_proxy=%f upstream=%f", preProxyDelta, upstreamDelta)
+	}
+}
+
+func TestProxyHandlerMetricsBodyReadPreservesUpstreamBody(t *testing.T) {
+	denylists.Lock()
+	denylists.m = make(map[string]map[string][]CallRule)
+	denylists.Unlock()
+
+	plugin := &bodyReadingMetricsPlugin{matchHost: "body-metrics"}
+	metrics.Register(plugin)
+
+	var upstreamBody, upstreamPath, upstreamQuery string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Errorf("read upstream body: %v", err)
+		}
+		upstreamBody = string(body)
+		upstreamPath = r.URL.Path
+		upstreamQuery = r.URL.RawQuery
+		w.WriteHeader(http.StatusAccepted)
+	}))
+	defer srv.Close()
+
+	integ := Integration{Name: "body-metrics", Destination: srv.URL + "/base?static=1", InRateLimit: 1, OutRateLimit: 1}
+	if err := AddIntegration(&integ); err != nil {
+		t.Fatalf("failed to add integration: %v", err)
+	}
+	t.Cleanup(func() {
+		integ.inLimiter.Stop()
+		integ.outLimiter.Stop()
+		DeleteIntegration(integ.Name)
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "http://body-metrics/submit?foo=bar", strings.NewReader("payload"))
+	req.Host = "body-metrics"
+	rr := httptest.NewRecorder()
+
+	proxyHandler(rr, req)
+
+	if rr.Code != http.StatusAccepted {
+		t.Fatalf("expected 202, got %d", rr.Code)
+	}
+	if plugin.err != nil {
+		t.Fatalf("metrics body read failed: %v", plugin.err)
+	}
+	if plugin.host != "body-metrics" || plugin.path != "/submit" || plugin.rawQuery != "foo=bar" {
+		t.Fatalf("metrics saw host/path/query %q %q %q", plugin.host, plugin.path, plugin.rawQuery)
+	}
+	if plugin.body != "payload" {
+		t.Fatalf("metrics saw body %q", plugin.body)
+	}
+	if upstreamBody != "payload" {
+		t.Fatalf("upstream saw body %q", upstreamBody)
+	}
+	if upstreamPath != "/base/submit" || upstreamQuery != "static=1&foo=bar" {
+		t.Fatalf("upstream saw path/query %q %q", upstreamPath, upstreamQuery)
 	}
 }
 
@@ -1129,6 +1214,82 @@ func TestProxyHandlerWildcardAddAuthSeesResolvedDestination(t *testing.T) {
 		t.Fatalf("expected AddAuth to be called once, got %d", captureAddAuthCount)
 	}
 	if captureLastURL != "http://foo.example.com/base/test?static=1&foo=bar" {
+		t.Fatalf("unexpected URL seen by AddAuth: %s", captureLastURL)
+	}
+}
+
+func TestProxyHandlerStaticAddAuthSeesResolvedDestination(t *testing.T) {
+	denylists.Lock()
+	denylists.m = make(map[string]map[string][]CallRule)
+	denylists.Unlock()
+
+	captureAddAuthCount = 0
+	captureLastURL = ""
+
+	upstream, err := url.Parse("http://backend.example.com/base?static=1")
+	if err != nil {
+		t.Fatalf("parse upstream: %v", err)
+	}
+
+	integ := Integration{
+		Name:         "static-auth-url",
+		Destination:  upstream.String(),
+		InRateLimit:  1,
+		OutRateLimit: 1,
+		OutgoingAuth: []AuthPluginConfig{{
+			Type:   "test_capture",
+			Params: map[string]interface{}{"expect_host": upstream.Host},
+		}},
+	}
+	if err := AddIntegration(&integ); err != nil {
+		t.Fatalf("failed to add integration: %v", err)
+	}
+	t.Cleanup(func() {
+		integ.inLimiter.Stop()
+		integ.outLimiter.Stop()
+		DeleteIntegration("static-auth-url")
+	})
+
+	called := false
+	integ.proxy.Transport = roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		called = true
+		if req.URL.Host != upstream.Host {
+			t.Fatalf("unexpected upstream host: %s", req.URL.Host)
+		}
+		if req.Host != upstream.Host {
+			t.Fatalf("unexpected request host: %s", req.Host)
+		}
+		if req.URL.Path != "/base/test" {
+			t.Fatalf("unexpected upstream path: %s", req.URL.Path)
+		}
+		if req.URL.RawQuery != "static=1&foo=bar" {
+			t.Fatalf("unexpected query: %s", req.URL.RawQuery)
+		}
+		resp := &http.Response{
+			StatusCode: http.StatusNoContent,
+			Header:     make(http.Header),
+			Body:       io.NopCloser(strings.NewReader("")),
+			Request:    req,
+		}
+		return resp, nil
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "http://static-auth-url/test?foo=bar", nil)
+	req.Host = "static-auth-url"
+	rr := httptest.NewRecorder()
+
+	proxyHandler(rr, req)
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d", rr.Code)
+	}
+	if !called {
+		t.Fatal("expected transport to be invoked")
+	}
+	if captureAddAuthCount != 1 {
+		t.Fatalf("expected AddAuth to be called once, got %d", captureAddAuthCount)
+	}
+	if captureLastURL != "http://backend.example.com/base/test?static=1&foo=bar" {
 		t.Fatalf("unexpected URL seen by AddAuth: %s", captureLastURL)
 	}
 }
