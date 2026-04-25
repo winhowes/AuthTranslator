@@ -122,6 +122,34 @@ func (*delayedMetricsPlugin) WriteProm(http.ResponseWriter) {}
 
 var delayedMetricsPluginOnce sync.Once
 
+type bodyReadingMetricsPlugin struct {
+	matchHost string
+	err       error
+	body      string
+	host      string
+	path      string
+	rawQuery  string
+}
+
+func (p *bodyReadingMetricsPlugin) OnRequest(_ string, r *http.Request) {
+	if r.Host != p.matchHost {
+		return
+	}
+	p.host = r.Host
+	p.path = r.URL.Path
+	p.rawQuery = r.URL.RawQuery
+	body, err := authplugins.GetBody(r)
+	if err != nil {
+		p.err = err
+		return
+	}
+	p.body = string(body)
+}
+
+func (*bodyReadingMetricsPlugin) OnResponse(string, string, *http.Request, *http.Response) {}
+
+func (*bodyReadingMetricsPlugin) WriteProm(http.ResponseWriter) {}
+
 func promCounterValue(t *testing.T, prefix string) float64 {
 	t.Helper()
 
@@ -329,6 +357,63 @@ func TestProxyHandlerPreProxyIncludesMetricsRequestHooks(t *testing.T) {
 	}
 	if preProxyDelta-upstreamDelta < minExpectedDelay {
 		t.Fatalf("expected pre-proxy duration to include hook delay excluded from upstream roundtrip, got pre_proxy=%f upstream=%f", preProxyDelta, upstreamDelta)
+	}
+}
+
+func TestProxyHandlerMetricsBodyReadPreservesUpstreamBody(t *testing.T) {
+	denylists.Lock()
+	denylists.m = make(map[string]map[string][]CallRule)
+	denylists.Unlock()
+
+	plugin := &bodyReadingMetricsPlugin{matchHost: "body-metrics"}
+	metrics.Register(plugin)
+
+	var upstreamBody, upstreamPath, upstreamQuery string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Errorf("read upstream body: %v", err)
+		}
+		upstreamBody = string(body)
+		upstreamPath = r.URL.Path
+		upstreamQuery = r.URL.RawQuery
+		w.WriteHeader(http.StatusAccepted)
+	}))
+	defer srv.Close()
+
+	integ := Integration{Name: "body-metrics", Destination: srv.URL + "/base?static=1", InRateLimit: 1, OutRateLimit: 1}
+	if err := AddIntegration(&integ); err != nil {
+		t.Fatalf("failed to add integration: %v", err)
+	}
+	t.Cleanup(func() {
+		integ.inLimiter.Stop()
+		integ.outLimiter.Stop()
+		DeleteIntegration(integ.Name)
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "http://body-metrics/submit?foo=bar", strings.NewReader("payload"))
+	req.Host = "body-metrics"
+	rr := httptest.NewRecorder()
+
+	proxyHandler(rr, req)
+
+	if rr.Code != http.StatusAccepted {
+		t.Fatalf("expected 202, got %d", rr.Code)
+	}
+	if plugin.err != nil {
+		t.Fatalf("metrics body read failed: %v", plugin.err)
+	}
+	if plugin.host != "body-metrics" || plugin.path != "/submit" || plugin.rawQuery != "foo=bar" {
+		t.Fatalf("metrics saw host/path/query %q %q %q", plugin.host, plugin.path, plugin.rawQuery)
+	}
+	if plugin.body != "payload" {
+		t.Fatalf("metrics saw body %q", plugin.body)
+	}
+	if upstreamBody != "payload" {
+		t.Fatalf("upstream saw body %q", upstreamBody)
+	}
+	if upstreamPath != "/base/submit" || upstreamQuery != "static=1&foo=bar" {
+		t.Fatalf("upstream saw path/query %q %q", upstreamPath, upstreamQuery)
 	}
 }
 

@@ -1467,11 +1467,18 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	metricsReq := r.Clone(r.Context())
-	metricsReq.Host = metricsHost
-	metricsReq.RequestURI = metricsRequestURI
-	metricsReq.URL = metricsURL
-	metrics.OnRequest(integ.Name, metricsReq)
+	proxyHost := r.Host
+	proxyRequestURI := r.RequestURI
+	proxyURL := r.URL
+	// Metrics hooks observe the proxy-facing route, but must use the live
+	// request so body reads are restored for the upstream proxy.
+	r.Host = metricsHost
+	r.RequestURI = metricsRequestURI
+	r.URL = metricsURL
+	metrics.OnRequest(integ.Name, r)
+	r.Host = proxyHost
+	r.RequestURI = proxyRequestURI
+	r.URL = proxyURL
 	handoffStart := time.Now()
 	r = r.WithContext(metrics.WithUpstreamRoundtripStart(r.Context(), handoffStart))
 	metrics.RecordPreProxyDuration(integ.Name, handoffStart.Sub(start))
