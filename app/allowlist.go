@@ -129,27 +129,34 @@ func matchPath(pattern, p string) bool {
 }
 
 func matchSegments(pattern, path []string) bool {
-	if len(pattern) == 0 {
-		return len(path) == 0
-	}
-	if pattern[0] == "**" {
-		if matchSegments(pattern[1:], path) {
-			// "**" matches zero segments
-			return true
+	pi, si := 0, 0
+	lastDoubleStar := -1
+	doubleStarMatch := 0
+
+	for si < len(path) {
+		if pi < len(pattern) && (pattern[pi] == "*" || pattern[pi] == path[si]) {
+			pi++
+			si++
+			continue
 		}
-		if len(path) > 0 && matchSegments(pattern, path[1:]) {
-			// consume one segment and try again
-			return true
+		if pi < len(pattern) && pattern[pi] == "**" {
+			lastDoubleStar = pi
+			doubleStarMatch = si
+			pi++
+			continue
 		}
-		return false
+		if lastDoubleStar == -1 {
+			return false
+		}
+		doubleStarMatch++
+		si = doubleStarMatch
+		pi = lastDoubleStar + 1
 	}
-	if len(path) == 0 {
-		return false
+
+	for pi < len(pattern) && pattern[pi] == "**" {
+		pi++
 	}
-	if pattern[0] == "*" || pattern[0] == path[0] {
-		return matchSegments(pattern[1:], path[1:])
-	}
-	return false
+	return pi == len(pattern)
 }
 
 // validateRequest checks headers and body according to the request constraint.
