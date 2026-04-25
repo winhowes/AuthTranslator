@@ -163,12 +163,82 @@ func TestMatchSegmentsEdgeCases(t *testing.T) {
 		{[]string{"**", "b"}, []string{"a", "b"}, true},
 		{[]string{"*", "b"}, []string{"a", "b"}, true},
 		{[]string{"a", "b"}, []string{"a"}, false},
+		{[]string{"**", "**", "b"}, []string{"a", "b"}, true},
+		{[]string{"a", "**", "b", "**", "c"}, []string{"a", "x", "b", "y", "z", "c"}, true},
+		{[]string{"**", "a", "**", "b"}, []string{"x", "a", "y", "c"}, false},
 	}
 	for i, tt := range cases {
 		if got := matchSegments(tt.pattern, tt.path); got != tt.ok {
 			t.Errorf("case %d: got %v want %v", i, got, tt.ok)
 		}
 	}
+}
+
+func TestMatchSegmentsDoubleStarPathologicalFailure(t *testing.T) {
+	pattern := make([]string, 0, 65)
+	for i := 0; i < 32; i++ {
+		pattern = append(pattern, "**", "a")
+	}
+	pattern = append(pattern, "c")
+
+	path := make([]string, 33)
+	for i := range path {
+		path[i] = "a"
+	}
+	path[len(path)-1] = "b"
+
+	if matchSegments(pattern, path) {
+		t.Fatal("expected pathological double-star pattern to fail")
+	}
+}
+
+func TestMatchSegmentsMatchesRecursiveSemantics(t *testing.T) {
+	patterns := segmentPermutations([]string{"a", "b", "*", "**"}, 5)
+	paths := segmentPermutations([]string{"a", "b"}, 4)
+
+	for _, pattern := range patterns {
+		for _, path := range paths {
+			got := matchSegments(pattern, path)
+			want := recursiveMatchSegments(pattern, path)
+			if got != want {
+				t.Fatalf("matchSegments(%v, %v)=%v want %v", pattern, path, got, want)
+			}
+		}
+	}
+}
+
+func segmentPermutations(tokens []string, maxLen int) [][]string {
+	var out [][]string
+	var build func([]string, int)
+	build = func(prefix []string, remaining int) {
+		cp := append([]string(nil), prefix...)
+		out = append(out, cp)
+		if remaining == 0 {
+			return
+		}
+		for _, token := range tokens {
+			build(append(prefix, token), remaining-1)
+		}
+	}
+	build(nil, maxLen)
+	return out
+}
+
+func recursiveMatchSegments(pattern, path []string) bool {
+	if len(pattern) == 0 {
+		return len(path) == 0
+	}
+	if pattern[0] == "**" {
+		return recursiveMatchSegments(pattern[1:], path) ||
+			(len(path) > 0 && recursiveMatchSegments(pattern, path[1:]))
+	}
+	if len(path) == 0 {
+		return false
+	}
+	if pattern[0] == "*" || pattern[0] == path[0] {
+		return recursiveMatchSegments(pattern[1:], path[1:])
+	}
+	return false
 }
 
 func TestToFloatVariousTypes(t *testing.T) {
