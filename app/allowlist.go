@@ -475,9 +475,7 @@ func toFloat(v interface{}) (float64, bool) {
 	}
 }
 
-// findConstraint returns the RequestConstraint for the given caller, path and
-// method if one exists.
-func findConstraint(i *Integration, callerID, pth, method string) (RequestConstraint, bool) {
+func findConstraintCandidates(i *Integration, callerID, pth, method string) []RequestConstraint {
 	segments := splitPath(pth)
 
 	allowlists.RLock()
@@ -489,39 +487,63 @@ func findConstraint(i *Integration, callerID, pth, method string) (RequestConstr
 	allowlists.RUnlock()
 
 	if ok {
-		if len(c.Capabilities) > 0 {
-			c = integrationplugins.ExpandCapabilities(i.Name, []CallerConfig{c})[0]
-			for ri := range c.Rules {
-				normalizeRule(&c.Rules[ri])
-			}
-		}
-		for _, r := range c.Rules {
-			if matchSegments(r.Segments, segments) {
-				if m, ok := r.Methods[method]; ok {
-					return m, true
-				}
-			}
+		if candidates := constraintCandidatesForCaller(i.Name, c, segments, method); len(candidates) > 0 {
+			return candidates
 		}
 		// Identified callers with explicit entries should not fall back to wildcard
 		// rules when their own rules do not match.
 		if callerID != "*" && callerID != "" {
-			return RequestConstraint{}, false
+			return nil
 		}
 	}
 	if hasWildcard && (!ok || callerID == "*" || callerID == "") {
-		if len(wildcard.Capabilities) > 0 {
-			wildcard = integrationplugins.ExpandCapabilities(i.Name, []CallerConfig{wildcard})[0]
-			for ri := range wildcard.Rules {
-				normalizeRule(&wildcard.Rules[ri])
-			}
+		return constraintCandidatesForCaller(i.Name, wildcard, segments, method)
+	}
+	return nil
+}
+
+func constraintCandidatesForCaller(integration string, c CallerConfig, segments []string, method string) []RequestConstraint {
+	if len(c.Capabilities) > 0 {
+		c = integrationplugins.ExpandCapabilities(integration, []CallerConfig{c})[0]
+		for ri := range c.Rules {
+			normalizeRule(&c.Rules[ri])
 		}
-		for _, r := range wildcard.Rules {
-			if matchSegments(r.Segments, segments) {
-				if m, ok := r.Methods[method]; ok {
-					return m, true
-				}
+	}
+
+	var candidates []RequestConstraint
+	for _, r := range c.Rules {
+		if matchSegments(r.Segments, segments) {
+			if m, ok := r.Methods[method]; ok {
+				candidates = append(candidates, m)
 			}
 		}
 	}
-	return RequestConstraint{}, false
+	return candidates
+}
+
+// findConstraint returns the first RequestConstraint for the given caller,
+// path and method if one exists.
+func findConstraint(i *Integration, callerID, pth, method string) (RequestConstraint, bool) {
+	candidates := findConstraintCandidates(i, callerID, pth, method)
+	if len(candidates) == 0 {
+		return RequestConstraint{}, false
+	}
+	return candidates[0], true
+}
+
+func findMatchingConstraint(i *Integration, callerID, pth, method string, r *http.Request) (RequestConstraint, bool, string) {
+	candidates := findConstraintCandidates(i, callerID, pth, method)
+	if len(candidates) == 0 {
+		return RequestConstraint{}, false, ""
+	}
+
+	firstReason := ""
+	for _, cons := range candidates {
+		if ok, reason := validateRequestReason(r, cons); ok {
+			return cons, true, ""
+		} else if firstReason == "" {
+			firstReason = reason
+		}
+	}
+	return RequestConstraint{}, false, firstReason
 }

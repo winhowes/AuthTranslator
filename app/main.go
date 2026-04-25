@@ -1402,20 +1402,16 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 
 	callers := GetAllowlist(integ.Name)
 	if len(callers) > 0 {
-		cons, ok := findConstraint(integ, callerID, r.URL.Path, r.Method)
+		_, ok, reason := findMatchingConstraint(integ, callerID, r.URL.Path, r.Method, r)
 		if !ok {
-			reason := "no allowlist match"
-			logger.Warn("request blocked", "integration", integ.Name, "caller_id", callerID, "reason", reason)
-			metrics.IncInternalResponse(integ.Name, http.StatusForbidden, internalReasonNoAllowlistMatch)
-			w.Header().Set("X-AT-Error-Reason", reason)
-			w.Header().Set("X-AT-Upstream-Error", "false")
-			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-			http.Error(w, fmt.Sprintf("Forbidden: %s", reason), http.StatusForbidden)
-			return
-		}
-		if ok2, reason := validateRequestReason(r, cons); !ok2 {
-			logger.Warn("request failed constraints", "integration", integ.Name, "caller_id", callerID, "reason", reason)
-			metrics.IncInternalResponse(integ.Name, http.StatusForbidden, internalReasonConstraintFailure)
+			if reason == "" {
+				reason = "no allowlist match"
+				logger.Warn("request blocked", "integration", integ.Name, "caller_id", callerID, "reason", reason)
+				metrics.IncInternalResponse(integ.Name, http.StatusForbidden, internalReasonNoAllowlistMatch)
+			} else {
+				logger.Warn("request failed constraints", "integration", integ.Name, "caller_id", callerID, "reason", reason)
+				metrics.IncInternalResponse(integ.Name, http.StatusForbidden, internalReasonConstraintFailure)
+			}
 			w.Header().Set("X-AT-Error-Reason", reason)
 			w.Header().Set("X-AT-Upstream-Error", "false")
 			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
