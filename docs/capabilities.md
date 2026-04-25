@@ -30,9 +30,9 @@ Run `go run ./cmd/allowlist list` to list capabilities from your build. For quic
 | linear | add_comment | – |
 | linear | create_task | – |
 | linear | update_status | – |
-| monday | add_comment | – |
-| monday | create_item | – |
-| monday | update_status | – |
+| monday | add_comment | operationName |
+| monday | create_item | operationName |
+| monday | update_status | operationName |
 | okta | create_user | – |
 | okta | deactivate_user | – |
 | okta | update_user | – |
@@ -63,5 +63,7 @@ Run `go run ./cmd/allowlist list` to list capabilities from your build. For quic
 | zendesk | query_status | – |
 | zendesk | update_ticket | – |
 
-For SendGrid `send_email`, if `replyTo` is omitted the reply address is empty. Provide `null` explicitly to leave the reply-to header unset.
+For Monday capabilities, `operationName` is optional and defaults to the capability name. Requests must include the matching GraphQL `operationName` field so the single `/v2` endpoint can still be constrained by action.
+
+For SendGrid `send_email`, `from` maps to `from.email` and `replyTo`, when provided, maps to `reply_to.email`. Omit `replyTo` or pass `null` to leave `reply_to` unconstrained.
 Capabilities not listed above may be added by custom plugins. Use the CLI to discover them in your build.

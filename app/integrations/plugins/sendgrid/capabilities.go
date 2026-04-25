@@ -15,11 +15,15 @@ func init() {
 				return nil, fmt.Errorf("from parameter required")
 			}
 			reply, replyOK := p["replyTo"]
-			body := map[string]interface{}{"from": from}
-			if replyOK {
-				body["reply_to"] = reply
-			} else {
-				body["reply_to"] = nil
+			body := map[string]interface{}{
+				"from": map[string]interface{}{"email": from},
+			}
+			if replyOK && reply != nil {
+				replyTo, ok := reply.(string)
+				if !ok || replyTo == "" {
+					return nil, fmt.Errorf("replyTo must be a non-empty string or null")
+				}
+				body["reply_to"] = map[string]interface{}{"email": replyTo}
 			}
 			rule := integrationplugins.CallRule{Path: "/v3/mail/send", Methods: map[string]integrationplugins.RequestConstraint{"POST": {Body: body}}}
 			return []integrationplugins.CallRule{rule}, nil

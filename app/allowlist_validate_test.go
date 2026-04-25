@@ -169,6 +169,52 @@ func TestValidateAllowlistEntriesDuplicateRule(t *testing.T) {
 	}
 }
 
+func TestValidateAllowlistEntriesAllowsSameRouteDifferentConstraints(t *testing.T) {
+	entries := []AllowlistEntry{{
+		Integration: "test",
+		Callers: []CallerConfig{{
+			ID: "c",
+			Rules: []CallRule{
+				{Path: "/x", Methods: map[string]RequestConstraint{"POST": {Body: map[string]interface{}{"channel": "c1"}}}},
+				{Path: "/x", Methods: map[string]RequestConstraint{"POST": {Body: map[string]interface{}{"channel": "c2"}}}},
+			},
+		}},
+	}}
+	if err := validateAllowlistEntries(entries); err != nil {
+		t.Fatalf("unexpected error for distinct constraints: %v", err)
+	}
+}
+
+func TestValidateAllowlistEntriesAllowsComposableCapabilities(t *testing.T) {
+	entries := []AllowlistEntry{{
+		Integration: "slack",
+		Callers: []CallerConfig{{
+			ID: "c",
+			Capabilities: []integrationplugins.CapabilityConfig{{
+				Name:   "post_channels",
+				Params: map[string]interface{}{"channels": []interface{}{"c1", "c2"}},
+			}},
+		}},
+	}}
+	if err := validateAllowlistEntries(entries); err != nil {
+		t.Fatalf("unexpected slack capability error: %v", err)
+	}
+
+	entries = []AllowlistEntry{{
+		Integration: "monday",
+		Callers: []CallerConfig{{
+			ID: "c",
+			Capabilities: []integrationplugins.CapabilityConfig{
+				{Name: "create_item"},
+				{Name: "update_status"},
+			},
+		}},
+	}}
+	if err := validateAllowlistEntries(entries); err != nil {
+		t.Fatalf("unexpected monday capability error: %v", err)
+	}
+}
+
 func TestValidateAllowlistEntriesDuplicateNormalizedPath(t *testing.T) {
 	entries := []AllowlistEntry{{
 		Integration: "test",
@@ -258,6 +304,39 @@ func TestValidateAllowlistEntriesGlobalCapability(t *testing.T) {
 	}}
 	if err := validateAllowlistEntries(entries); err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestValidateAllowlistEntriesCapabilityWithoutGenerator(t *testing.T) {
+	orig := make(map[string]map[string]integrationplugins.CapabilitySpec)
+	for integ, caps := range integrationplugins.AllCapabilities() {
+		m := make(map[string]integrationplugins.CapabilitySpec, len(caps))
+		for name, spec := range caps {
+			m[name] = spec
+		}
+		orig[integ] = m
+	}
+	t.Cleanup(func() {
+		reg := integrationplugins.AllCapabilities()
+		for k := range reg {
+			delete(reg, k)
+		}
+		for k, v := range orig {
+			reg[k] = v
+		}
+	})
+
+	integrationplugins.RegisterCapability("nogenerator", "cap", integrationplugins.CapabilitySpec{})
+	entries := []AllowlistEntry{{
+		Integration: "nogenerator",
+		Callers: []CallerConfig{{
+			ID:           "c",
+			Capabilities: []integrationplugins.CapabilityConfig{{Name: "cap"}},
+		}},
+	}}
+	err := validateAllowlistEntries(entries)
+	if err == nil || !strings.Contains(err.Error(), "has no rule generator") {
+		t.Fatalf("expected no rule generator error, got %v", err)
 	}
 }
 

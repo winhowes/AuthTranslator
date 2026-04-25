@@ -53,6 +53,15 @@ func TestBodyArrayMatching(t *testing.T) {
 	}
 }
 
+func TestBodyArrayRuleRejectsScalarValue(t *testing.T) {
+	body := []byte(`{"channel":"C123"}`)
+	rule := map[string]interface{}{"channel": []interface{}{"C123", "C456"}}
+	r := req(http.MethodPost, body)
+	if validateRequest(r, RequestConstraint{Body: rule}) {
+		t.Fatal("expected scalar body value to fail an array rule")
+	}
+}
+
 func TestBodyObjectMatching(t *testing.T) {
 	body := []byte(`{"foo":"bar","num":1,"extra":true}`)
 	tests := []struct {

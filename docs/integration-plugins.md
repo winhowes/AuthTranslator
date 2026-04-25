@@ -27,14 +27,14 @@ Think of it as a *cookie‑cutter* that stamps out a ready‑to‑run block in y
 | `openai` | `https://api.openai.com` | `token` |
 | `pagerduty` | `https://api.pagerduty.com` | `token` |
 | `sendgrid` | `https://api.sendgrid.com` | `token` |
-| `servicenow` | `https://api.servicenow.com` | `token` |
+| `servicenow` | `https://<instance>.service-now.com` (configurable) | `token` |
 | `slack` | `https://slack.com/` | `token` |
 | `gdrive` | `https://www.googleapis.com/drive/v3` | `gcp_token` |
 | `stripe` | `https://api.stripe.com` | `token` |
 | `trufflehog` | `https://trufflehog.cloud/api` | `token` |
 | `twilio` | `https://api.twilio.com` | `basic` |
 | `workday` | `https://<domain>/api` (configurable) | `token` |
-| `zendesk` | `https://api.zendesk.com` | `token` |
+| `zendesk` | `https://<subdomain>.zendesk.com` (configurable) | `token` |
 *(Full list lives under **[`cmd/integrations/plugins/`](../cmd/integrations/plugins/)**)*
 
 See [**Built-in Capabilities**](capabilities.md) for the convenience permissions
@@ -107,4 +107,3 @@ From here you can tweak fields—e.g. turn on `tls_insecure_skip_verify` for a d
 
 * **Set sane timeouts** SaaS APIs differ; codify them so callers don’t guess.
 * **Keep zero secrets** Integration plugins should only reference secret URIs, never raw tokens.
-

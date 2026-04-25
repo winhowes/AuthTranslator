@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 
 	integrationplugins "github.com/winhowes/AuthTranslator/app/integrations"
@@ -41,7 +42,7 @@ func validateAllowlistEntry(name string, callers []CallerConfig) error {
 		if len(c.Rules) == 0 && len(c.Capabilities) == 0 {
 			return fmt.Errorf("caller %q has no rules or capabilities", id)
 		}
-		ruleSeen := make(map[string]map[string]struct{})
+		ruleSeen := make(map[string]map[string][]RequestConstraint)
 		for _, cap := range c.Capabilities {
 			if err := validateCapability(name, cap); err != nil {
 				return err
@@ -56,18 +57,18 @@ func validateAllowlistEntry(name string, callers []CallerConfig) error {
 			}
 			normPath := strings.Join(splitPath(r.Path), "/")
 			if ruleSeen[normPath] == nil {
-				ruleSeen[normPath] = make(map[string]struct{})
+				ruleSeen[normPath] = make(map[string][]RequestConstraint)
 			}
-			for m := range r.Methods {
+			for m, cons := range r.Methods {
 				trimmed := strings.TrimSpace(m)
 				if trimmed == "" {
 					return fmt.Errorf("caller %q rule %d invalid method %q", id, ri, m)
 				}
 				upper := strings.ToUpper(trimmed)
-				if _, dup := ruleSeen[normPath][upper]; dup {
+				if hasMatchingConstraint(ruleSeen[normPath][upper], cons) {
 					return fmt.Errorf("duplicate rule for caller %q path %q method %s", id, r.Path, upper)
 				}
-				ruleSeen[normPath][upper] = struct{}{}
+				ruleSeen[normPath][upper] = append(ruleSeen[normPath][upper], cons)
 			}
 		}
 	}
@@ -122,8 +123,20 @@ func validateCapability(integration string, cap integrationplugins.CapabilityCon
 			return fmt.Errorf("unknown param %s for capability %s", p, cap.Name)
 		}
 	}
+	if spec.Generate == nil {
+		return fmt.Errorf("capability %s has no rule generator", cap.Name)
+	}
 	if _, err := spec.Generate(cap.Params); err != nil {
 		return fmt.Errorf("invalid params for capability %s: %v", cap.Name, err)
 	}
 	return nil
+}
+
+func hasMatchingConstraint(existing []RequestConstraint, cons RequestConstraint) bool {
+	for _, prev := range existing {
+		if reflect.DeepEqual(prev, cons) {
+			return true
+		}
+	}
+	return false
 }

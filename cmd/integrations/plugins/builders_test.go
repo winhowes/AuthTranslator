@@ -25,14 +25,14 @@ func TestBuilders(t *testing.T) {
 		{"okta", []string{"-name", "ok", "-domain", "okta.example.com", "-token", "tok"}, Okta("ok", "okta.example.com", "tok")},
 		{"sendgrid", []string{"-name", "sg", "-token", "tok"}, SendGrid("sg", "tok")},
 		{"trufflehog", []string{"-name", "th", "-token", "tok"}, TruffleHog("th", "tok")},
-		{"servicenow", []string{"-name", "sn", "-token", "tok"}, ServiceNow("sn", "tok")},
+		{"servicenow", []string{"-name", "sn", "-domain", "sn.example.com", "-token", "tok"}, ServiceNow("sn", "sn.example.com", "tok")},
 		{"slack", []string{"-name", "sl", "-token", "tok", "-signing-secret", "sec"}, Slack("sl", "tok", "sec")},
 		{"stripe", []string{"-name", "st", "-token", "tok"}, Stripe("st", "tok")},
 		{"twilio", []string{"-name", "tw", "-token", "tok"}, Twilio("tw", "tok")},
 		{"workday", []string{"-name", "wd", "-domain", "work.example.com", "-token", "tok"}, Workday("wd", "work.example.com", "tok")},
 		{"openai", []string{"-name", "oa", "-token", "tok"}, OpenAI("oa", "tok")},
 		{"pagerduty", []string{"-name", "pd", "-token", "tok"}, PagerDuty("pd", "tok")},
-		{"zendesk", []string{"-name", "zd", "-token", "tok"}, Zendesk("zd", "tok")},
+		{"zendesk", []string{"-name", "zd", "-domain", "zd.example.com", "-token", "tok"}, Zendesk("zd", "zd.example.com", "tok")},
 	}
 
 	for _, tt := range tests {
@@ -92,6 +92,17 @@ func TestBuilderErrors(t *testing.T) {
 
 	if Get("nonexistent") != nil {
 		t.Errorf("expected nil builder for unknown plugin")
+	}
+}
+
+func TestTenantDomainIntegrations(t *testing.T) {
+	serviceNow := ServiceNow("sn", "sn.example.com/", "tok")
+	if serviceNow.Destination != "https://sn.example.com" {
+		t.Fatalf("unexpected ServiceNow destination: %s", serviceNow.Destination)
+	}
+	zendesk := Zendesk("zd", "https://zd.example.com/", "tok")
+	if zendesk.Destination != "https://zd.example.com" {
+		t.Fatalf("unexpected Zendesk destination: %s", zendesk.Destination)
 	}
 }
 

@@ -78,6 +78,22 @@ func TestExpandCapabilitiesGenerateError(t *testing.T) {
 	}
 }
 
+func TestExpandCapabilitiesNilGenerator(t *testing.T) {
+	orig := capabilityRegistry
+	capabilityRegistry = map[string]map[string]CapabilitySpec{}
+	t.Cleanup(func() { capabilityRegistry = orig })
+	RegisterCapability("e", "cap", CapabilitySpec{})
+
+	callers := []CallerConfig{{ID: "c", Capabilities: []CapabilityConfig{{Name: "cap"}}}}
+	res := ExpandCapabilities("e", callers)
+	if len(res) != 1 || len(res[0].Rules) != 0 {
+		t.Fatalf("expected no rules without generator")
+	}
+	if len(res[0].Capabilities) != 0 {
+		t.Fatalf("capabilities not cleared")
+	}
+}
+
 func TestCapabilitiesHelpers(t *testing.T) {
 	// Save registry and restore after test
 	orig := capabilityRegistry

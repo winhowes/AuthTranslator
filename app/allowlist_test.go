@@ -282,6 +282,39 @@ func TestSetAllowlistDuplicateRule(t *testing.T) {
 	}
 }
 
+func TestFindMatchingConstraintTriesAlternateConstraints(t *testing.T) {
+	allowlists.Lock()
+	allowlists.m = make(map[string]map[string]CallerConfig)
+	allowlists.Unlock()
+
+	if _, ok, reason := findMatchingConstraint(&Integration{Name: "missing"}, "*", "/post", http.MethodPost, httptest.NewRequest(http.MethodPost, "http://missing/post", nil)); ok || reason != "" {
+		t.Fatalf("expected missing allowlist to have no candidate, got ok=%v reason=%q", ok, reason)
+	}
+
+	if err := SetAllowlist("multi", []CallerConfig{{
+		ID: "*",
+		Rules: []CallRule{
+			{Path: "/post", Methods: map[string]RequestConstraint{"POST": {Body: map[string]interface{}{"channel": "c1"}}}},
+			{Path: "/post", Methods: map[string]RequestConstraint{"POST": {Body: map[string]interface{}{"channel": "c2"}}}},
+		},
+	}}); err != nil {
+		t.Fatalf("failed to set allowlist: %v", err)
+	}
+
+	integ := &Integration{Name: "multi"}
+	req := httptest.NewRequest(http.MethodPost, "http://multi/post", strings.NewReader(`{"channel":"c2"}`))
+	req.Header.Set("Content-Type", "application/json")
+	if _, ok, reason := findMatchingConstraint(integ, "*", "/post", http.MethodPost, req); !ok {
+		t.Fatalf("expected second constraint to match, got reason %q", reason)
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "http://multi/post", strings.NewReader(`{"channel":"c3"}`))
+	req.Header.Set("Content-Type", "application/json")
+	if _, ok, reason := findMatchingConstraint(integ, "*", "/post", http.MethodPost, req); ok || reason == "" {
+		t.Fatalf("expected all constraints to fail with a reason, got ok=%v reason=%q", ok, reason)
+	}
+}
+
 func TestSetAllowlistMethodNormalization(t *testing.T) {
 	allowlists.Lock()
 	allowlists.m = make(map[string]map[string]CallerConfig)
@@ -480,6 +513,12 @@ func TestMatchValueNotOkBranches(t *testing.T) {
 	}
 	if matchValue("not-an-array", []interface{}{"a"}) {
 		t.Fatal("expected array type mismatch to fail")
+	}
+}
+
+func TestMatchValueArrayRuleRejectsScalarValue(t *testing.T) {
+	if matchValue("C123", []interface{}{"C123", "C456"}) {
+		t.Fatal("expected scalar value to fail an array rule")
 	}
 }
 

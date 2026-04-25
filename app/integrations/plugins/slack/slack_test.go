@@ -1,7 +1,6 @@
 package slack_test
 
 import (
-	"reflect"
 	"testing"
 
 	integrationplugins "github.com/winhowes/AuthTranslator/app/integrations"
@@ -54,17 +53,21 @@ func TestSlackCapabilities(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(rules) != 1 {
-		t.Fatalf("expected 1 rule, got %d", len(rules))
+	if len(rules) != 2 {
+		t.Fatalf("expected 2 rules, got %d", len(rules))
 	}
-	rule = rules[0]
-	rc, ok = rule.Methods["POST"]
-	if !ok {
-		t.Fatalf("missing POST method")
-	}
-	chVal, ok := rc.Body["channel"].([]interface{})
-	if !ok || !reflect.DeepEqual(chVal, []interface{}{"c1", "c2"}) {
-		t.Errorf("channels not propagated: %v", rc.Body["channel"])
+	for i, want := range []string{"c1", "c2"} {
+		rule = rules[i]
+		rc, ok = rule.Methods["POST"]
+		if !ok {
+			t.Fatalf("rule %d missing POST method", i)
+		}
+		if got := rc.Body["username"]; got != "bot" {
+			t.Errorf("rule %d username not propagated: %v", i, got)
+		}
+		if got := rc.Body["channel"]; got != want {
+			t.Errorf("rule %d channel not propagated: %v", i, got)
+		}
 	}
 
 	// missing fields should error
@@ -91,9 +94,8 @@ func TestSlackCapabilities(t *testing.T) {
 	if !ok {
 		t.Fatalf("missing POST method")
 	}
-	chVal, ok = rc.Body["channel"].([]interface{})
-	if !ok || !reflect.DeepEqual(chVal, []interface{}{"c1"}) {
-		t.Errorf("channels not propagated: %v", rc.Body["channel"])
+	if got := rc.Body["channel"]; got != "c1" {
+		t.Errorf("channels not propagated: %v", got)
 	}
 
 	// missing channels should error

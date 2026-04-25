@@ -14,13 +14,14 @@ func TestMondayCapabilities(t *testing.T) {
 	}
 
 	tests := []struct {
-		name   string
-		path   string
-		method string
+		name          string
+		path          string
+		method        string
+		operationName string
 	}{
-		{"create_item", "/v2", "POST"},
-		{"update_status", "/v2", "POST"},
-		{"add_comment", "/v2", "POST"},
+		{"create_item", "/v2", "POST", "create_item"},
+		{"update_status", "/v2", "POST", "update_status"},
+		{"add_comment", "/v2", "POST", "add_comment"},
 	}
 
 	for _, tt := range tests {
@@ -39,8 +40,28 @@ func TestMondayCapabilities(t *testing.T) {
 		if r.Path != tt.path {
 			t.Errorf("%s path mismatch: %s", tt.name, r.Path)
 		}
-		if _, ok := r.Methods[tt.method]; !ok {
+		rc, ok := r.Methods[tt.method]
+		if !ok {
 			t.Errorf("%s missing method %s", tt.name, tt.method)
+		}
+		if rc.Body["operationName"] != tt.operationName {
+			t.Errorf("%s operationName mismatch: %v", tt.name, rc.Body["operationName"])
+		}
+
+		rules, err = spec.Generate(map[string]interface{}{})
+		if err != nil {
+			t.Fatalf("generate empty params failed: %v", err)
+		}
+		if got := rules[0].Methods[tt.method].Body["operationName"]; got != tt.operationName {
+			t.Errorf("%s empty operationName fallback mismatch: %v", tt.name, got)
+		}
+
+		rules, err = spec.Generate(map[string]interface{}{"operationName": "customOp"})
+		if err != nil {
+			t.Fatalf("generate custom operation failed: %v", err)
+		}
+		if got := rules[0].Methods[tt.method].Body["operationName"]; got != "customOp" {
+			t.Errorf("%s custom operationName mismatch: %v", tt.name, got)
 		}
 	}
 }
