@@ -213,24 +213,16 @@ func prepareIntegration(i *Integration) error {
 
 	i.proxy = httputil.NewSingleHostReverseProxy(u)
 	oldDirector := i.proxy.Director
-	if hasWildcard {
-		i.proxy.Director = func(req *http.Request) {
-			dest, ok := resolvedDestinationFromContext(req.Context())
-			if !ok {
-				oldDirector(req)
-				req.Host = u.Host
-				return
-			}
-			if resolvedDestinationApplied(req.Context()) {
-				return
-			}
+	i.proxy.Director = func(req *http.Request) {
+		if resolvedDestinationApplied(req.Context()) {
+			return
+		}
+		if dest, ok := resolvedDestinationFromContext(req.Context()); ok {
 			applyResolvedDestination(req, dest)
+			return
 		}
-	} else {
-		i.proxy.Director = func(req *http.Request) {
-			oldDirector(req)
-			req.Host = u.Host
-		}
+		oldDirector(req)
+		req.Host = u.Host
 	}
 
 	i.proxy.ModifyResponse = func(resp *http.Response) error {
