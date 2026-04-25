@@ -62,10 +62,14 @@ func GetBody(r *http.Request) ([]byte, error) {
 
 // SetBody replaces the request body and updates the cached body bytes used by
 // GetBody.
-func SetBody(r *http.Request, b []byte) {
+func SetBody(r *http.Request, b []byte) error {
+	if MaxBodySize > 0 && int64(len(b)) > MaxBodySize {
+		return ErrBodyTooLarge
+	}
 	body := append([]byte(nil), b...)
 	r.Body = io.NopCloser(bytes.NewReader(body))
 	r.ContentLength = int64(len(body))
 	ctx := context.WithValue(r.Context(), bodyKey{}, body)
 	*r = *r.WithContext(ctx)
+	return nil
 }

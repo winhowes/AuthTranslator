@@ -84,7 +84,9 @@ func (f *FindReplace) AddAuth(ctx context.Context, r *http.Request, params inter
 		}
 		_ = r.Body.Close()
 		nb := replaceAll(string(b), findVal, replVal)
-		authplugins.SetBody(r, []byte(nb))
+		if err := authplugins.SetBody(r, []byte(nb)); err != nil {
+			return err
+		}
 	}
 
 	return nil

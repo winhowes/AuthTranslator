@@ -56,7 +56,9 @@ func TestSetBodyUpdatesCacheAndResetsBody(t *testing.T) {
 		t.Fatalf("unexpected setup error: %v", err)
 	}
 
-	SetBody(r, []byte("updated"))
+	if err := SetBody(r, []byte("updated")); err != nil {
+		t.Fatalf("unexpected set body error: %v", err)
+	}
 
 	cached, err := GetBody(r)
 	if err != nil {
@@ -74,6 +76,17 @@ func TestSetBodyUpdatesCacheAndResetsBody(t *testing.T) {
 	}
 	if r.ContentLength != int64(len("updated")) {
 		t.Fatalf("expected content length %d, got %d", len("updated"), r.ContentLength)
+	}
+}
+
+func TestSetBodyPreservesMaxBodySize(t *testing.T) {
+	old := MaxBodySize
+	MaxBodySize = 5
+	defer func() { MaxBodySize = old }()
+
+	r := httptest.NewRequest(http.MethodPost, "http://example.com", bytes.NewBufferString("hello"))
+	if err := SetBody(r, []byte("abcdef")); !errors.Is(err, ErrBodyTooLarge) {
+		t.Fatalf("expected ErrBodyTooLarge, got %v", err)
 	}
 }
 

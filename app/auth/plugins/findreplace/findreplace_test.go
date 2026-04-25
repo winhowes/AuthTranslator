@@ -138,6 +138,29 @@ func TestFindReplaceAddAuthUpdatesCachedBody(t *testing.T) {
 	}
 }
 
+func TestFindReplaceAddAuthPreservesMaxBodySize(t *testing.T) {
+	old := authplugins.MaxBodySize
+	authplugins.MaxBodySize = int64(len("body SECRET") - 1)
+	defer func() { authplugins.MaxBodySize = old }()
+
+	r := &http.Request{
+		URL:    &url.URL{Path: "/"},
+		Header: http.Header{},
+		Body:   io.NopCloser(strings.NewReader("body PLACE")),
+	}
+	p := FindReplace{}
+	t.Setenv("FIND", "PLACE")
+	t.Setenv("REP", "SECRET")
+	cfg, err := p.ParseParams(map[string]interface{}{"find_secret": "env:FIND", "replace_secret": "env:REP"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := p.AddAuth(context.Background(), r, cfg); err != authplugins.ErrBodyTooLarge {
+		t.Fatalf("expected ErrBodyTooLarge, got %v", err)
+	}
+}
+
 func TestFindReplaceAddAuthRawPathAndNilBody(t *testing.T) {
 	r := &http.Request{
 		URL: &url.URL{ // RawPath should also be rewritten
