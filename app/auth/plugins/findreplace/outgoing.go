@@ -1,7 +1,6 @@
 package findreplace
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -85,8 +84,7 @@ func (f *FindReplace) AddAuth(ctx context.Context, r *http.Request, params inter
 		}
 		_ = r.Body.Close()
 		nb := replaceAll(string(b), findVal, replVal)
-		r.Body = io.NopCloser(bytes.NewBufferString(nb))
-		r.ContentLength = int64(len(nb))
+		authplugins.SetBody(r, []byte(nb))
 	}
 
 	return nil
