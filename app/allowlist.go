@@ -113,7 +113,7 @@ func SetAllowlist(name string, callers []CallerConfig) error {
 // GetAllowlist retrieves the allowlist for an integration.
 func GetAllowlist(name string) []CallerConfig {
 	allowlists.RLock()
-	m := allowlists.m[name]
+	m := allowlists.m[strings.ToLower(name)]
 	res := make([]CallerConfig, 0, len(m))
 	for _, c := range m {
 		res = append(res, c)

@@ -193,6 +193,21 @@ func TestSetAllowlistIndexing(t *testing.T) {
 	}
 }
 
+func TestGetAllowlistCaseInsensitive(t *testing.T) {
+	allowlists.Lock()
+	allowlists.m = make(map[string]map[string]CallerConfig)
+	allowlists.Unlock()
+
+	if err := SetAllowlist("MiXeD", []CallerConfig{{ID: "caller"}}); err != nil {
+		t.Fatalf("failed to set allowlist: %v", err)
+	}
+
+	got := GetAllowlist("MIXED")
+	if len(got) != 1 || got[0].ID != "caller" {
+		t.Fatalf("expected case-insensitive allowlist lookup, got %#v", got)
+	}
+}
+
 func TestFindConstraintWildcard(t *testing.T) {
 	allowlists.Lock()
 	allowlists.m = make(map[string]map[string]CallerConfig)
