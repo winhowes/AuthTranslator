@@ -20,7 +20,7 @@ Unknown top‑level keys cause a validation error.
 ## 1  Caller ID keys
 
 * **Exact ID** `user-123`, `service-A`, `spiffe://tenant/worker`
-* **Wildcard** `"*"` – used when the incoming auth plugin did **not** return an ID. Handy for anonymous webhooks.
+* **Wildcard** `"*"` – used when the incoming auth plugin did **not** return an ID, or as a fallback for caller IDs without an explicit entry. Handy for anonymous webhooks and broad defaults.
 
 If no matching caller key exists – or a matched caller fails rule constraints – the proxy returns **403 Forbidden** and sets an `X-AT-Error-Reason` header describing the first mismatch. Every 4xx/5xx error from the proxy includes this header with a brief phrase explaining the reason.
 
@@ -51,6 +51,8 @@ Look for a `capabilities.go` file under `app/integrations/plugins/<integration>/
     - id: bot-123
       capabilities:
         - name: post_as
+          params:
+            username: AuthTranslator
 ```
 Each capability item contains a `name` and optional `params` map.
 
@@ -122,4 +124,4 @@ A request passes if **any** rule (or capability‑expanded rule) matches.
 
 * **One capability ≈ one business use‑case** (e.g. `post_as`).
 * Prefer **uppercase** HTTP methods (`GET`, `POST`) for consistency.
-* Log level `debug` will print which rule matched; helpful in staging.
+* Use `X-AT-Error-Reason` on 403 responses to see why a request missed the allowlist or failed constraints.

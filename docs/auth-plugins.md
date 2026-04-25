@@ -2,11 +2,11 @@
 
 AuthTranslator’s behaviour is extended by **plugins** – small Go packages that validate the *incoming* caller credential or inject the *outgoing* credential expected by an upstream service.
 
-* **Incoming plugins** run **before** any allowlist or denylist checks. They must either
+* **Incoming plugins** run **before** any denylist or allowlist checks. Each configured plugin must authenticate the request successfully. Plugins may also implement optional interfaces to derive a caller ID or strip credentials before proxying.
 
-  1. **Accept**: return a `callerID` string; the request continues, or
-  2. **Reject**: return an error → the proxy replies **401/403**.
-* **Outgoing plugins** run **after** the allowlist passes and the denylist check succeeds. They mutate the request (headers, query or body) so the upstream authenticates it.
+  1. **Accept**: return `true`; the request continues to the next incoming plugin.
+  2. **Reject**: return `false`; the proxy replies **401 Unauthorized**.
+* **Outgoing plugins** run after the request avoids the denylist and passes the allowlist. They mutate the request (headers, query or body) so the upstream authenticates it.
 
 > **Tip** Any plugin can be swapped at runtime – just edit `config.yaml` and send `SIGHUP` (or run with `-watch`).
 
@@ -201,6 +201,6 @@ Identifiers flow through to:
 |   |
 | - |
 
-* Use `-log-level DEBUG` to dump request headers after plugin injection (redacted for secrets).
+* Use `X-AT-Error-Reason` response headers and WARN logs to distinguish authentication, allowlist, denylist, and rate-limit failures.
 
 ---

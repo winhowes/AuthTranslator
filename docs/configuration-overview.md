@@ -11,7 +11,7 @@ AuthTranslator loads up to **three** YAML (or pure‑JSON) documents at runtime:
 If no allowlist is provided, every request is permitted once inbound authentication succeeds.
 Running without an allowlist effectively gives all authenticated callers unrestricted access, so supplying `allowlist.yaml` is **strongly recommended** even if it just contains a single wildcard entry to start. The denylist stays optional as well; omit it when you have no hard blocks to enforce.
 
-The proxy currently infers its schema directly from Go structs. Unknown top‑level keys cause a validation error.
+The proxy currently infers its schema directly from Go structs. Unknown YAML fields cause a validation error.
 
 > **Tip** The Go YAML parser accepts JSON too, so curl pipes / CI steps can build your config in whichever syntax is easier to template.
 For command-line tooling, see the [Command-Line Helpers](cli.md) guide.
@@ -52,10 +52,10 @@ See [Secret Back-Ends](secret-backends.md) for all supported URI schemes.
 | --------------- | -------------- | ------------ | ---------------------------------------------------------------------------- |
 | `destination`   | URL            | **required** | Base URL; path from client is appended as‑is. Supports `*` wildcards in the host (e.g. `https://*.example.com`) when paired with an `X-AT-Destination` header containing the concrete upstream URL. |
 | `outgoing_auth` | `[]PluginSpec` | `[]`         | Injects credential **before** forwarding.                         |
-| `incoming_auth` | `[]PluginSpec` | `[]`         | Zero or more validators that run **in order**; the first that succeeds wins. |
-| `in_rate_limit` | int            | `0`          | Max inbound requests per caller within the window. |
-| `out_rate_limit` | int           | `0`          | Max outbound requests per caller within the window. |
-| `rate_limit_window` | duration    | `1m`         | Rolling window length for rate limiting. |
+| `incoming_auth` | `[]PluginSpec` | `[]`         | Zero or more validators that run **in order**; every configured validator must succeed. |
+| `in_rate_limit` | int            | `0`          | Max inbound requests per caller ID, or client IP when no caller ID is available, within the window. |
+| `out_rate_limit` | int           | `0`          | Max outbound requests per integration host within the window. |
+| `rate_limit_window` | duration    | `1m`         | Window length for rate limiting. |
 | `rate_limit_strategy` | string    | `fixed_window` | Rate limit algorithm (`fixed_window`, `token_bucket`, or `leaky_bucket`). |
 | `idle_conn_timeout` | duration    | `90s`        | How long idle connections stay pooled. |
 | `tls_handshake_timeout` | duration | `10s`        | Maximum time to wait for TLS handshakes. |
@@ -96,6 +96,8 @@ Two ways to authorise a caller:
       # easiest: assign a capability
       capabilities:
         - name: post_as
+          params:
+            username: AuthTranslator
 
     - id: service‑42
       # granular example
@@ -150,7 +152,7 @@ authorised to use it.
 
 ## 3  `denylist.yaml` – request blockers
 
-Denylists complement allowlists by describing requests that must never be forwarded. Each entry targets an integration and groups `CallRule` objects (the same schema as allowlist rules) per caller ID—just like the allowlist. Provide specific IDs for callers you want to block or use `"*"`/omit the field for a wildcard block. If **any** rule matches a request for that caller, the proxy immediately returns **403 Forbidden**.
+Denylists describe requests that must never be forwarded. They are evaluated before allowlists, so a matching deny rule blocks the request even if an allowlist rule would otherwise permit it. Each entry targets an integration and groups `CallRule` objects (the same schema as allowlist rules) per caller ID. Provide specific IDs for callers you want to block or use `"*"`/omit the field for a wildcard block. If **any** rule matches a request for that caller, the proxy immediately returns **403 Forbidden**.
 
 ```yaml
 - integration: example
@@ -215,4 +217,3 @@ CI fails fast on typos so you never ship an invalid proxy.
 * [Auth Plugins](auth-plugins.md)
 * [Secret Back-Ends](secret-backends.md)
 * [Rate-Limiting](rate-limiting.md)
-

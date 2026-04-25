@@ -4,8 +4,8 @@ AuthTranslator ships with two small helper binaries under **`cmd/`**:
 
 | Binary         | Purpose                                       | Typical usage                                     |
 | -------------- | --------------------------------------------- | ------------------------------------------------- |
-| `integrations` | Modify or inspect *config.yaml*. | `go run ./cmd/integrations slack -file config.yaml -token env:SLACK_TOKEN -signing-secret env:SLACK_SIGNING` |
-| `allowlist`    | Modify or inspect *allowlist.yaml*.           | `go run ./cmd/allowlist add -integration slack -caller bot -capability post_as` |
+| `integrations` | Modify or inspect *config.yaml*. | `go run ./cmd/integrations -file config.yaml slack -token env:SLACK_TOKEN -signing-secret env:SLACK_SIGNING` |
+| `allowlist`    | Modify or inspect *allowlist.yaml*.           | `go run ./cmd/allowlist -file allowlist.yaml add -integration slack -caller bot -capability post_as` |
 These helpers complement the [Configuration Reference](configuration-overview.md) and [Allowlist Configuration](allowlist-yaml.md) docs.
 
 > **Heads‑up** Both helpers are thin wrappers around Go structs—check the `--help` output for the definitive flag list because the CLI evolves alongside the schema.
@@ -17,8 +17,8 @@ These helpers complement the [Configuration Reference](configuration-overview.md
 You can run directly with `go run`, but for faster iteration:
 
 ```bash
-go install ./cmd/integrations@latest
-go install ./cmd/allowlist@latest
+go install ./cmd/integrations
+go install ./cmd/allowlist
 ```
 
 Make sure `$GOBIN` is on your `PATH`.
@@ -28,7 +28,7 @@ Make sure `$GOBIN` is on your `PATH`.
 ## 2  `integrations` helper
 
 ```text
-integrations <command> [flags]
+integrations [options] <command> [plugin options]
 ```
 
 ### Common commands
@@ -42,12 +42,11 @@ integrations <command> [flags]
 
 ```bash
 # Add a Slack integration from env vars
-go run ./cmd/integrations slack \
-  -file config.yaml \
+go run ./cmd/integrations -file config.yaml slack \
   -token env:SLACK_TOKEN -signing-secret env:SLACK_SIGNING
 
 # Delete an integration
-go run ./cmd/integrations delete slack -file config.yaml
+go run ./cmd/integrations -file config.yaml delete slack
 ```
 
 #### Flags
@@ -59,14 +58,14 @@ go run ./cmd/integrations delete slack -file config.yaml
 ## 3  `allowlist` helper
 
 ```text
-allowlist <command> [flags]
+allowlist [options] <command> [command flags]
 ```
 
 ### Common commands
 
 | Command  | Purpose                                              |
 | -------- | ---------------------------------------------------- |
-| `list`   | Show capabilities provided by integration plugins.   |
+| `list`   | Show capabilities known to the allowlist helper.     |
 | `add`    | Append a capability entry to `allowlist.yaml`.       |
 | `remove` | Delete an entry from `allowlist.yaml`.               |
 
@@ -75,11 +74,11 @@ allowlist <command> [flags]
 go run ./cmd/allowlist list
 
 # Grant a caller permission
-go run ./cmd/allowlist add -integration slack \
+go run ./cmd/allowlist -file allowlist.yaml add -integration slack \
   -caller bot-123 -capability post_as
 
 # Revoke that permission
-go run ./cmd/allowlist remove -integration slack \
+go run ./cmd/allowlist -file allowlist.yaml remove -integration slack \
   -caller bot-123 -capability post_as
 ```
 
@@ -93,8 +92,8 @@ go run ./cmd/allowlist remove -integration slack \
 | `-capability`  | –                | Capability name for `add`/`remove`. |
 | `-params`      | ""               | Extra `key=value` pairs for `add` (optional). |
 
-`allowlist list` prints the capability names registered by each integration plug-in
-and the parameter keys they expect. It does **not** read `allowlist.yaml`; the
+`allowlist list` prints the capability names known to the allowlist helper
+and the parameter keys it knows about. It does **not** read `allowlist.yaml`; the
 command is purely a discovery tool to help you decide which capability name and
 parameter keys to pass to `add`.
 
@@ -108,15 +107,15 @@ then touch up the generated YAML manually to insert arrays or nested objects.
 
 ## 4  Using helpers in CI
 
-A minimal **GitHub Actions** snippet that checks both files on every PR:
+A minimal **GitHub Actions** snippet that checks helper-readable config and lists helper-supported capabilities:
 
 ```yaml
 - name: Validate AuthTranslator config
   run: |
-    go run ./cmd/integrations list
+    go run ./cmd/integrations -file config.yaml list
     go run ./cmd/allowlist list
 ```
 
-Fail‑fast means broken YAML never reaches production.
+The `integrations` helper reads `config.yaml` using the helper's supported integration fields, so use schema or application startup validation for full runtime config coverage.
 
 If you template configs (e.g., with CUE or Helm), call the helpers *after* rendering so you lint the final artifacts.

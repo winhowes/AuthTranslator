@@ -1,17 +1,15 @@
 # Rate‑Limiting
 
-AuthTranslator defaults to a **fixed‑window counter with elastic expiry** (aka *sliding window approximation*). Limits apply **per‑caller ID per integration** so noisy neighbours can’t starve other users of the same upstream service. The schema allows choosing between `fixed_window`, `token_bucket`, and `leaky_bucket` strategies for different workloads.
+AuthTranslator defaults to a **fixed-window counter**. Inbound limits apply per integration and caller ID, or per integration and client IP when no caller ID is available. Outbound limits apply per integration host. The schema allows choosing between `fixed_window`, `token_bucket`, and `leaky_bucket` strategies for different workloads.
 
 ---
 
 ## How it works
 
-1. When a request is authorised, the proxy builds a key: `<callerID>:<integration>`. If none of the inbound auth methods provide a caller ID, the client’s IP address is used instead.
+1. After incoming auth succeeds, the proxy builds an inbound key from the integration and caller ID. If none of the inbound auth methods provide a caller ID, the client IP address is used instead.
 2. It increments a counter in the chosen backend (**memory** or **Redis**).
 3. If the counter ≤ *N* → continue. If it would exceed *N* → reject with **429**.
-4. The counter’s TTL is extended to `window` seconds every time it’s incremented (elastic expiry).
-
-This approximates a smooth sliding window while touching Redis once per request.
+4. It separately checks the outbound limit using the integration host as the key.
 
 ---
 
@@ -27,9 +25,9 @@ integrations:
 
 | Field               | Type     | Default | Notes |
 | ------------------- | -------- | ------- | ------------------------------------------- |
-| `in_rate_limit`     | int      | `0`     | Max inbound requests per caller within the window. |
-| `out_rate_limit`    | int      | `0`     | Max outbound requests per caller within the window. |
-| `rate_limit_window` | duration | `1m`    | Rolling window length for rate limiting. |
+| `in_rate_limit`     | int      | `0`     | Max inbound requests per caller ID, or client IP when no caller ID is available, within the window. |
+| `out_rate_limit`    | int      | `0`     | Max outbound requests per integration host within the window. |
+| `rate_limit_window` | duration | `1m`    | Window length for rate limiting. |
 | `rate_limit_strategy` | string | `fixed_window` | Algorithm to apply (`fixed_window`, `token_bucket`, or `leaky_bucket`). |
 
 ### Strategies
@@ -60,7 +58,7 @@ requests = ceiling( peak_rps × window_seconds )
 
 Example: If a caller peaks at 12 RPS and you choose a 60 s window → `12 × 60 = 720` → round up to 800.
 
-> Elastic expiry smooths bursts within the window, but if you see 5 × steady‑state spikes (e.g., cron jobs) pick a larger bucket or smaller window.
+> For bursty workloads, consider `token_bucket` or `leaky_bucket` instead of raising a fixed-window limit far above steady-state traffic.
 
 ---
 
@@ -75,7 +73,7 @@ When a request is throttled the proxy sets a `Retry‑After` header with the num
 * **Structured log** when a request is throttled:
 
   ```json
-  {"level":"WARN","msg":"rate‑limit exceeded","caller_id":"bot‑123","integration":"slack","limit":800,"window":"60s"}
+  {"level":"WARN","msg":"caller exceeded rate limit","caller":"bot-123","host":"slack"}
   ```
 * Prometheus: `authtranslator_rate_limit_events_total{integration="slack"}`
 

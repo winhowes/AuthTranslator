@@ -10,7 +10,7 @@ Welcome to **AuthTranslator**! In a couple of minutes you’ll have a running pr
 | ------------------------------------------ | ------------------------------------------------------------------------- |
 | **Docker ≥ 24**                            | Easiest way to run the proxy without installing Go.                       |
 | **Slack app token** (`SLACK_TOKEN`)        | Long‑lived token with `chat:write` scope.                                 |
-| *(Optional)* **Go 1.24+**                  | Only needed if you’d like to run from source.                             |
+| *(Optional)* **Go 1.26.2+**                | Only needed if you’d like to run from source.                             |
 
 > **Tip** A personal workspace app is fine for testing.
 
@@ -31,7 +31,7 @@ docker run --rm -p 8080:8080 \
 `config.yaml` defines which integrations are available, `allowlist.yaml` controls which callers may use them, and
 `denylist.yaml` lists requests that should always be rejected.
 
-When the service starts it prints its version and log level to standard output.
+The service validates the configuration during startup and exits before listening if it finds an error.
 
 ---
 

@@ -66,7 +66,7 @@ graph LR
 
 ## 📄 Configuration overview
 
-AuthTranslator eats **YAML** (or pure JSON) for two files:
+AuthTranslator eats **YAML** (or pure JSON) for three files:
 
 | File             | Purpose                                                                                               |
 | ---------------- | ----------------------------------------------------------------------------------------------------- |
@@ -84,7 +84,7 @@ Secrets can be pulled from several providers:
 * **file:** path to an on‑disk file
 * **k8s:** Kubernetes secrets
 * **gcp:** Google Cloud KMS
-* **aws:** AWS Secrets Manager
+* **aws:** AES-GCM encrypted values using `AWS_KMS_KEY`
 * **azure:** Azure Key Vault
 * **vault:** HashiCorp Vault
 
@@ -112,7 +112,7 @@ Also see [`cmd/allowlist`](cmd/allowlist) for CRUD operations on the allowlist.
 | Endpoint                | Purpose                                                                |
 | ----------------------- | ---------------------------------------------------------------------- |
 | `/_at_internal/healthz` | Liveness probe – returns **200 OK** when the proxy is running.         |
-| `/_at_internal/metrics` | Prometheus metrics (request totals, status codes, latency, rate‑limit and auth failures plus Go runtime metrics). |
+| `/_at_internal/metrics` | Prometheus metrics for request totals, status codes, latency, rate-limit events, auth failures, and proxy-generated responses. |
 | Structured logs         | Text by default; pass `-log-format json` for JSON via `slog`. Includes method, integration, path, status; adds `caller_id` when known. |
 
 Official container images include a Docker HEALTHCHECK that polls the health endpoint; the container reports **healthy** once it returns 200.
