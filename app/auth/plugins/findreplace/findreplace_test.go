@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	authplugins "github.com/winhowes/AuthTranslator/app/auth"
 	"github.com/winhowes/AuthTranslator/app/secrets"
 	_ "github.com/winhowes/AuthTranslator/app/secrets/plugins"
 )
@@ -97,6 +98,66 @@ func TestFindReplaceAddAuthNoMatch(t *testing.T) {
 	b, _ := io.ReadAll(r.Body)
 	if string(b) != "bar" {
 		t.Fatalf("body changed: %q", string(b))
+	}
+}
+
+func TestFindReplaceAddAuthUpdatesCachedBody(t *testing.T) {
+	r := &http.Request{
+		URL:    &url.URL{Path: "/"},
+		Header: http.Header{},
+		Body:   io.NopCloser(strings.NewReader("body PLACE")),
+	}
+	p := FindReplace{}
+	t.Setenv("FIND", "PLACE")
+	t.Setenv("REP", "SECRET")
+	cfg, err := p.ParseParams(map[string]interface{}{"find_secret": "env:FIND", "replace_secret": "env:REP"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if body, err := authplugins.GetBody(r); err != nil || string(body) != "body PLACE" {
+		t.Fatalf("cached body setup failed: %q %v", string(body), err)
+	}
+
+	if err := p.AddAuth(context.Background(), r, cfg); err != nil {
+		t.Fatal(err)
+	}
+
+	cached, err := authplugins.GetBody(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(cached) != "body SECRET" {
+		t.Fatalf("cached body not updated: %q", string(cached))
+	}
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(body) != "body SECRET" {
+		t.Fatalf("request body not updated: %q", string(body))
+	}
+}
+
+func TestFindReplaceAddAuthPreservesMaxBodySize(t *testing.T) {
+	old := authplugins.MaxBodySize
+	authplugins.MaxBodySize = int64(len("body SECRET") - 1)
+	defer func() { authplugins.MaxBodySize = old }()
+
+	r := &http.Request{
+		URL:    &url.URL{Path: "/"},
+		Header: http.Header{},
+		Body:   io.NopCloser(strings.NewReader("body PLACE")),
+	}
+	p := FindReplace{}
+	t.Setenv("FIND", "PLACE")
+	t.Setenv("REP", "SECRET")
+	cfg, err := p.ParseParams(map[string]interface{}{"find_secret": "env:FIND", "replace_secret": "env:REP"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := p.AddAuth(context.Background(), r, cfg); err != authplugins.ErrBodyTooLarge {
+		t.Fatalf("expected ErrBodyTooLarge, got %v", err)
 	}
 }
 

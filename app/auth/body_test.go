@@ -50,6 +50,46 @@ func TestGetBodyCachesAndResets(t *testing.T) {
 	}
 }
 
+func TestSetBodyUpdatesCacheAndResetsBody(t *testing.T) {
+	r := httptest.NewRequest(http.MethodPost, "http://example.com", bytes.NewBufferString("hello"))
+	if _, err := GetBody(r); err != nil {
+		t.Fatalf("unexpected setup error: %v", err)
+	}
+
+	if err := SetBody(r, []byte("updated")); err != nil {
+		t.Fatalf("unexpected set body error: %v", err)
+	}
+
+	cached, err := GetBody(r)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if string(cached) != "updated" {
+		t.Fatalf("expected cached body 'updated', got %q", string(cached))
+	}
+	readBack, err := io.ReadAll(r.Body)
+	if err != nil {
+		t.Fatalf("unexpected read error: %v", err)
+	}
+	if string(readBack) != "updated" {
+		t.Fatalf("expected request body 'updated', got %q", string(readBack))
+	}
+	if r.ContentLength != int64(len("updated")) {
+		t.Fatalf("expected content length %d, got %d", len("updated"), r.ContentLength)
+	}
+}
+
+func TestSetBodyPreservesMaxBodySize(t *testing.T) {
+	old := MaxBodySize
+	MaxBodySize = 5
+	defer func() { MaxBodySize = old }()
+
+	r := httptest.NewRequest(http.MethodPost, "http://example.com", bytes.NewBufferString("hello"))
+	if err := SetBody(r, []byte("abcdef")); !errors.Is(err, ErrBodyTooLarge) {
+		t.Fatalf("expected ErrBodyTooLarge, got %v", err)
+	}
+}
+
 func TestGetBodyReadError(t *testing.T) {
 	r := httptest.NewRequest(http.MethodPost, "http://example.com", nil)
 	r.Body = errReadCloser{}
