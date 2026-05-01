@@ -46,6 +46,7 @@ type cachedToken struct {
 	accessToken  string
 	refreshToken string
 	exp          time.Time
+	refreshAt    time.Time
 }
 
 var tokenCache = struct {
@@ -206,7 +207,30 @@ func (o *OAuth2) AddAuth(ctx context.Context, r *http.Request, params interface{
 }
 
 func tokenNeedsRefresh(ct cachedToken) bool {
-	return ct.accessToken == "" || time.Now().After(ct.exp.Add(-refreshSkew))
+	if ct.accessToken == "" {
+		return true
+	}
+	now := time.Now()
+	refreshAt := ct.refreshAt
+	if refreshAt.IsZero() {
+		refreshAt = tokenRefreshTime(now, ct.exp)
+	}
+	return !now.Before(refreshAt)
+}
+
+func tokenRefreshTime(now, exp time.Time) time.Time {
+	ttl := exp.Sub(now)
+	if ttl <= 0 {
+		return now
+	}
+	skew := ttl / 10
+	if skew > refreshSkew {
+		skew = refreshSkew
+	}
+	if skew <= 0 {
+		return exp
+	}
+	return exp.Add(-skew)
 }
 
 func fetchToken(ctx context.Context, cfg *oauth2Params, cachedRefreshToken string) (cachedToken, error) {
@@ -282,10 +306,13 @@ func fetchToken(ctx context.Context, cfg *oauth2Params, cachedRefreshToken strin
 		return cachedToken{}, fmt.Errorf("empty access token")
 	}
 
+	now := time.Now()
+	exp := now.Add(parseExpiresIn(tr.ExpiresIn))
 	return cachedToken{
 		accessToken:  tr.AccessToken,
 		refreshToken: tr.RefreshToken,
-		exp:          time.Now().Add(parseExpiresIn(tr.ExpiresIn)),
+		exp:          exp,
+		refreshAt:    tokenRefreshTime(now, exp),
 	}, nil
 }
 

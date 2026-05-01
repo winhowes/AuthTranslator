@@ -182,7 +182,23 @@ func TestOAuth2RefreshesEarlyAndUsesRotatedRefreshToken(t *testing.T) {
 	if err := p.AddAuth(context.Background(), r2, cfg); err != nil {
 		t.Fatal(err)
 	}
-	if got := r2.Header.Get("Authorization"); got != "Bearer new" {
+	if got := r2.Header.Get("Authorization"); got != "Bearer old" {
+		t.Fatalf("short-lived token should be cached before refresh window, got %q", got)
+	}
+	if got := atomic.LoadInt32(&hits); got != 1 {
+		t.Fatalf("expected short-lived token to be cached, got %d token requests", got)
+	}
+
+	key := parsed.cacheKey()
+	ct := getCachedToken(key)
+	ct.refreshAt = time.Now().Add(-time.Second)
+	setCachedToken(key, ct)
+
+	r3 := &http.Request{Header: http.Header{}}
+	if err := p.AddAuth(context.Background(), r3, cfg); err != nil {
+		t.Fatal(err)
+	}
+	if got := r3.Header.Get("Authorization"); got != "Bearer new" {
 		t.Fatalf("unexpected refreshed header %q", got)
 	}
 }
@@ -235,6 +251,12 @@ func TestOAuth2SerializesConcurrentRefresh(t *testing.T) {
 	if got := first.Header.Get("Authorization"); got != "Bearer old" {
 		t.Fatalf("unexpected first token %q", got)
 	}
+
+	parsed := cfg.(*oauth2Params)
+	key := parsed.cacheKey()
+	ct := getCachedToken(key)
+	ct.refreshAt = time.Now().Add(-time.Second)
+	setCachedToken(key, ct)
 
 	const workers = 8
 	errs := make(chan error, workers)
@@ -640,6 +662,35 @@ func TestOAuth2DefaultExpiry(t *testing.T) {
 	}
 	if got := parseExpiresIn([]byte(`{}`)); got != time.Minute {
 		t.Fatalf("unexpected object fallback expiry: %s", got)
+	}
+}
+
+func TestOAuth2TokenRefreshTime(t *testing.T) {
+	now := time.Unix(1000, 0)
+
+	if got := tokenRefreshTime(now, now.Add(-time.Second)); !got.Equal(now) {
+		t.Fatalf("expired token should refresh now, got %s", got)
+	}
+	if got := tokenRefreshTime(now, now.Add(time.Nanosecond)); !got.Equal(now.Add(time.Nanosecond)) {
+		t.Fatalf("sub-nanosecond skew should refresh at expiry, got %s", got)
+	}
+	if got := tokenRefreshTime(now, now.Add(30*time.Second)); !got.Equal(now.Add(27 * time.Second)) {
+		t.Fatalf("short-lived token refreshAt should use proportional skew, got %s", got)
+	}
+	if got := tokenRefreshTime(now, now.Add(time.Hour)); !got.Equal(now.Add(59 * time.Minute)) {
+		t.Fatalf("long-lived token refreshAt should cap skew, got %s", got)
+	}
+}
+
+func TestOAuth2TokenNeedsRefreshWithComputedRefreshAt(t *testing.T) {
+	if !tokenNeedsRefresh(cachedToken{}) {
+		t.Fatal("empty cached token should refresh")
+	}
+	if tokenNeedsRefresh(cachedToken{accessToken: "tok", exp: time.Now().Add(30 * time.Second)}) {
+		t.Fatal("short-lived token should not refresh immediately when refreshAt is absent")
+	}
+	if !tokenNeedsRefresh(cachedToken{accessToken: "tok", exp: time.Now().Add(-time.Second)}) {
+		t.Fatal("expired token should refresh when refreshAt is absent")
 	}
 }
 
