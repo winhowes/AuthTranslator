@@ -290,6 +290,71 @@ func TestOAuth2SerializesConcurrentRefresh(t *testing.T) {
 	}
 }
 
+func TestOAuth2PreRefreshFailureUsesCachedToken(t *testing.T) {
+	resetCache()
+	t.Setenv("CLIENT_SECRET", "secret")
+
+	var hits int32
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch atomic.AddInt32(&hits, 1) {
+		case 1:
+			fmt.Fprint(w, `{"access_token":"cached","expires_in":3600}`)
+		default:
+			http.Error(w, "temporary token endpoint failure", http.StatusServiceUnavailable)
+		}
+	}))
+	defer ts.Close()
+	withTestClient(t, ts.Client())
+
+	p := OAuth2{}
+	cfg, err := p.ParseParams(map[string]interface{}{
+		"token_url":     ts.URL,
+		"client_id":     "client",
+		"client_secret": "env:CLIENT_SECRET",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	first := &http.Request{Header: http.Header{}}
+	if err := p.AddAuth(context.Background(), first, cfg); err != nil {
+		t.Fatal(err)
+	}
+	if got := first.Header.Get("Authorization"); got != "Bearer cached" {
+		t.Fatalf("unexpected first token %q", got)
+	}
+
+	parsed := cfg.(*oauth2Params)
+	key := parsed.cacheKey()
+	ct := getCachedToken(key)
+	ct.refreshAt = time.Now().Add(-time.Second)
+	setCachedToken(key, ct)
+
+	fallback := &http.Request{Header: http.Header{}}
+	if err := p.AddAuth(context.Background(), fallback, cfg); err != nil {
+		t.Fatalf("expected cached token fallback, got %v", err)
+	}
+	if got := fallback.Header.Get("Authorization"); got != "Bearer cached" {
+		t.Fatalf("expected cached token fallback, got %q", got)
+	}
+	if got := atomic.LoadInt32(&hits); got != 2 {
+		t.Fatalf("expected failed pre-refresh attempt, got %d token requests", got)
+	}
+
+	ct = getCachedToken(key)
+	ct.exp = time.Now().Add(-time.Second)
+	ct.refreshAt = time.Now().Add(-time.Second)
+	setCachedToken(key, ct)
+
+	expired := &http.Request{Header: http.Header{}}
+	if err := p.AddAuth(context.Background(), expired, cfg); err == nil {
+		t.Fatal("expected refresh error after cached token expiry")
+	}
+	if got := expired.Header.Get("Authorization"); got != "" {
+		t.Fatalf("expected no header after expired-token refresh failure, got %q", got)
+	}
+}
+
 func TestOAuth2ClientCredentialsBasicAuth(t *testing.T) {
 	resetCache()
 	t.Setenv("CLIENT_SECRET", "secret")
@@ -691,6 +756,19 @@ func TestOAuth2TokenNeedsRefreshWithComputedRefreshAt(t *testing.T) {
 	}
 	if !tokenNeedsRefresh(cachedToken{accessToken: "tok", exp: time.Now().Add(-time.Second)}) {
 		t.Fatal("expired token should refresh when refreshAt is absent")
+	}
+}
+
+func TestOAuth2TokenUsable(t *testing.T) {
+	now := time.Now()
+	if tokenUsable(cachedToken{}, now) {
+		t.Fatal("empty token should not be usable")
+	}
+	if tokenUsable(cachedToken{accessToken: "tok", exp: now}, now) {
+		t.Fatal("token at expiry should not be usable")
+	}
+	if !tokenUsable(cachedToken{accessToken: "tok", exp: now.Add(time.Second)}, now) {
+		t.Fatal("unexpired token should be usable")
 	}
 }
 

@@ -193,6 +193,10 @@ func (o *OAuth2) AddAuth(ctx context.Context, r *http.Request, params interface{
 
 		next, err := fetchToken(ctx, cfg, ct.refreshToken)
 		if err != nil {
+			if tokenUsable(ct, time.Now()) {
+				r.Header.Set(cfg.Header, cfg.Prefix+ct.accessToken)
+				return nil
+			}
 			return err
 		}
 		if next.refreshToken == "" {
@@ -204,6 +208,10 @@ func (o *OAuth2) AddAuth(ctx context.Context, r *http.Request, params interface{
 
 	r.Header.Set(cfg.Header, cfg.Prefix+ct.accessToken)
 	return nil
+}
+
+func tokenUsable(ct cachedToken, now time.Time) bool {
+	return ct.accessToken != "" && now.Before(ct.exp)
 }
 
 func tokenNeedsRefresh(ct cachedToken) bool {
