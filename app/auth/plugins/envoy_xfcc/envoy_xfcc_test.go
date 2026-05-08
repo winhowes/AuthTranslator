@@ -106,6 +106,25 @@ func TestEnvoyXFCCAuthenticateSuccessDoesNotLogHeaders(t *testing.T) {
 	}
 }
 
+func TestEnvoyXFCCAuthenticateInvalidParamsFails(t *testing.T) {
+	p := EnvoyXFCCAuth{}
+	if p.Authenticate(context.Background(), nil, struct{}{}) {
+		t.Fatal("expected invalid params to fail")
+	}
+}
+
+func TestEnvoyXFCCIdentifyExtractionFailure(t *testing.T) {
+	p := EnvoyXFCCAuth{}
+	cfg, err := p.ParseParams(map[string]interface{}{"allowed_uris": []string{"spiffe://allowed"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	id, ok := p.Identify(&http.Request{Header: http.Header{}}, cfg)
+	if ok || id != "" {
+		t.Fatalf("expected identify failure, got id=%q ok=%v", id, ok)
+	}
+}
+
 func TestEnvoyXFCCMultipleNonIgnoredURIsFails(t *testing.T) {
 	p := EnvoyXFCCAuth{}
 	cfg, err := p.ParseParams(map[string]interface{}{"allowed_uri_prefixes": []string{"spiffe://"}})
