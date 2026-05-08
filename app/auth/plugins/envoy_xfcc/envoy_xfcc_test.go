@@ -1,10 +1,16 @@
 package envoy_xfcc
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
+
+	authplugins "github.com/winhowes/AuthTranslator/app/auth"
 )
 
 func TestEnvoyXFCCSingleElementAllowed(t *testing.T) {
@@ -40,6 +46,63 @@ func TestEnvoyXFCCDisallowedURIFails(t *testing.T) {
 	r := &http.Request{Header: http.Header{"X-Forwarded-Client-Cert": []string{"URI=spiffe://denied"}}}
 	if p.Authenticate(context.Background(), r, cfg) {
 		t.Fatal("expected disallowed uri to fail")
+	}
+}
+
+func TestEnvoyXFCCAuthenticateFailureLogsHeaders(t *testing.T) {
+	var buf bytes.Buffer
+	oldLogger := authplugins.SetLogger(slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	t.Cleanup(func() { authplugins.SetLogger(oldLogger) })
+
+	p := EnvoyXFCCAuth{}
+	cfg, err := p.ParseParams(map[string]interface{}{"allowed_uris": []string{"spiffe://allowed"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := httptest.NewRequest(http.MethodGet, "https://internal.example/resource", nil)
+	r.Header.Add("X-Forwarded-Client-Cert", "URI=spiffe://denied")
+	r.Header.Add("X-Forwarded-Client-Cert", "URI=spiffe://also-denied")
+	r.Header.Set("X-Debug-Header", "debug-value")
+
+	if p.Authenticate(context.Background(), r, cfg) {
+		t.Fatal("expected authentication to fail")
+	}
+
+	got := buf.String()
+	for _, want := range []string{
+		`"msg":"envoy_xfcc authentication failed"`,
+		`"reason":"authentication_failed"`,
+		`"configured_header":"X-Forwarded-Client-Cert"`,
+		"X-Forwarded-Client-Cert",
+		"spiffe://denied",
+		"spiffe://also-denied",
+		"X-Debug-Header",
+		"debug-value",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("expected log to contain %q; got %s", want, got)
+		}
+	}
+}
+
+func TestEnvoyXFCCAuthenticateSuccessDoesNotLogHeaders(t *testing.T) {
+	var buf bytes.Buffer
+	oldLogger := authplugins.SetLogger(slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	t.Cleanup(func() { authplugins.SetLogger(oldLogger) })
+
+	p := EnvoyXFCCAuth{}
+	cfg, err := p.ParseParams(map[string]interface{}{"allowed_uris": []string{"spiffe://allowed"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := httptest.NewRequest(http.MethodGet, "https://internal.example/resource", nil)
+	r.Header.Set("X-Forwarded-Client-Cert", "URI=spiffe://allowed")
+
+	if !p.Authenticate(context.Background(), r, cfg) {
+		t.Fatal("expected authentication to succeed")
+	}
+	if got := buf.String(); got != "" {
+		t.Fatalf("expected no auth failure log, got %s", got)
 	}
 }
 
