@@ -1,7 +1,9 @@
 package authplugins
 
 import (
+	"bytes"
 	"context"
+	"log/slog"
 	"net/http"
 	"testing"
 )
@@ -54,5 +56,22 @@ func TestRegistryIncomingOutgoing(t *testing.T) {
 	}
 	if GetOutgoing("missing") != nil {
 		t.Fatal("expected nil for unknown outgoing plugin")
+	}
+}
+
+func TestLoggerAccessors(t *testing.T) {
+	var buf bytes.Buffer
+	testLogger := slog.New(slog.NewTextHandler(&buf, nil))
+	previous := SetLogger(testLogger)
+	t.Cleanup(func() { SetLogger(previous) })
+
+	if got := Logger(); got != testLogger {
+		t.Fatal("expected configured logger")
+	}
+	if prev := SetLogger(nil); prev != testLogger {
+		t.Fatal("expected SetLogger to return previous logger")
+	}
+	if got := Logger(); got == nil || got == testLogger {
+		t.Fatal("expected nil logger to reset to discard logger")
 	}
 }

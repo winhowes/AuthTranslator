@@ -40,8 +40,16 @@ func (e *EnvoyXFCCAuth) ParseParams(m map[string]interface{}) (interface{}, erro
 }
 
 func (e *EnvoyXFCCAuth) Authenticate(ctx context.Context, r *http.Request, p interface{}) bool {
-	_, ok := e.Identify(r, p)
-	return ok
+	cfg, ok := p.(*inParams)
+	if !ok {
+		logAuthFailure(ctx, r, "", "invalid_params")
+		return false
+	}
+	if _, ok := extractCallerIdentityFromValues(r.Header.Values(cfg.Header), cfg); !ok {
+		logAuthFailure(ctx, r, cfg.Header, "authentication_failed")
+		return false
+	}
+	return true
 }
 
 func (e *EnvoyXFCCAuth) Identify(r *http.Request, p interface{}) (string, bool) {
@@ -62,6 +70,21 @@ func (e *EnvoyXFCCAuth) StripAuth(r *http.Request, p interface{}) {
 		return
 	}
 	r.Header.Del(cfg.Header)
+}
+
+func logAuthFailure(ctx context.Context, r *http.Request, header, reason string) {
+	headers := http.Header{}
+	if r != nil {
+		headers = r.Header.Clone()
+	}
+	attrs := []any{
+		"reason", reason,
+		"headers", headers,
+	}
+	if header != "" {
+		attrs = append(attrs, "configured_header", header)
+	}
+	authplugins.Logger().WarnContext(ctx, "envoy_xfcc authentication failed", attrs...)
 }
 
 func extractCallerIdentityFromValues(values []string, cfg *inParams) (string, bool) {

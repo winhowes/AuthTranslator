@@ -1564,6 +1564,7 @@ func main() {
 		handler = slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: parseLevel(*logLevel)})
 	}
 	logger = slog.New(handler)
+	authplugins.SetLogger(logger)
 
 	if err := reload(); err != nil {
 		log.Fatal(err)
