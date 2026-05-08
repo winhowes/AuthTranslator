@@ -73,16 +73,17 @@ func (e *EnvoyXFCCAuth) StripAuth(r *http.Request, p interface{}) {
 }
 
 func logAuthFailure(ctx context.Context, r *http.Request, header, reason string) {
-	headers := http.Header{}
-	if r != nil {
-		headers = r.Header.Clone()
-	}
 	attrs := []any{
 		"reason", reason,
-		"headers", headers,
 	}
 	if header != "" {
-		attrs = append(attrs, "configured_header", header)
+		headers := http.Header{}
+		if r != nil {
+			if values := r.Header.Values(header); len(values) > 0 {
+				headers[http.CanonicalHeaderKey(header)] = append([]string(nil), values...)
+			}
+		}
+		attrs = append(attrs, "configured_header", header, "headers", headers)
 	}
 	authplugins.Logger().WarnContext(ctx, "envoy_xfcc authentication failed", attrs...)
 }
