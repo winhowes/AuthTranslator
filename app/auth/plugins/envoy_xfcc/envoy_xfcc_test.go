@@ -49,7 +49,7 @@ func TestEnvoyXFCCDisallowedURIFails(t *testing.T) {
 	}
 }
 
-func TestEnvoyXFCCAuthenticateFailureLogsHeaders(t *testing.T) {
+func TestEnvoyXFCCAuthenticateFailureLogsConfiguredHeaderOnly(t *testing.T) {
 	var buf bytes.Buffer
 	oldLogger := authplugins.SetLogger(slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
 	t.Cleanup(func() { authplugins.SetLogger(oldLogger) })
@@ -76,11 +76,14 @@ func TestEnvoyXFCCAuthenticateFailureLogsHeaders(t *testing.T) {
 		"X-Forwarded-Client-Cert",
 		"spiffe://denied",
 		"spiffe://also-denied",
-		"X-Debug-Header",
-		"debug-value",
 	} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("expected log to contain %q; got %s", want, got)
+		}
+	}
+	for _, notWant := range []string{"X-Debug-Header", "debug-value"} {
+		if strings.Contains(got, notWant) {
+			t.Fatalf("expected log to omit %q; got %s", notWant, got)
 		}
 	}
 }
