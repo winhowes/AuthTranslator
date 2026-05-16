@@ -29,6 +29,10 @@ type paramRules interface {
 	OptionalParams() []string
 }
 
+type secretRefsProvider interface {
+	SecretRefs() []string
+}
+
 // validateRequired checks that all fields named in rules.RequiredParams()
 // are non-zero in v.  It assumes v has already been produced by the plugin’s
 // ParseParams, which should take care of “unknown field” errors by calling
@@ -83,18 +87,23 @@ func validateRequired(v interface{}, rules paramRules) error {
 	return nil
 }
 
-// collectSecretRefs returns any fields named "secrets" (case-insensitive) that
-// are slices of strings. It assumes cfg is a struct or pointer to struct.
+// collectSecretRefs returns plugin-declared secret refs plus any fields named
+// "secrets" (case-insensitive) that are slices of strings. It assumes cfg is a
+// struct or pointer to struct for reflective collection.
 func collectSecretRefs(cfg interface{}) []string {
+	var refs []string
+	if p, ok := cfg.(secretRefsProvider); ok {
+		refs = append(refs, p.SecretRefs()...)
+	}
+
 	rv := reflect.ValueOf(cfg)
 	if rv.Kind() == reflect.Pointer {
 		rv = rv.Elem()
 	}
 	if rv.Kind() != reflect.Struct {
-		return nil
+		return refs
 	}
 	rt := rv.Type()
-	var refs []string
 	for i := 0; i < rt.NumField(); i++ {
 		sf := rt.Field(i)
 		name := sf.Tag.Get("json")

@@ -34,6 +34,7 @@ AuthTranslator’s behaviour is extended by **plugins** – small Go packages th
 | Outbound  | `google_oidc`      | Attaches a Google identity token from the metadata service. |
 | Outbound  | `gcp_token`        | Uses a metadata service access token. |
 | Outbound  | `azure_managed_identity` | Retrieves an Azure access token from the Instance Metadata Service. |
+| Outbound  | `oauth2`           | Exchanges client credentials or a refresh token for an access token. |
 | Outbound  | `hmac_signature`   | Computes an HMAC for the request. |
 | Outbound  | `jwt`              | Adds a signed JWT to the request. |
 | Outbound  | `mtls`             | Sends a client certificate and exposes the CN via header. |
@@ -122,6 +123,30 @@ outgoing_auth:
 
 Obtains an access token from the Azure Instance Metadata Service for the specified `resource`, caches it, and attaches it to the
 configured header on each outgoing request.
+
+### Outbound `oauth2`
+
+```yaml
+outgoing_auth:
+  - type: oauth2
+    params:
+      token_url: https://auth.example.com/oauth/token
+      grant_type: refresh_token           # or client_credentials
+      client_id: my-client-id             # required for client_credentials
+      client_secret: env:OAUTH_SECRET     # secret reference
+      refresh_token: env:OAUTH_REFRESH    # secret reference for refresh_token grant
+      scope: "read write"                 # optional
+      audience: https://api.example.com   # optional
+      client_auth: body                   # body, basic, or none
+      header: Authorization               # optional (default: Authorization)
+      prefix: "Bearer "                   # optional (default: "Bearer ")
+      extra_params:                       # optional provider-specific token params
+        resource: https://resource.example.com
+```
+
+Requests an access token from the configured token endpoint, caches it, and refreshes it one minute before `expires_in`.
+For refresh-token flows, any rotated `refresh_token` returned by the provider is reused in memory until restart.
+`client_secret` and `refresh_token` must be secret references, not raw values.
 
 ---
 
